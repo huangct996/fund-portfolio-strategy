@@ -6,6 +6,69 @@ class PortfolioService {
   }
 
   /**
+   * 计算综合得分并分配权重
+   * @param {Array} stocks - 股票列表，包含市值、股息率、质量因子
+   * @param {Object} weights - 权重配置 {mvWeight, dvWeight, qualityWeight}
+   * @returns {Array} 带有综合得分和权重的股票列表
+   */
+  calculateCompositeScore(stocks, weights = {mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2}) {
+    const {mvWeight, dvWeight, qualityWeight} = weights;
+    
+    // 确保权重和为1
+    const totalWeight = mvWeight + dvWeight + qualityWeight;
+    const normalizedMvWeight = mvWeight / totalWeight;
+    const normalizedDvWeight = dvWeight / totalWeight;
+    const normalizedQualityWeight = qualityWeight / totalWeight;
+    
+    // 过滤掉无效数据
+    const validStocks = stocks.filter(s => s.marketValue > 0);
+    
+    if (validStocks.length === 0) {
+      return [];
+    }
+    
+    // 计算排名（值越大排名越高，排名分数越高）
+    // 市值排名
+    const sortedByMv = [...validStocks].sort((a, b) => b.marketValue - a.marketValue);
+    sortedByMv.forEach((stock, index) => {
+      stock.mvRank = validStocks.length - index;  // 排名分数：第1名得最高分
+    });
+    
+    // 股息率排名
+    const sortedByDv = [...validStocks].sort((a, b) => (b.dvRatio || 0) - (a.dvRatio || 0));
+    sortedByDv.forEach((stock, index) => {
+      stock.dvRank = validStocks.length - index;
+    });
+    
+    // 质量因子排名
+    const sortedByQuality = [...validStocks].sort((a, b) => (b.qualityFactor || 0) - (a.qualityFactor || 0));
+    sortedByQuality.forEach((stock, index) => {
+      stock.qualityRank = validStocks.length - index;
+    });
+    
+    // 计算综合得分（归一化排名分数）
+    validStocks.forEach(stock => {
+      const mvScore = stock.mvRank / validStocks.length;
+      const dvScore = stock.dvRank / validStocks.length;
+      const qualityScore = stock.qualityRank / validStocks.length;
+      
+      stock.compositeScore = 
+        mvScore * normalizedMvWeight + 
+        dvScore * normalizedDvWeight + 
+        qualityScore * normalizedQualityWeight;
+    });
+    
+    // 按综合得分分配权重
+    const totalScore = validStocks.reduce((sum, s) => sum + s.compositeScore, 0);
+    validStocks.forEach(stock => {
+      stock.adjustedWeight = stock.compositeScore / totalScore;
+      stock.isLimited = false;
+    });
+    
+    return validStocks.sort((a, b) => b.compositeScore - a.compositeScore);
+  }
+
+  /**
    * 调整组合权重（单只不超过maxWeight）
    */
   adjustWeights(holdings, maxWeight = 0.10) {
@@ -171,9 +234,20 @@ class PortfolioService {
   }
 
   /**
-   * 计算2025年中报持仓的收益率（完全复制持仓，按市值分配权重）
+   * 计算所有报告期持仓的收益率（支持综合得分策略）
+   * @param {string} fundCode - 基金代码
+   * @param {number} maxWeight - 单只股票最大权重
+   * @param {Object} options - 配置选项
+   * @param {Array} options.reportPeriods - 报告期列表，如['20250630']，空数组表示全部
+   * @param {Object} options.scoreWeights - 得分权重配置
+   * @param {boolean} options.useCompositeScore - 是否使用综合得分策略
    */
-  async calculateAllPeriodReturns(fundCode, maxWeight) {
+  async calculateAllPeriodReturns(fundCode, maxWeight, options = {}) {
+    const {
+      reportPeriods = [],  // 空数组表示使用全部报告期
+      scoreWeights = {mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2},
+      useCompositeScore = false
+    } = options;
     const holdings = await tushareService.getFundHoldings(fundCode);
     
     console.log(`获取到 ${holdings.length} 条持仓记录`);
@@ -191,27 +265,52 @@ class PortfolioService {
       groupedHoldings[h.end_date].push(h);
     });
 
-    // 只保留2025年中报（20250630）
+    // 筛选报告期
     const allReportDates = Object.keys(groupedHoldings).sort();
-    const reportDates = allReportDates.filter(date => date === '20250630');
+    let selectedReportDates;
     
-    console.log(`所有报告期: ${allReportDates.join(', ')}`);
-    console.log(`2025年中报: ${reportDates.join(', ')}`);
+    if (reportPeriods && reportPeriods.length > 0) {
+      // 使用用户指定的报告期
+      selectedReportDates = allReportDates.filter(date => reportPeriods.includes(date));
+      console.log(`所有报告期: ${allReportDates.join(', ')}`);
+      console.log(`选择的报告期: ${selectedReportDates.join(', ')}`);
+    } else {
+      // 使用全部报告期
+      selectedReportDates = allReportDates;
+      console.log(`使用全部 ${selectedReportDates.length} 个报告期: ${selectedReportDates.join(', ')}`);
+    }
     
     const results = [];
 
-    console.log('\n开始计算2024-2025年各报告期收益率\n');
+    console.log('\n开始计算各报告期收益率\n');
 
-    for (let i = 0; i < reportDates.length; i++) {
-      const reportDate = reportDates[i];
+    for (let i = 0; i < selectedReportDates.length; i++) {
+      const reportDate = selectedReportDates[i];
       const reportHoldings = groupedHoldings[reportDate];
 
-      // 2025年中报披露日期为2025-08-28，从披露后第一个交易日开始
-      const startDate = '20250828';  // 中报披露日
+      // 根据报告期计算披露日期（一般是报告期后2个月）
+      const year = reportDate.substring(0, 4);
+      const month = reportDate.substring(4, 6);
+      let disclosureDate;
+      
+      if (month === '03') {  // 一季报，4月底披露
+        disclosureDate = `${year}0430`;
+      } else if (month === '06') {  // 中报，8月底披露
+        disclosureDate = `${year}0828`;
+      } else if (month === '09') {  // 三季报，10月底披露
+        disclosureDate = `${year}1031`;
+      } else if (month === '12') {  // 年报，次年4月底披露
+        const nextYear = parseInt(year) + 1;
+        disclosureDate = `${nextYear}0430`;
+      } else {
+        disclosureDate = reportDate;
+      }
+      
+      const startDate = disclosureDate;
       const today = new Date();
       const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
 
-      console.log(`\n2025年中报持仓: ${reportDate}`);
+      console.log(`\n报告期: ${reportDate}`);
       console.log(`计算时间段: ${startDate} -> ${endDate}`);
 
       try {
@@ -226,19 +325,24 @@ class PortfolioService {
         // 计算原始权重（基金持仓市值）
         const totalOriginalMkv = reportHoldings.reduce((sum, h) => sum + (h.mkv || 0), 0);
         
-        // 按股票市值重新分配权重
+        // 构建股票数据
         let totalMarketValue = 0;
         const portfolioWithMv = reportHoldings.map(h => {
           const tsCode = h.symbol.includes('.') ? h.symbol : 
                         (h.symbol.startsWith('6') || h.symbol.startsWith('5')) ? 
                         `${h.symbol}.SH` : `${h.symbol}.SZ`;
-          const mv = stockInfo[tsCode]?.totalMv || 0;
+          const info = stockInfo[tsCode] || {};
+          const mv = info.totalMv || 0;
           totalMarketValue += mv;
           return {
             symbol: h.symbol,
-            name: stockInfo[tsCode]?.name || h.symbol,
+            name: info.name || h.symbol,
             originalMkv: h.mkv || 0,
             marketValue: mv,
+            dvRatio: info.dvRatio || 0,
+            qualityFactor: info.qualityFactor || 0,
+            peTtm: info.peTtm || 0,
+            pb: info.pb || 0,
             originalWeight: (h.mkv || 0) / totalOriginalMkv,
             adjustedWeight: 0,
             isLimited: false
@@ -249,14 +353,21 @@ class PortfolioService {
         
         // 只保留有市值数据的股票
         const validPortfolio = portfolioWithMv.filter(p => p.marketValue > 0);
-        const validTotalMv = validPortfolio.reduce((sum, p) => sum + p.marketValue, 0);
         
-        // 按市值分配初始权重
-        let portfolioWithWeights = validPortfolio.map(p => ({
-          ...p,
-          adjustedWeight: p.marketValue / validTotalMv,
-          isLimited: false
-        })).sort((a, b) => b.adjustedWeight - a.adjustedWeight);
+        // 根据策略分配权重
+        let portfolioWithWeights;
+        if (useCompositeScore) {
+          console.log(`使用综合得分策略 - 市值权重:${scoreWeights.mvWeight}, 股息率权重:${scoreWeights.dvWeight}, 质量因子权重:${scoreWeights.qualityWeight}`);
+          portfolioWithWeights = this.calculateCompositeScore(validPortfolio, scoreWeights);
+        } else {
+          console.log(`使用市值加权策略`);
+          const validTotalMv = validPortfolio.reduce((sum, p) => sum + p.marketValue, 0);
+          portfolioWithWeights = validPortfolio.map(p => ({
+            ...p,
+            adjustedWeight: p.marketValue / validTotalMv,
+            isLimited: false
+          })).sort((a, b) => b.adjustedWeight - a.adjustedWeight);
+        }
         
         // 应用10%权重上限限制
         const maxWeight = this.maxWeight;
@@ -343,6 +454,14 @@ class PortfolioService {
               originalWeight: p.originalWeight,
               adjustedWeight: p.adjustedWeight,
               marketValue: p.marketValue,
+              dvRatio: p.dvRatio,
+              qualityFactor: p.qualityFactor,
+              peTtm: p.peTtm,
+              pb: p.pb,
+              compositeScore: p.compositeScore,
+              mvRank: p.mvRank,
+              dvRank: p.dvRank,
+              qualityRank: p.qualityRank,
               isLimited: p.isLimited,
               mkv: p.originalMkv
             })),

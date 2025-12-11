@@ -276,6 +276,156 @@ tbody tr:hover {
     border-left: 4px solid var(--danger-color);
 }
 
+/* 配置面板样式 */
+.config-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: var(--bg-color);
+    border-radius: 8px;
+}
+
+.config-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.period-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.period-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+    padding: 15px;
+    background: white;
+    border-radius: 6px;
+}
+
+.period-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.period-checkboxes input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.strategy-selector {
+    display: flex;
+    gap: 30px;
+}
+
+.strategy-selector label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.strategy-selector input[type="radio"] {
+    cursor: pointer;
+}
+
+.weight-config {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.weight-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.weight-item label {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+}
+
+.weight-item input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.weight-item input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+}
+
+.weight-item input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    border: none;
+}
+
+.weight-sum {
+    margin-top: 10px;
+    padding: 15px;
+    background: white;
+    border-radius: 6px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.config-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.btn-primary, .btn-secondary {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(46, 134, 171, 0.4);
+}
+
+.btn-secondary {
+    background: white;
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-color);
+}
+
 @media (max-width: 768px) {
     .header h1 {
         font-size: 1.8rem;
@@ -292,5 +442,18 @@ tbody tr:hover {
     
     .modal-body > div {
         grid-template-columns: 1fr !important;
+    }
+    
+    .period-checkboxes {
+        grid-template-columns: 1fr;
+    }
+    
+    .strategy-selector {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .config-actions {
+        flex-direction: column;
     }
 }

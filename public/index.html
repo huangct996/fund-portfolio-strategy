@@ -10,8 +10,8 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1>🎯 红利低波ETF(512890) 持仓复制分析系统</h1>
-            <p class="subtitle">策略：复制2025年中报持仓，按股票市值分配权重（单只上限10%）</p>
+            <h1>🎯 红利低波ETF(512890) 持仓复制分析系统 v2.0</h1>
+            <p class="subtitle">支持多报告期分析 | 综合得分策略 | 可配置权重</p>
         </header>
 
         <div id="loading" class="loading">
@@ -38,6 +38,59 @@
                     <span class="label">成立日期:</span>
                     <span class="value" id="foundDate">-</span>
                 </div>
+            </div>
+        </section>
+
+        <section id="configPanel" class="card" style="display: none;">
+            <h2>⚙️ 策略配置</h2>
+            
+            <div class="config-section">
+                <h3>报告期选择</h3>
+                <div id="reportPeriodSelector" class="period-selector">
+                    <label><input type="checkbox" id="selectAllPeriods" checked> 全部报告期</label>
+                    <div id="periodCheckboxes" class="period-checkboxes"></div>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h3>策略类型</h3>
+                <div class="strategy-selector">
+                    <label>
+                        <input type="radio" name="strategy" value="marketValue" checked>
+                        市值加权策略
+                    </label>
+                    <label>
+                        <input type="radio" name="strategy" value="composite">
+                        综合得分策略
+                    </label>
+                </div>
+            </div>
+
+            <div id="compositeWeights" class="config-section" style="display: none;">
+                <h3>综合得分权重配置</h3>
+                <div class="weight-config">
+                    <div class="weight-item">
+                        <label>市值权重: <span id="mvWeightValue">0.50</span></label>
+                        <input type="range" id="mvWeight" min="0" max="1" step="0.05" value="0.5">
+                    </div>
+                    <div class="weight-item">
+                        <label>股息率权重: <span id="dvWeightValue">0.30</span></label>
+                        <input type="range" id="dvWeight" min="0" max="1" step="0.05" value="0.3">
+                    </div>
+                    <div class="weight-item">
+                        <label>质量因子权重: <span id="qualityWeightValue">0.20</span></label>
+                        <input type="range" id="qualityWeight" min="0" max="1" step="0.05" value="0.2">
+                    </div>
+                    <div class="weight-sum">
+                        权重总和: <span id="weightSum">1.00</span>
+                        <span id="weightWarning" style="color: #FF6B6B; display: none;">⚠️ 权重总和应为1.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config-actions">
+                <button id="applyConfig" class="btn-primary">应用配置并计算</button>
+                <button id="resetConfig" class="btn-secondary">重置为默认</button>
             </div>
         </section>
 
@@ -78,7 +131,7 @@
                     </div>
                 </div>
                 <div>
-                    <h3 style="color: #2E86AB;">策略持仓（市值加权+10%上限）</h3>
+                    <h3 style="color: #2E86AB;" id="strategyTitle">策略持仓（市值加权+10%上限）</h3>
                     <div class="table-container" style="max-height: 600px; overflow-y: auto;">
                         <table>
                             <thead>
@@ -87,6 +140,9 @@
                                     <th>股票代码</th>
                                     <th>股票名称</th>
                                     <th>策略权重</th>
+                                    <th class="composite-col" style="display: none;">综合得分</th>
+                                    <th class="composite-col" style="display: none;">股息率</th>
+                                    <th class="composite-col" style="display: none;">质量因子</th>
                                     <th>状态</th>
                                 </tr>
                             </thead>

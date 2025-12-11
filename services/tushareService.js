@@ -81,7 +81,7 @@ class TushareService {
   }
 
   /**
-   * 批量获取股票基本信息（包含名称和市值）
+   * 批量获取股票基本信息（包含名称、市值、股息率、质量因子）
    */
   async batchGetStockBasic(stockCodes, tradeDate) {
     const results = {};
@@ -130,18 +130,19 @@ class TushareService {
       }
     }
 
-    // 2. 获取股票市值（逐个获取以避免权限问题）
-    console.log(`开始获取 ${tsCodes.length} 只股票的市值数据...`);
+    // 2. 获取股票市值、股息率、质量因子（逐个获取以避免权限问题）
+    console.log(`开始获取 ${tsCodes.length} 只股票的市值、股息率和质量因子数据...`);
     let successCount = 0;
     
     for (let i = 0; i < tsCodes.length; i++) {
       const tsCode = tsCodes[i];
       
       try {
+        // 获取市值和股息率
         const data = await this.callApi('daily_basic', {
           ts_code: tsCode,
           trade_date: tradeDate,
-          fields: 'ts_code,trade_date,total_mv'
+          fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
         });
 
         if (data && data.length > 0) {
@@ -149,6 +150,16 @@ class TushareService {
             results[tsCode] = {};
           }
           results[tsCode].totalMv = data[0].total_mv || 0;  // 总市值（万元）
+          results[tsCode].dvRatio = data[0].dv_ratio || 0;  // 股息率（%）
+          results[tsCode].peTtm = data[0].pe_ttm || 0;      // 市盈率TTM
+          results[tsCode].pb = data[0].pb || 0;              // 市净率
+          
+          // 计算质量因子：使用市盈率和市净率的倒数作为质量指标
+          // 质量因子 = (1/PE + 1/PB) / 2，值越大质量越好
+          const peScore = data[0].pe_ttm > 0 ? 1 / data[0].pe_ttm : 0;
+          const pbScore = data[0].pb > 0 ? 1 / data[0].pb : 0;
+          results[tsCode].qualityFactor = (peScore + pbScore) / 2;
+          
           successCount++;
         }
 
@@ -158,11 +169,11 @@ class TushareService {
         }
         
       } catch (error) {
-        console.warn(`获取 ${tsCode} 市值失败:`, error.message);
+        console.warn(`获取 ${tsCode} 数据失败:`, error.message);
       }
     }
     
-    console.log(`成功获取 ${successCount}/${tsCodes.length} 只股票的市值数据`);
+    console.log(`成功获取 ${successCount}/${tsCodes.length} 只股票的完整数据`);
 
     return results;
   }
