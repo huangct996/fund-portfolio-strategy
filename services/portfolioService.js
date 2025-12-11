@@ -380,9 +380,13 @@ class PortfolioService {
         
         // 根据策略分配权重
         let portfolioWithWeights;
+        let applyWeightLimit = false;  // 是否应用权重上限
+        
         if (useCompositeScore) {
           console.log(`使用综合得分策略 - 市值权重:${scoreWeights.mvWeight}, 股息率权重:${scoreWeights.dvWeight}, 质量因子权重:${scoreWeights.qualityWeight}, 质量因子类型:${qualityFactorType}`);
+          console.log(`综合得分策略不应用10%权重上限`);
           portfolioWithWeights = this.calculateCompositeScore(validPortfolio, scoreWeights, qualityFactorType);
+          applyWeightLimit = false;  // 综合得分策略不应用权重上限
         } else {
           console.log(`使用市值加权策略`);
           const validTotalMv = validPortfolio.reduce((sum, p) => sum + p.marketValue, 0);
@@ -391,21 +395,24 @@ class PortfolioService {
             adjustedWeight: p.marketValue / validTotalMv,
             isLimited: false
           })).sort((a, b) => b.adjustedWeight - a.adjustedWeight);
+          applyWeightLimit = true;  // 市值加权策略应用权重上限
         }
         
-        // 应用10%权重上限限制
+        // 仅在市值加权策略下应用10%权重上限限制
         const maxWeight = this.maxWeight;
-        let needsAdjustment = true;
+        let needsAdjustment = applyWeightLimit;  // 只有需要应用权重限制时才进入循环
         let iterationCount = 0;
         const maxIterations = 100; // 防止无限循环
         
-        console.log(`开始应用10%权重上限限制...`);
-        console.log(`初始权重前5名:`);
-        portfolioWithWeights.slice(0, 5).forEach(s => {
-          console.log(`  ${s.symbol} ${s.name}: ${(s.adjustedWeight * 100).toFixed(2)}%`);
-        });
+        if (applyWeightLimit) {
+          console.log(`开始应用10%权重上限限制...`);
+          console.log(`初始权重前5名:`);
+          portfolioWithWeights.slice(0, 5).forEach(s => {
+            console.log(`  ${s.symbol} ${s.name}: ${(s.adjustedWeight * 100).toFixed(2)}%`);
+          });
+        }
         
-        while (needsAdjustment && iterationCount < maxIterations) {
+        while (needsAdjustment && iterationCount < maxIterations && applyWeightLimit) {
           needsAdjustment = false;
           let excessWeight = 0;
           let unrestrictedCount = 0;

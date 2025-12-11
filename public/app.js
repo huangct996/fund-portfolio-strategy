@@ -321,9 +321,17 @@ function renderHoldingsForPeriod(period) {
     const reportDateFormatted = formatDate(period.reportDate);
     document.getElementById('originalHoldingsTitle').textContent = `基金持仓 (${reportDateFormatted})`;
     
+    // 更新提示信息
+    const holdingsNote = document.getElementById('holdingsNote');
+    if (currentConfig.useCompositeScore) {
+        holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓（综合得分策略，无权重上限）。';
+    } else {
+        holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓（市值加权，单只上限10%）。';
+    }
+    
     const strategyTitle = document.getElementById('strategyTitle');
     if (currentConfig.useCompositeScore) {
-        strategyTitle.textContent = `策略持仓（综合得分+10%上限） (${reportDateFormatted})`;
+        strategyTitle.textContent = `策略持仓（综合得分） (${reportDateFormatted})`;
     } else {
         strategyTitle.textContent = `策略持仓（市值加权+10%上限） (${reportDateFormatted})`;
     }
@@ -355,8 +363,6 @@ function renderHoldingsForPeriod(period) {
     const sortedByAdjusted = [...period.adjustedHoldings].sort((a, b) => b.adjustedWeight - a.adjustedWeight);
     sortedByAdjusted.forEach((stock, index) => {
         const tr = document.createElement('tr');
-        const statusText = stock.isLimited ? '⚠️ 受限10%' : '✓';
-        const statusColor = stock.isLimited ? 'color: #FF6B6B; font-weight: bold;' : 'color: #06D6A0;';
         
         let rowHtml = `
             <td>${index + 1}</td>
@@ -366,14 +372,18 @@ function renderHoldingsForPeriod(period) {
         `;
         
         if (currentConfig.useCompositeScore) {
+            // 综合得分策略：显示得分相关列，无状态列
             rowHtml += `
                 <td class="composite-col">${(stock.compositeScore || 0).toFixed(4)}</td>
                 <td class="composite-col">${(stock.dvRatio || 0).toFixed(2)}%</td>
                 <td class="composite-col">${(stock.qualityFactor || 0).toFixed(4)}</td>
             `;
+        } else {
+            // 市值加权策略：显示状态列
+            const statusText = stock.isLimited ? '⚠️ 受限10%' : '✓';
+            const statusColor = stock.isLimited ? 'color: #FF6B6B; font-weight: bold;' : 'color: #06D6A0;';
+            rowHtml += `<td style="${statusColor}">${statusText}</td>`;
         }
-        
-        rowHtml += `<td style="${statusColor}">${statusText}</td>`;
         
         tr.innerHTML = rowHtml;
         adjustedBody.appendChild(tr);
@@ -384,7 +394,8 @@ function drawCumulativeReturnChart(data) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
     // 构建数据点：起点(0,0) + 实际数据点
-    const labels = ['起始', ...data.map(d => formatDate(d.endDate))];
+    // 使用报告期作为标签，避免多个报告期endDate相同的问题
+    const labels = ['起始', ...data.map(d => formatDate(d.reportDate))];
     const replicatedData = [0, ...data.map(d => (d.adjustedCumulativeReturn || d.adjustedReturn) * 100)];
     const fundData = [0, ...data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100)];
     
