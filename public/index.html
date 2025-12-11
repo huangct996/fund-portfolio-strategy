@@ -126,12 +126,12 @@
             <h2>收益对比曲线</h2>
             
             <div class="info-note">
-                <strong>✅ 数据说明：</strong>每个报告期独立计算，从该报告期披露日到今天的收益率。
-                横坐标为报告期日期，纵坐标为从披露日到今天的收益率。
+                <strong>✅ 回测逻辑：</strong>每个报告期披露后根据策略调整持仓，持有到下一个报告期披露日（最后一期持有到今天）。
+                横坐标为报告期日期，纵坐标为从第一个报告期开始的累计收益率。
             </div>
 
             <div class="chart-container">
-                <h3>各报告期收益率对比（披露日→今天）</h3>
+                <h3>累计收益率对比（按报告期调仓）</h3>
                 <canvas id="cumulativeReturnChart"></canvas>
             </div>
         </section>

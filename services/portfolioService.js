@@ -328,8 +328,30 @@ class PortfolioService {
       }
       
       const startDate = disclosureDate;
-      const today = new Date();
-      const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+      
+      // 计算结束日期：下一个报告期的披露日，如果是最后一个报告期则到今天
+      let endDate;
+      if (i < selectedReportDates.length - 1) {
+        // 不是最后一个报告期，计算到下一个报告期的披露日
+        const nextReportDate = selectedReportDates[i + 1];
+        const nextYear = nextReportDate.substring(0, 4);
+        const nextMonth = nextReportDate.substring(4, 6);
+        
+        if (nextMonth === '03') {
+          endDate = `${nextYear}0430`;
+        } else if (nextMonth === '06') {
+          endDate = `${nextYear}0828`;
+        } else if (nextMonth === '09') {
+          endDate = `${nextYear}1031`;
+        } else if (nextMonth === '12') {
+          const nextNextYear = parseInt(nextYear) + 1;
+          endDate = `${nextNextYear}0430`;
+        }
+      } else {
+        // 最后一个报告期，计算到今天
+        const today = new Date();
+        endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+      }
 
       console.log(`\n报告期: ${reportDate}`);
       console.log(`计算时间段: ${startDate} -> ${endDate}`);
@@ -532,16 +554,19 @@ class PortfolioService {
 
     const filteredResults = results.filter(r => r.totalStocks > 10);
 
+    // 计算累计收益率：每个报告期的收益率累乘
     let adjustedCumulative = 1;
     let fundCumulative = 1;
     
-    filteredResults.forEach(r => {
+    filteredResults.forEach((r, index) => {
       adjustedCumulative *= (1 + r.adjustedReturn);
       fundCumulative *= (1 + r.fundReturn);
       
       r.adjustedCumulativeReturn = adjustedCumulative - 1;
       r.fundCumulativeReturn = fundCumulative - 1;
       r.excessCumulativeReturn = r.adjustedCumulativeReturn - r.fundCumulativeReturn;
+      
+      console.log(`累计到${r.reportDate}: 复制组合累计${(r.adjustedCumulativeReturn * 100).toFixed(2)}%, 基金累计${(r.fundCumulativeReturn * 100).toFixed(2)}%`);
     });
 
     console.log(`\n${'='.repeat(60)}`);
