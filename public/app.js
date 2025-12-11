@@ -30,14 +30,36 @@ async function initializePage() {
         availablePeriods = await fetchReportPeriods();
         setupConfigPanel();
         
-        // 加载默认数据
-        await loadData();
-        
+        // 不自动加载数据，等待用户点击"应用配置并计算"
         showLoading(false);
+        
+        // 显示提示信息
+        document.getElementById('chartsSection').style.display = 'block';
+        document.getElementById('holdingsTable').style.display = 'block';
+        showPlaceholder();
+        
     } catch (error) {
         showLoading(false);
         throw error;
     }
+}
+
+function showPlaceholder() {
+    const chartCanvas = document.getElementById('cumulativeReturnChart');
+    const ctx = chartCanvas.getContext('2d');
+    
+    // 清空画布
+    ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+    
+    // 显示提示文字
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#999';
+    ctx.textAlign = 'center';
+    ctx.fillText('请配置策略参数后点击"应用配置并计算"按钮', chartCanvas.width / 2, chartCanvas.height / 2);
+    
+    // 清空持仓表格
+    document.getElementById('originalHoldingsTable').innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #999;">等待计算...</td></tr>';
+    document.getElementById('adjustedHoldingsTable').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #999;">等待计算...</td></tr>';
 }
 
 async function loadData() {
@@ -270,15 +292,40 @@ function resetConfiguration() {
 function displayHoldingsTable(data) {
     if (data.length === 0) return;
     
-    const period = data[0];  // 显示第一个报告期
+    // 填充报告期选择下拉框
+    const periodSelect = document.getElementById('holdingsPeriodSelect');
+    periodSelect.innerHTML = '';
+    data.forEach((period, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = formatDate(period.reportDate);
+        periodSelect.appendChild(option);
+    });
+    
+    // 监听报告期切换
+    periodSelect.onchange = (e) => {
+        const selectedIndex = parseInt(e.target.value);
+        renderHoldingsForPeriod(data[selectedIndex]);
+    };
+    
+    // 默认显示第一个报告期
+    renderHoldingsForPeriod(data[0]);
+    
+    document.getElementById('holdingsTable').style.display = 'block';
+}
+
+function renderHoldingsForPeriod(period) {
     if (!period || !period.adjustedHoldings) return;
     
-    // 更新策略标题
+    // 更新标题
+    const reportDateFormatted = formatDate(period.reportDate);
+    document.getElementById('originalHoldingsTitle').textContent = `基金持仓 (${reportDateFormatted})`;
+    
     const strategyTitle = document.getElementById('strategyTitle');
     if (currentConfig.useCompositeScore) {
-        strategyTitle.textContent = '策略持仓（综合得分+10%上限）';
+        strategyTitle.textContent = `策略持仓（综合得分+10%上限） (${reportDateFormatted})`;
     } else {
-        strategyTitle.textContent = '策略持仓（市值加权+10%上限）';
+        strategyTitle.textContent = `策略持仓（市值加权+10%上限） (${reportDateFormatted})`;
     }
     
     // 显示/隐藏综合得分列
@@ -331,8 +378,6 @@ function displayHoldingsTable(data) {
         tr.innerHTML = rowHtml;
         adjustedBody.appendChild(tr);
     });
-    
-    document.getElementById('holdingsTable').style.display = 'block';
 }
 
 function drawCumulativeReturnChart(data) {

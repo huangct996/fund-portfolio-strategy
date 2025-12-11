@@ -383,6 +383,36 @@ tbody tr:hover {
     color: #2C3E50;
 }
 
+.period-selector-holdings {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--bg-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.period-selector-holdings label {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.period-select {
+    padding: 8px 15px;
+    border: 2px solid var(--primary-color);
+    border-radius: 6px;
+    font-size: 1rem;
+    background: white;
+    cursor: pointer;
+    min-width: 200px;
+}
+
+.period-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(46, 134, 171, 0.2);
+}
+
 .weight-config {
     display: flex;
     flex-direction: column;

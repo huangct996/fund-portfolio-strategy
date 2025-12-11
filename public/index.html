@@ -138,12 +138,18 @@
 
         <section id="holdingsTable" class="card" style="display: none;">
             <h2>持仓明细</h2>
+            
+            <div class="period-selector-holdings">
+                <label><strong>选择报告期：</strong></label>
+                <select id="holdingsPeriodSelect" class="period-select"></select>
+            </div>
+            
             <div class="info-note">
-                <strong>💡 提示：</strong>左侧为512890基金中报持仓，右侧为策略持仓（按股票市值分配，单只上限10%）。
+                <strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓（单只上限10%）。
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
-                    <h3 style="color: #A23B72;">512890基金中报持仓</h3>
+                    <h3 style="color: #A23B72;" id="originalHoldingsTitle">基金持仓</h3>
                     <div class="table-container" style="max-height: 600px; overflow-y: auto;">
                         <table>
                             <thead>
