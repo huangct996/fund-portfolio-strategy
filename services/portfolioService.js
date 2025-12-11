@@ -227,6 +227,8 @@ class PortfolioService {
 
   /**
    * 使用基金净值计算收益率
+   * 注意：使用单位净值计算区间收益率，而非累计净值
+   * 累计净值包含历史分红，不能直接用于计算区间收益率
    */
   async calculateReturnsFromNav(fundCode, startDate, endDate) {
     const navData = await tushareService.getFundNav(fundCode, startDate);
@@ -242,13 +244,19 @@ class PortfolioService {
       return null;
     }
 
-    const returnRate = (endNav.accum_nav - startNav.accum_nav) / startNav.accum_nav;
+    // 使用单位净值计算收益率（正确方法）
+    // 单位净值反映了基金在该时间段的实际涨跌
+    const returnRate = (endNav.unit_nav - startNav.unit_nav) / startNav.unit_nav;
+    
+    console.log(`基金净值: ${startNav.nav_date}(${startNav.unit_nav}) -> ${endNav.nav_date}(${endNav.unit_nav}), 收益率: ${(returnRate * 100).toFixed(2)}%`);
     
     return {
       startDate: startNav.nav_date,
       endDate: endNav.nav_date,
-      startNav: startNav.accum_nav,
-      endNav: endNav.accum_nav,
+      startNav: startNav.unit_nav,
+      endNav: endNav.unit_nav,
+      accumStartNav: startNav.accum_nav,
+      accumEndNav: endNav.accum_nav,
       return: returnRate
     };
   }
