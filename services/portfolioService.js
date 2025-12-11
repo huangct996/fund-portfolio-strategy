@@ -311,12 +311,19 @@ class PortfolioService {
     }
     
     const results = [];
+    let lastValidPortfolio = null;  // 保存上一个有效报告期的持仓组合
 
     console.log('\n开始计算各报告期收益率\n');
 
     for (let i = 0; i < selectedReportDates.length; i++) {
       const reportDate = selectedReportDates[i];
       const reportHoldings = groupedHoldings[reportDate];
+      
+      // 检查是否只公布了前10大持仓
+      if (reportHoldings.length <= 10) {
+        console.log(`\n报告期 ${reportDate}: 只公布前${reportHoldings.length}大持仓，跳过该报告期，维持上一期持仓`);
+        continue;  // 跳过该报告期，不调仓
+      }
 
       // 根据报告期计算披露日期（一般是报告期后2个月）
       const year = reportDate.substring(0, 4);
@@ -338,11 +345,25 @@ class PortfolioService {
       
       const startDate = disclosureDate;
       
-      // 计算结束日期：下一个报告期的披露日，如果是最后一个报告期则到今天
+      // 计算结束日期：找到下一个有效报告期（持仓数>10）的披露日
       let endDate;
-      if (i < selectedReportDates.length - 1) {
-        // 不是最后一个报告期，计算到下一个报告期的披露日
-        const nextReportDate = selectedReportDates[i + 1];
+      let nextValidReportIndex = -1;
+      
+      // 从当前报告期之后查找下一个有效报告期
+      for (let j = i + 1; j < selectedReportDates.length; j++) {
+        const nextReportDate = selectedReportDates[j];
+        const nextReportHoldings = groupedHoldings[nextReportDate];
+        
+        // 找到下一个持仓数>10的报告期
+        if (nextReportHoldings.length > 10) {
+          nextValidReportIndex = j;
+          break;
+        }
+      }
+      
+      if (nextValidReportIndex !== -1) {
+        // 找到了下一个有效报告期，计算到该报告期的披露日
+        const nextReportDate = selectedReportDates[nextValidReportIndex];
         const nextYear = nextReportDate.substring(0, 4);
         const nextMonth = nextReportDate.substring(4, 6);
         
@@ -357,7 +378,7 @@ class PortfolioService {
           endDate = `${nextNextYear}0430`;
         }
       } else {
-        // 最后一个报告期，计算到今天
+        // 没有找到下一个有效报告期，计算到今天
         const today = new Date();
         endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
       }
@@ -561,13 +582,12 @@ class PortfolioService {
       }
     }
 
-    const filteredResults = results.filter(r => r.totalStocks > 10);
-
+    // 不需要再过滤，因为已经在循环中跳过了持仓数<=10的报告期
     // 计算累计收益率：每个报告期的收益率累乘
     let adjustedCumulative = 1;
     let fundCumulative = 1;
     
-    filteredResults.forEach((r, index) => {
+    results.forEach((r, index) => {
       adjustedCumulative *= (1 + r.adjustedReturn);
       fundCumulative *= (1 + r.fundReturn);
       
@@ -579,17 +599,17 @@ class PortfolioService {
     });
 
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`总报告期数: ${results.length} (过滤后: ${filteredResults.length})`);
-    console.log(`已过滤掉 ${results.length - filteredResults.length} 个只显示前10大持仓的报告期`);
-    if (filteredResults.length > 0) {
-      const lastPeriod = filteredResults[filteredResults.length - 1];
+    console.log(`有效报告期数: ${results.length}`);
+    console.log(`已跳过只公布前10大持仓的报告期`);
+    if (results.length > 0) {
+      const lastPeriod = results[results.length - 1];
       console.log(`\n调整后组合累计收益: ${(lastPeriod.adjustedCumulativeReturn * 100).toFixed(2)}%`);
       console.log(`原基金累计收益: ${(lastPeriod.fundCumulativeReturn * 100).toFixed(2)}%`);
       console.log(`累计超额收益: ${(lastPeriod.excessCumulativeReturn * 100).toFixed(2)}%`);
     }
     console.log(`${'='.repeat(60)}\n`);
 
-    return filteredResults;
+    return results;
   }
 }
 
