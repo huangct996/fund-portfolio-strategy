@@ -202,6 +202,14 @@ class PortfolioService {
         const startPrice = prices[0].close;
         const endPrice = prices[prices.length - 1].close;
         const stockReturn = (endPrice - startPrice) / startPrice;
+        
+        // 添加详细日志，检查异常收益率
+        if (Math.abs(stockReturn) > 2.0) {  // 收益率超过200%
+          console.warn(`⚠️  ${stock.symbol} 收益率异常: ${(stockReturn * 100).toFixed(2)}%`);
+          console.warn(`   起始: ${prices[0].trade_date} 价格${startPrice.toFixed(2)} (复权因子${prices[0].adj_factor})`);
+          console.warn(`   结束: ${prices[prices.length - 1].trade_date} 价格${endPrice.toFixed(2)} (复权因子${prices[prices.length - 1].adj_factor})`);
+          console.warn(`   原始价格: ${prices[0].original_close} -> ${prices[prices.length - 1].original_close}`);
+        }
 
         stockReturns.push({
           symbol: stock.symbol,
@@ -234,6 +242,21 @@ class PortfolioService {
 
     console.log(`✅ 成功计算 ${stockReturns.length}/${portfolio.length} 只股票`);
     console.log(`✅ 调整后组合收益率: ${(portfolioReturn * 100).toFixed(2)}%`);
+    
+    // 如果组合收益率异常，显示贡献最大的股票
+    if (Math.abs(portfolioReturn) > 0.5) {  // 超过50%
+      console.warn(`⚠️  组合收益率异常，前5大贡献股票:`);
+      const contributions = stockReturns.map(s => ({
+        symbol: s.symbol,
+        contribution: s.return * s.normalizedWeight,
+        return: s.return,
+        weight: s.normalizedWeight
+      })).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+      
+      contributions.slice(0, 5).forEach(c => {
+        console.warn(`   ${c.symbol}: 收益${(c.return*100).toFixed(2)}% × 权重${(c.weight*100).toFixed(2)}% = 贡献${(c.contribution*100).toFixed(2)}%`);
+      });
+    }
 
     return {
       startDate,
