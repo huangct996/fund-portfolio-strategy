@@ -443,6 +443,26 @@ tbody tr:hover {
     color: var(--primary-color);
 }
 
+/* 部分披露的报告期样式 */
+.partial-period {
+    opacity: 0.6;
+}
+
+.partial-period input[type="checkbox"] {
+    cursor: help;
+}
+
+.period-checkboxes label {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.period-checkboxes label:hover {
+    background-color: rgba(46, 134, 171, 0.1);
+}
+
 .weight-config {
     display: flex;
     flex-direction: column;

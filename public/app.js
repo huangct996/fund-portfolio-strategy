@@ -27,7 +27,11 @@ async function initializePage() {
         displayFundInfo(fundInfo);
 
         // 获取所有报告期
-        availablePeriods = await fetchReportPeriods();
+        const periodsResult = await fetchReportPeriods();
+        availablePeriods = periodsResult.periods || periodsResult;
+        window.periodData = periodsResult;  // 保存完整数据供后续使用
+        console.log('可用报告期:', availablePeriods);
+        console.log('第一次完整披露:', periodsResult.firstValidPeriod);
         setupConfigPanel();
         
         // 不自动加载数据，等待用户点击"应用配置并计算"
@@ -116,7 +120,12 @@ async function fetchReportPeriods() {
         throw new Error(result.error || '获取报告期失败');
     }
     
-    return result.data;
+    // 兼容旧格式和新格式
+    if (result.data.periods) {
+        return result.data;  // 新格式：包含periodInfo
+    } else {
+        return { periods: result.data };  // 旧格式：只有periods数组
+    }
 }
 
 async function fetchAllReturns(config) {
@@ -161,9 +170,33 @@ function setupConfigPanel() {
     const periodCheckboxes = document.getElementById('periodCheckboxes');
     periodCheckboxes.innerHTML = '';
     
+    const periodData = window.periodData || {};
+    const periodInfo = periodData.periodInfo || [];
+    const firstValidPeriod = periodData.firstValidPeriod;
+    
     availablePeriods.forEach(period => {
         const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" class="period-checkbox" value="${period}"> ${formatDate(period)}`;
+        const info = periodInfo.find(p => p.date === period);
+        
+        let displayText = formatDate(period);
+        let className = '';
+        let title = '';
+        
+        if (info) {
+            if (info.isPartial) {
+                displayText += ` ⚠️ (仅${info.holdingCount}只)`;
+                className = 'partial-period';
+                title = `只公布前${info.holdingCount}大持仓，无法独立计算`;
+            }
+            if (info.isFirstValid) {
+                displayText += ` 🎯`;
+                title = '第一次完整披露，回测从此开始';
+            }
+        }
+        
+        label.className = className;
+        label.title = title;
+        label.innerHTML = `<input type="checkbox" class="period-checkbox" value="${period}"> ${displayText}`;
         periodCheckboxes.appendChild(label);
     });
     

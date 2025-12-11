@@ -25,15 +25,46 @@ router.get('/fund-info', async (req, res) => {
 });
 
 /**
- * 获取所有可用的报告期
+ * 获取所有可用的报告期（包含持仓数量信息）
  */
 router.get('/report-periods', async (req, res) => {
   try {
     const holdings = await tushareService.getFundHoldings(FUND_CODE);
-    const periods = [...new Set(holdings.map(h => h.end_date))].sort();
+    
+    // 按报告期分组
+    const groupedHoldings = {};
+    holdings.forEach(h => {
+      if (!groupedHoldings[h.end_date]) {
+        groupedHoldings[h.end_date] = [];
+      }
+      groupedHoldings[h.end_date].push(h);
+    });
+    
+    // 找出第一个完整披露的报告期
+    const allPeriods = Object.keys(groupedHoldings).sort();
+    let firstValidPeriod = null;
+    for (let i = 0; i < allPeriods.length; i++) {
+      if (groupedHoldings[allPeriods[i]].length > 10) {
+        firstValidPeriod = allPeriods[i];
+        break;
+      }
+    }
+    
+    // 构建报告期信息
+    const periodInfo = allPeriods.map(period => ({
+      date: period,
+      holdingCount: groupedHoldings[period].length,
+      isPartial: groupedHoldings[period].length <= 10,
+      isFirstValid: period === firstValidPeriod
+    }));
+    
     res.json({
       success: true,
-      data: periods
+      data: {
+        periods: allPeriods,  // 保持兼容性
+        periodInfo: periodInfo,
+        firstValidPeriod: firstValidPeriod
+      }
     });
   } catch (error) {
     res.json({
