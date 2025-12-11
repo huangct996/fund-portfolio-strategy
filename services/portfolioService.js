@@ -9,10 +9,30 @@ class PortfolioService {
    * 计算综合得分并分配权重
    * @param {Array} stocks - 股票列表，包含市值、股息率、质量因子
    * @param {Object} weights - 权重配置 {mvWeight, dvWeight, qualityWeight}
+   * @param {string} qualityFactorType - 质量因子类型: 'pe_pb', 'pe', 'pb', 'roe'
    * @returns {Array} 带有综合得分和权重的股票列表
    */
-  calculateCompositeScore(stocks, weights = {mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2}) {
+  calculateCompositeScore(stocks, weights = {mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2}, qualityFactorType = 'pe_pb') {
     const {mvWeight, dvWeight, qualityWeight} = weights;
+    
+    // 根据类型计算质量因子
+    stocks.forEach(stock => {
+      switch(qualityFactorType) {
+        case 'pe':
+          stock.qualityFactor = stock.peScore || 0;
+          break;
+        case 'pb':
+          stock.qualityFactor = stock.pbScore || 0;
+          break;
+        case 'roe':
+          stock.qualityFactor = (stock.roe || 0) / 100;  // ROE转换为0-1范围
+          break;
+        case 'pe_pb':
+        default:
+          // 已经在tushareService中计算好了
+          stock.qualityFactor = stock.qualityFactor || 0;
+      }
+    });
     
     // 确保权重和为1
     const totalWeight = mvWeight + dvWeight + qualityWeight;
@@ -246,7 +266,8 @@ class PortfolioService {
     const {
       reportPeriods = [],  // 空数组表示使用全部报告期
       scoreWeights = {mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2},
-      useCompositeScore = false
+      useCompositeScore = false,
+      qualityFactorType = 'pe_pb'  // 质量因子类型
     } = options;
     const holdings = await tushareService.getFundHoldings(fundCode);
     
@@ -341,6 +362,9 @@ class PortfolioService {
             marketValue: mv,
             dvRatio: info.dvRatio || 0,
             qualityFactor: info.qualityFactor || 0,
+            peScore: info.peScore || 0,
+            pbScore: info.pbScore || 0,
+            roe: info.roe || 0,
             peTtm: info.peTtm || 0,
             pb: info.pb || 0,
             originalWeight: (h.mkv || 0) / totalOriginalMkv,
@@ -357,8 +381,8 @@ class PortfolioService {
         // 根据策略分配权重
         let portfolioWithWeights;
         if (useCompositeScore) {
-          console.log(`使用综合得分策略 - 市值权重:${scoreWeights.mvWeight}, 股息率权重:${scoreWeights.dvWeight}, 质量因子权重:${scoreWeights.qualityWeight}`);
-          portfolioWithWeights = this.calculateCompositeScore(validPortfolio, scoreWeights);
+          console.log(`使用综合得分策略 - 市值权重:${scoreWeights.mvWeight}, 股息率权重:${scoreWeights.dvWeight}, 质量因子权重:${scoreWeights.qualityWeight}, 质量因子类型:${qualityFactorType}`);
+          portfolioWithWeights = this.calculateCompositeScore(validPortfolio, scoreWeights, qualityFactorType);
         } else {
           console.log(`使用市值加权策略`);
           const validTotalMv = validPortfolio.reduce((sum, p) => sum + p.marketValue, 0);
@@ -401,21 +425,35 @@ class PortfolioService {
             }
           });
           
-          // 将超出的权重按市值比例重新分配给未受限的股票
+          // 将超出的权重重新分配给未受限的股票
           if (excessWeight > 0 && unrestrictedCount > 0) {
-            // 计算未受限股票的总市值
-            const unrestrictedTotalMv = portfolioWithWeights
-              .filter(s => !s.isLimited)
-              .reduce((sum, s) => sum + s.marketValue, 0);
-            
-            // 按市值比例分配超额权重
-            portfolioWithWeights.forEach(stock => {
-              if (!stock.isLimited) {
-                const mvRatio = stock.marketValue / unrestrictedTotalMv;
-                stock.adjustedWeight += excessWeight * mvRatio;
-              }
-            });
-            console.log(`  重新分配 ${(excessWeight * 100).toFixed(2)}% 给 ${unrestrictedCount} 只未受限股票（按市值比例）`);
+            if (useCompositeScore) {
+              // 综合得分策略：按综合得分比例分配
+              const unrestrictedTotalScore = portfolioWithWeights
+                .filter(s => !s.isLimited)
+                .reduce((sum, s) => sum + (s.compositeScore || 0), 0);
+              
+              portfolioWithWeights.forEach(stock => {
+                if (!stock.isLimited && unrestrictedTotalScore > 0) {
+                  const scoreRatio = (stock.compositeScore || 0) / unrestrictedTotalScore;
+                  stock.adjustedWeight += excessWeight * scoreRatio;
+                }
+              });
+              console.log(`  重新分配 ${(excessWeight * 100).toFixed(2)}% 给 ${unrestrictedCount} 只未受限股票（按综合得分比例）`);
+            } else {
+              // 市值加权策略：按市值比例分配
+              const unrestrictedTotalMv = portfolioWithWeights
+                .filter(s => !s.isLimited)
+                .reduce((sum, s) => sum + s.marketValue, 0);
+              
+              portfolioWithWeights.forEach(stock => {
+                if (!stock.isLimited) {
+                  const mvRatio = stock.marketValue / unrestrictedTotalMv;
+                  stock.adjustedWeight += excessWeight * mvRatio;
+                }
+              });
+              console.log(`  重新分配 ${(excessWeight * 100).toFixed(2)}% 给 ${unrestrictedCount} 只未受限股票（按市值比例）`);
+            }
           }
         }
         

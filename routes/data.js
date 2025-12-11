@@ -59,7 +59,8 @@ router.get('/all-returns', async (req, res) => {
       useCompositeScore,
       mvWeight,
       dvWeight,
-      qualityWeight
+      qualityWeight,
+      qualityFactorType
     } = req.query;
     
     const options = {
@@ -69,7 +70,8 @@ router.get('/all-returns', async (req, res) => {
         mvWeight: parseFloat(mvWeight) || 0.5,
         dvWeight: parseFloat(dvWeight) || 0.3,
         qualityWeight: parseFloat(qualityWeight) || 0.2
-      }
+      },
+      qualityFactorType: qualityFactorType || 'pe_pb'
     };
     
     const returns = await portfolioService.calculateAllPeriodReturns(FUND_CODE, MAX_WEIGHT, options);

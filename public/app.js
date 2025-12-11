@@ -6,7 +6,8 @@ let currentConfig = {
     useCompositeScore: false,
     mvWeight: 0.5,
     dvWeight: 0.3,
-    qualityWeight: 0.2
+    qualityWeight: 0.2,
+    qualityFactorType: 'pe_pb'
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -100,6 +101,7 @@ async function fetchAllReturns(config) {
     params.append('mvWeight', config.mvWeight);
     params.append('dvWeight', config.dvWeight);
     params.append('qualityWeight', config.qualityWeight);
+    params.append('qualityFactorType', config.qualityFactorType);
     
     const response = await fetch(`${API_BASE}/all-returns?${params}`);
     const result = await response.json();
@@ -150,6 +152,13 @@ function setupConfigPanel() {
         });
     });
     
+    // 质量因子选择
+    document.querySelectorAll('input[name="qualityFactor"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            updateFactorDescription(e.target.value);
+        });
+    });
+    
     // 权重滑块
     ['mvWeight', 'dvWeight', 'qualityWeight'].forEach(id => {
         const slider = document.getElementById(id);
@@ -166,6 +175,16 @@ function setupConfigPanel() {
     
     // 重置按钮
     document.getElementById('resetConfig').addEventListener('click', resetConfiguration);
+}
+
+function updateFactorDescription(factorType) {
+    const descriptions = {
+        'pe_pb': '💡 PE+PB综合：质量因子 = (1/PE + 1/PB) / 2，值越大质量越好',
+        'pe': '💡 仅市盈率PE：质量因子 = 1/PE，PE越低质量越好',
+        'pb': '💡 仅市净率PB：质量因子 = 1/PB，PB越低质量越好',
+        'roe': '💡 ROE（净资产收益率）：ROE越高质量越好，反映盈利能力'
+    };
+    document.getElementById('factorDescription').textContent = descriptions[factorType] || descriptions['pe_pb'];
 }
 
 function updateWeightSum() {
@@ -203,6 +222,9 @@ async function applyConfiguration() {
     const strategy = document.querySelector('input[name="strategy"]:checked').value;
     const useCompositeScore = strategy === 'composite';
     
+    // 获取质量因子类型
+    const qualityFactorType = document.querySelector('input[name="qualityFactor"]:checked')?.value || 'pe_pb';
+    
     // 获取权重
     const mvWeight = parseFloat(document.getElementById('mvWeight').value);
     const dvWeight = parseFloat(document.getElementById('dvWeight').value);
@@ -220,7 +242,8 @@ async function applyConfiguration() {
         useCompositeScore,
         mvWeight,
         dvWeight,
-        qualityWeight
+        qualityWeight,
+        qualityFactorType
     };
     
     // 重新加载数据

@@ -138,7 +138,7 @@ class TushareService {
       const tsCode = tsCodes[i];
       
       try {
-        // 获取市值和股息率
+        // 获取市值、股息率、PE、PB
         const data = await this.callApi('daily_basic', {
           ts_code: tsCode,
           trade_date: tradeDate,
@@ -154,13 +154,29 @@ class TushareService {
           results[tsCode].peTtm = data[0].pe_ttm || 0;      // 市盈率TTM
           results[tsCode].pb = data[0].pb || 0;              // 市净率
           
-          // 计算质量因子：使用市盈率和市净率的倒数作为质量指标
-          // 质量因子 = (1/PE + 1/PB) / 2，值越大质量越好
+          // 默认质量因子：PE+PB综合
           const peScore = data[0].pe_ttm > 0 ? 1 / data[0].pe_ttm : 0;
           const pbScore = data[0].pb > 0 ? 1 / data[0].pb : 0;
           results[tsCode].qualityFactor = (peScore + pbScore) / 2;
+          results[tsCode].peScore = peScore;
+          results[tsCode].pbScore = pbScore;
           
           successCount++;
+        }
+        
+        // 尝试获取ROE数据（财务指标）
+        try {
+          const finData = await this.callApi('fina_indicator', {
+            ts_code: tsCode,
+            period: tradeDate.substring(0, 6) + '31',  // 转换为季度末日期
+            fields: 'ts_code,end_date,roe'
+          });
+          
+          if (finData && finData.length > 0 && results[tsCode]) {
+            results[tsCode].roe = finData[0].roe || 0;  // ROE（%）
+          }
+        } catch (error) {
+          // ROE数据获取失败不影响主流程
         }
 
         // 每10个请求延迟一下

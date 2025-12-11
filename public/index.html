@@ -68,6 +68,34 @@
 
             <div id="compositeWeights" class="config-section" style="display: none;">
                 <h3>综合得分权重配置</h3>
+                
+                <div class="quality-factor-selector">
+                    <label><strong>质量因子选择：</strong></label>
+                    <div class="factor-options">
+                        <label>
+                            <input type="radio" name="qualityFactor" value="pe_pb" checked>
+                            PE+PB综合（默认）
+                        </label>
+                        <label>
+                            <input type="radio" name="qualityFactor" value="pe">
+                            仅市盈率PE
+                        </label>
+                        <label>
+                            <input type="radio" name="qualityFactor" value="pb">
+                            仅市净率PB
+                        </label>
+                        <label>
+                            <input type="radio" name="qualityFactor" value="roe">
+                            ROE（净资产收益率）
+                        </label>
+                    </div>
+                    <div class="factor-description">
+                        <small id="factorDescription">
+                            💡 PE+PB综合：质量因子 = (1/PE + 1/PB) / 2，值越大质量越好
+                        </small>
+                    </div>
+                </div>
+                
                 <div class="weight-config">
                     <div class="weight-item">
                         <label>市值权重: <span id="mvWeightValue">0.50</span></label>
