@@ -47,12 +47,12 @@ class PortfolioService {
       return [];
     }
     
-    // 特殊情况：如果只有市值权重（市值权重=1），直接按市值比例分配
+    // 特殊情况：如果市值权重占绝对主导（>=0.95），直接按市值比例分配
     console.log(`权重检查: mvWeight=${mvWeight}, dvWeight=${dvWeight}, qualityWeight=${qualityWeight}`);
     console.log(`归一化权重: normalizedMvWeight=${normalizedMvWeight.toFixed(4)}, normalizedDvWeight=${normalizedDvWeight.toFixed(4)}, normalizedQualityWeight=${normalizedQualityWeight.toFixed(4)}`);
     
-    if (normalizedMvWeight === 1.0) {
-      console.log(`✅ 检测到纯市值加权（市值权重=1.0），直接按市值比例分配`);
+    if (normalizedMvWeight >= 0.95) {
+      console.log(`✅ 检测到市值权重占主导（${(normalizedMvWeight*100).toFixed(1)}%），直接按市值比例分配`);
       const totalMv = validStocks.reduce((sum, s) => sum + s.marketValue, 0);
       validStocks.forEach(stock => {
         stock.compositeScore = stock.marketValue / totalMv;

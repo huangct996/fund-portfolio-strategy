@@ -221,13 +221,27 @@ function setupConfigPanel() {
         });
     });
     
-    // 权重滑块
+    // 权重滑块 - 添加智能调整功能
     ['mvWeight', 'dvWeight', 'qualityWeight'].forEach(id => {
         const slider = document.getElementById(id);
         const valueSpan = document.getElementById(id + 'Value');
         
         slider.addEventListener('input', (e) => {
-            valueSpan.textContent = parseFloat(e.target.value).toFixed(2);
+            const value = parseFloat(e.target.value);
+            valueSpan.textContent = value.toFixed(2);
+            
+            // 如果某个权重被拉到1.0，自动将其他权重设为0
+            if (value >= 0.99) {
+                ['mvWeight', 'dvWeight', 'qualityWeight'].forEach(otherId => {
+                    if (otherId !== id) {
+                        const otherSlider = document.getElementById(otherId);
+                        const otherValueSpan = document.getElementById(otherId + 'Value');
+                        otherSlider.value = 0;
+                        otherValueSpan.textContent = '0.00';
+                    }
+                });
+            }
+            
             updateWeightSum();
         });
     });
