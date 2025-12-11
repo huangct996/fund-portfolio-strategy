@@ -207,7 +207,8 @@ class TushareService {
   }
 
   /**
-   * 批量获取股票价格（使用逗号分隔一次性获取多个股票）
+   * 批量获取股票价格（使用前复权价格）
+   * 前复权：将历史价格按照分红、配股等因素调整，使价格连续可比
    */
   async batchGetStockPrices(stockCodes, startDate, endDate) {
     const results = {};
@@ -229,7 +230,8 @@ class TushareService {
       return code;
     });
 
-    // 每次最多获取50只股票
+    // 由于需要获取复权因子，只能逐个股票获取
+    // 每次最多获取50只股票的数据和复权因子
     const batchSize = 50;
     
     for (let i = 0; i < tsCodes.length; i += batchSize) {
@@ -239,23 +241,52 @@ class TushareService {
       try {
         console.log(`批量获取股票 ${i + 1}-${Math.min(i + batchSize, tsCodes.length)} / ${tsCodes.length}`);
         
-        const data = await this.callApi('daily', {
+        // 获取日线数据
+        const dailyData = await this.callApi('daily', {
           ts_code: tsCodeStr,
           start_date: startDate,
           end_date: endDate
         });
 
-        // 按股票代码分组
-        data.forEach(item => {
+        // 获取复权因子
+        const adjFactorData = await this.callApi('adj_factor', {
+          ts_code: tsCodeStr,
+          start_date: startDate,
+          end_date: endDate
+        });
+
+        // 构建复权因子映射 {ts_code: {trade_date: adj_factor}}
+        const adjFactorMap = {};
+        adjFactorData.forEach(item => {
+          if (!adjFactorMap[item.ts_code]) {
+            adjFactorMap[item.ts_code] = {};
+          }
+          adjFactorMap[item.ts_code][item.trade_date] = item.adj_factor;
+        });
+
+        // 按股票代码分组，并应用前复权
+        dailyData.forEach(item => {
           const code = item.ts_code;
+          const adjFactor = adjFactorMap[code]?.[item.trade_date] || 1;
+          
           if (!results[code]) {
             results[code] = [];
           }
-          results[code].push(item);
+          
+          // 计算前复权价格：价格 × 复权因子
+          results[code].push({
+            ...item,
+            close: item.close * adjFactor,  // 前复权收盘价
+            open: item.open * adjFactor,    // 前复权开盘价
+            high: item.high * adjFactor,    // 前复权最高价
+            low: item.low * adjFactor,      // 前复权最低价
+            adj_factor: adjFactor,          // 保存复权因子
+            original_close: item.close      // 保存原始价格
+          });
         });
 
         // 短暂延迟避免API限流
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 300));
         
       } catch (error) {
         console.warn(`批量获取股票数据失败:`, error.message);

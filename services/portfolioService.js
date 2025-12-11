@@ -150,13 +150,14 @@ class PortfolioService {
   }
 
   /**
-   * 计算调整后组合的收益率
+   * 计算调整后组合的收益率（使用前复权价格）
    */
   async calculatePortfolioReturns(portfolio, startDate, endDate) {
     const stockCodes = portfolio.map(p => p.symbol);
     
     console.log(`\n计算调整后组合收益: ${startDate} -> ${endDate}`);
     console.log(`股票数量: ${stockCodes.length}`);
+    console.log(`使用前复权价格计算收益率`);
 
     const priceData = await tushareService.batchGetStockPrices(
       stockCodes,
