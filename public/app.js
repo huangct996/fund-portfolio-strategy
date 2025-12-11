@@ -401,8 +401,11 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
     // 显示累计收益率：自定义策略 vs 原策略
-    // 添加起始点(0,0)，然后是各报告期的累计收益率
-    const labels = ['起始', ...data.map(d => formatDate(d.reportDate))];
+    // 横轴使用实际的计算结束日期（每个报告期持有到下一期披露日）
+    const labels = ['起始', ...data.map(d => {
+        // 使用endDate作为横轴标签，表示该报告期持有到何时
+        return formatDate(d.endDate);
+    })];
     const customData = [0, ...data.map(d => (d.customCumulativeReturn || d.customReturn) * 100)];
     const originalData = [0, ...data.map(d => (d.originalCumulativeReturn || d.originalReturn) * 100)];
     const fundData = [0, ...data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100)];

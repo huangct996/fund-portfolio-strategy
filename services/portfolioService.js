@@ -354,17 +354,30 @@ class PortfolioService {
     // 筛选报告期
     const allReportDates = Object.keys(groupedHoldings).sort();
     let selectedReportDates;
+    let isUserSelected = false;  // 标记是否是用户选择的报告期
     
     if (reportPeriods && reportPeriods.length > 0) {
       // 使用用户指定的报告期
       selectedReportDates = allReportDates.filter(date => reportPeriods.includes(date));
+      isUserSelected = true;
       console.log(`所有报告期: ${allReportDates.join(', ')}`);
       console.log(`选择的报告期: ${selectedReportDates.join(', ')}`);
     } else {
       // 使用全部报告期
       selectedReportDates = allReportDates;
+      isUserSelected = false;
       console.log(`使用全部 ${selectedReportDates.length} 个报告期: ${selectedReportDates.join(', ')}`);
     }
+    
+    // 找出真实的最后一个有效报告期（持仓数>10）
+    let realLastReportDate = null;
+    for (let i = allReportDates.length - 1; i >= 0; i--) {
+      if (groupedHoldings[allReportDates[i]].length > 10) {
+        realLastReportDate = allReportDates[i];
+        break;
+      }
+    }
+    console.log(`真实的最后一个有效报告期: ${realLastReportDate}`);
     
     const results = [];
     let lastValidPortfolio = null;  // 保存上一个有效报告期的持仓组合
@@ -401,13 +414,16 @@ class PortfolioService {
       
       const startDate = disclosureDate;
       
-      // 计算结束日期：找到下一个有效报告期（持仓数>10）的披露日
+      // 计算结束日期：区分用户选择的最后一期和真实的最后一期
       let endDate;
       let nextValidReportIndex = -1;
+      const isCurrentRealLast = (reportDate === realLastReportDate);
       
-      // 从当前报告期之后查找下一个有效报告期
-      for (let j = i + 1; j < selectedReportDates.length; j++) {
-        const nextReportDate = selectedReportDates[j];
+      // 从所有报告期中查找下一个有效报告期（不限于用户选择的）
+      const currentIndexInAll = allReportDates.indexOf(reportDate);
+      
+      for (let j = currentIndexInAll + 1; j < allReportDates.length; j++) {
+        const nextReportDate = allReportDates[j];
         const nextReportHoldings = groupedHoldings[nextReportDate];
         
         // 找到下一个持仓数>10的报告期
@@ -437,10 +453,21 @@ class PortfolioService {
         }
       }
       
+      // 判断是否计算到今天
       if (nextValidReportIndex === -1) {
-        // 没有找到下一个有效报告期，计算到今天
-        const today = new Date();
-        endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+        // 没有找到下一个有效报告期
+        if (isCurrentRealLast) {
+          // 当前是真实的最后一期，计算到今天
+          const today = new Date();
+          endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+          console.log(`当前报告期 ${reportDate} 是真实的最后一期，计算到今天: ${endDate}`);
+        } else {
+          // 当前不是真实的最后一期，但找不到下一期（理论上不应该发生）
+          console.warn(`⚠️  报告期 ${reportDate} 不是最后一期，但找不到下一个有效报告期，跳过`);
+          continue;
+        }
+      } else {
+        console.log(`报告期 ${reportDate} 计算到下一个有效报告期 ${allReportDates[nextValidReportIndex]} 的披露日: ${endDate}`);
       }
 
       console.log(`\n报告期: ${reportDate}`);
@@ -489,6 +516,12 @@ class PortfolioService {
         
         // 只保留有市值数据的股票
         const validPortfolio = portfolioWithMv.filter(p => p.marketValue > 0);
+        
+        // 记录被过滤的股票
+        const filteredStocks = portfolioWithMv.filter(p => p.marketValue === 0);
+        if (filteredStocks.length > 0) {
+          console.log(`⚠️  ${filteredStocks.length} 只股票因无市值数据被过滤: ${filteredStocks.map(s => s.symbol).join(', ')}`);
+        }
         
         // 根据策略分配权重
         let portfolioWithWeights;
