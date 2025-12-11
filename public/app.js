@@ -1,6 +1,7 @@
 const API_BASE = '/api';
 let allReturnsData = [];
 let availablePeriods = [];
+let chartInstance = null;  // 保存图表实例，用于销毁和重建
 let currentConfig = {
     reportPeriods: [],
     useCompositeScore: false,
@@ -447,6 +448,12 @@ function renderHoldingsForPeriod(period) {
 function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
+    // 销毁旧图表实例（如果存在）
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+    
     // 显示累计收益率：自定义策略 vs 原策略
     // 横轴使用实际的时间点：第一个点用startDate，后续点用endDate
     const labels = data.length > 0 
@@ -456,7 +463,7 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     const originalData = [0, ...data.map(d => (d.originalCumulativeReturn || d.originalReturn) * 100)];
     const fundData = [0, ...data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100)];
     
-    new Chart(ctx, {
+    chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
