@@ -434,11 +434,10 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
     // 显示累计收益率：自定义策略 vs 原策略
-    // 横轴使用实际的计算结束日期（每个报告期持有到下一期披露日）
-    const labels = ['起始', ...data.map(d => {
-        // 使用endDate作为横轴标签，表示该报告期持有到何时
-        return formatDate(d.endDate);
-    })];
+    // 横轴使用实际的时间点：第一个点用startDate，后续点用endDate
+    const labels = data.length > 0 
+        ? [formatDate(data[0].startDate), ...data.map(d => formatDate(d.endDate))]
+        : [];
     const customData = [0, ...data.map(d => (d.customCumulativeReturn || d.customReturn) * 100)];
     const originalData = [0, ...data.map(d => (d.originalCumulativeReturn || d.originalReturn) * 100)];
     const fundData = [0, ...data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100)];
