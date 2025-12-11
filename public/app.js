@@ -393,11 +393,11 @@ function renderHoldingsForPeriod(period) {
 function drawCumulativeReturnChart(data) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
-    // 构建数据点：起点(0,0) + 实际数据点
-    // 使用报告期作为标签，避免多个报告期endDate相同的问题
-    const labels = ['起始', ...data.map(d => formatDate(d.reportDate))];
-    const replicatedData = [0, ...data.map(d => (d.adjustedCumulativeReturn || d.adjustedReturn) * 100)];
-    const fundData = [0, ...data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100)];
+    // 每个报告期都是独立计算的（从披露日到今天），不应该累乘
+    // 直接显示每个报告期的收益率
+    const labels = data.map(d => formatDate(d.reportDate));
+    const replicatedData = data.map(d => d.adjustedReturn * 100);
+    const fundData = data.map(d => d.fundReturn * 100);
     
     new Chart(ctx, {
         type: 'line',
