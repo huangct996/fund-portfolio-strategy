@@ -67,21 +67,28 @@ async function loadData() {
 
     try {
         const returnsResult = await fetchAllReturns(currentConfig);
-        allReturnsData = returnsResult.adjustedReturns;
+        allReturnsData = returnsResult.periods;
+        const customRisk = returnsResult.customRisk;
+        const originalRisk = returnsResult.originalRisk;
         
         console.log('获取到的数据:', allReturnsData);
         console.log('数据条数:', allReturnsData.length);
+        console.log('自定义策略风险指标:', customRisk);
+        console.log('原策略风险指标:', originalRisk);
         
         if (!allReturnsData || allReturnsData.length === 0) {
             throw new Error('未获取到收益率数据');
         }
 
         // 绘制收益对比曲线
-        drawCumulativeReturnChart(allReturnsData);
+        drawCumulativeReturnChart(allReturnsData, customRisk, originalRisk);
         document.getElementById('chartsSection').style.display = 'block';
 
         // 显示持仓明细
         displayHoldingsTable(allReturnsData);
+        
+        // 显示风险指标
+        displayRiskMetrics(customRisk, originalRisk);
 
         showLoading(false);
     } catch (error) {
@@ -390,13 +397,14 @@ function renderHoldingsForPeriod(period) {
     });
 }
 
-function drawCumulativeReturnChart(data) {
+function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
-    // 显示累计收益率：每个报告期调仓后，从第一个报告期开始累计
+    // 显示累计收益率：自定义策略 vs 原策略
     // 添加起始点(0,0)，然后是各报告期的累计收益率
     const labels = ['起始', ...data.map(d => formatDate(d.reportDate))];
-    const replicatedData = [0, ...data.map(d => (d.adjustedCumulativeReturn || d.adjustedReturn) * 100)];
+    const customData = [0, ...data.map(d => (d.customCumulativeReturn || d.customReturn) * 100)];
+    const originalData = [0, ...data.map(d => (d.originalCumulativeReturn || d.originalReturn) * 100)];
     const fundData = [0, ...data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100)];
     
     new Chart(ctx, {
@@ -405,8 +413,8 @@ function drawCumulativeReturnChart(data) {
             labels: labels,
             datasets: [
                 {
-                    label: '复制组合',
-                    data: replicatedData,
+                    label: '自定义策略',
+                    data: customData,
                     borderColor: '#2E86AB',
                     backgroundColor: 'rgba(46, 134, 171, 0.1)',
                     borderWidth: 3,
@@ -414,11 +422,20 @@ function drawCumulativeReturnChart(data) {
                     tension: 0.4
                 },
                 {
-                    label: '原512890基金',
+                    label: '原策略（基金持仓权重）',
+                    data: originalData,
+                    borderColor: '#F18F01',
+                    backgroundColor: 'rgba(241, 143, 1, 0.1)',
+                    borderWidth: 3,
+                    fill: false,
+                    tension: 0.4
+                },
+                {
+                    label: '基金净值（参考）',
                     data: fundData,
                     borderColor: '#A23B72',
                     backgroundColor: 'rgba(162, 59, 114, 0.1)',
-                    borderWidth: 3,
+                    borderWidth: 2,
                     fill: false,
                     tension: 0.4,
                     borderDash: [5, 5]
@@ -463,9 +480,75 @@ function showError(message) {
 }
 
 function formatDate(dateStr) {
-    if (!dateStr) return '-';
+    if (!dateStr) return '';
     const str = String(dateStr);
     return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}`;
+}
+
+function displayRiskMetrics(customRisk, originalRisk) {
+    if (!customRisk || !originalRisk) return;
+    
+    const riskSection = document.getElementById('riskMetrics');
+    if (!riskSection) return;
+    
+    riskSection.style.display = 'block';
+    
+    const customMetrics = document.getElementById('customRiskMetrics');
+    const originalMetrics = document.getElementById('originalRiskMetrics');
+    
+    customMetrics.innerHTML = `
+        <div class="risk-item">
+            <span class="risk-label">累计收益率:</span>
+            <span class="risk-value">${(customRisk.totalReturn * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">年化收益率:</span>
+            <span class="risk-value">${(customRisk.annualizedReturn * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">年化波动率:</span>
+            <span class="risk-value">${(customRisk.volatility * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">最大回撤:</span>
+            <span class="risk-value" style="color: #FF6B6B;">${(customRisk.maxDrawdown * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">夏普比率:</span>
+            <span class="risk-value">${customRisk.sharpeRatio.toFixed(2)}</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">索提诺比率:</span>
+            <span class="risk-value">${customRisk.sortinoRatio.toFixed(2)}</span>
+        </div>
+    `;
+    
+    originalMetrics.innerHTML = `
+        <div class="risk-item">
+            <span class="risk-label">累计收益率:</span>
+            <span class="risk-value">${(originalRisk.totalReturn * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">年化收益率:</span>
+            <span class="risk-value">${(originalRisk.annualizedReturn * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">年化波动率:</span>
+            <span class="risk-value">${(originalRisk.volatility * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">最大回撤:</span>
+            <span class="risk-value" style="color: #FF6B6B;">${(originalRisk.maxDrawdown * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">夏普比率:</span>
+            <span class="risk-value">${originalRisk.sharpeRatio.toFixed(2)}</span>
+        </div>
+        <div class="risk-item">
+            <span class="risk-label">索提诺比率:</span>
+            <span class="risk-value">${originalRisk.sortinoRatio.toFixed(2)}</span>
+        </div>
+    `;
 }
 
 function formatPercent(value) {

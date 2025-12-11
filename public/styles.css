@@ -413,6 +413,36 @@ tbody tr:hover {
     box-shadow: 0 0 0 3px rgba(46, 134, 171, 0.2);
 }
 
+/* 风险指标样式 */
+.risk-metrics-container {
+    background: var(--bg-color);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.risk-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.risk-item:last-child {
+    border-bottom: none;
+}
+
+.risk-label {
+    font-weight: 500;
+    color: #666;
+}
+
+.risk-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
 .weight-config {
     display: flex;
     flex-direction: column;

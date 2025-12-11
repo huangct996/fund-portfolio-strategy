@@ -137,6 +137,26 @@
             </div>
         </section>
 
+        <section id="riskMetrics" class="card" style="display: none;">
+            <h2>风险指标对比</h2>
+            
+            <div class="info-note">
+                <strong>📈 对比说明：</strong>原策略使用基金原始持仓权重，自定义策略使用调整后的权重。
+                两者使用<strong>完全相同的股票池和价格数据</strong>，确保公平对比。
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                <div>
+                    <h3 style="color: #2E86AB;">自定义策略</h3>
+                    <div id="customRiskMetrics" class="risk-metrics-container"></div>
+                </div>
+                <div>
+                    <h3 style="color: #F18F01;">原策略（基金持仓权重）</h3>
+                    <div id="originalRiskMetrics" class="risk-metrics-container"></div>
+                </div>
+            </div>
+        </section>
+
         <section id="holdingsTable" class="card" style="display: none;">
             <h2>持仓明细</h2>
             

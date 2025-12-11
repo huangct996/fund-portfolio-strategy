@@ -74,12 +74,14 @@ router.get('/all-returns', async (req, res) => {
       qualityFactorType: qualityFactorType || 'pe_pb'
     };
     
-    const returns = await portfolioService.calculateAllPeriodReturns(FUND_CODE, MAX_WEIGHT, options);
+    const result = await portfolioService.calculateAllPeriodReturns(FUND_CODE, MAX_WEIGHT, options);
     res.json({
       success: true,
       data: {
-        adjustedReturns: returns,
-        fundNav: [],
+        periods: result.periods || [],
+        customRisk: result.customRisk || null,
+        originalRisk: result.originalRisk || null,
+        fundRisk: result.fundRisk || null,
         options: options  // 返回使用的配置
       }
     });

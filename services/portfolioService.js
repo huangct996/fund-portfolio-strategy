@@ -263,7 +263,63 @@ class PortfolioService {
   }
 
   /**
-   * 计算所有报告期持仓的收益率（支持综合得分策略）
+   * 计算风险指标
+   */
+  calculateRiskMetrics(returns, periods) {
+    if (returns.length === 0) return null;
+    
+    // 计算年化收益率
+    const totalReturn = returns.reduce((acc, r) => acc * (1 + r), 1) - 1;
+    const years = periods / 4; // 假设每个报告期是一个季度
+    const annualizedReturn = Math.pow(1 + totalReturn, 1 / years) - 1;
+    
+    // 计算波动率（标准差）
+    const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+    const volatility = Math.sqrt(variance);
+    const annualizedVolatility = volatility * Math.sqrt(4); // 年化波动率
+    
+    // 计算最大回撤
+    let maxDrawdown = 0;
+    let peak = 1;
+    let cumulative = 1;
+    
+    returns.forEach(r => {
+      cumulative *= (1 + r);
+      if (cumulative > peak) {
+        peak = cumulative;
+      }
+      const drawdown = (peak - cumulative) / peak;
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    });
+    
+    // 计算夏普比率（假设无风险利率为3%）
+    const riskFreeRate = 0.03;
+    const excessReturn = annualizedReturn - riskFreeRate;
+    const sharpeRatio = annualizedVolatility > 0 ? excessReturn / annualizedVolatility : 0;
+    
+    // 计算索提诺比率（只考虑下行波动）
+    const downReturns = returns.filter(r => r < avgReturn);
+    const downVariance = downReturns.length > 0 
+      ? downReturns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length
+      : 0;
+    const downVolatility = Math.sqrt(downVariance) * Math.sqrt(4);
+    const sortinoRatio = downVolatility > 0 ? excessReturn / downVolatility : 0;
+    
+    return {
+      totalReturn,
+      annualizedReturn,
+      volatility: annualizedVolatility,
+      maxDrawdown,
+      sharpeRatio,
+      sortinoRatio
+    };
+  }
+
+  /**
+   * 计算所有报告期持仓的收益率（重构版：确保原策略和自定义策略公平对比）
    * @param {string} fundCode - 基金代码
    * @param {number} maxWeight - 单只股票最大权重
    * @param {Object} options - 配置选项
@@ -523,28 +579,48 @@ class PortfolioService {
         console.log(`受限股票数: ${limitedCount} (权重>10%)`);
         console.log(`权重调整迭代次数: ${iterationCount}`);
 
-        const replicatedReturns = await this.calculatePortfolioReturns(
+        // 计算自定义策略收益率（使用调整后的权重）
+        const customStrategyReturns = await this.calculatePortfolioReturns(
           replicatedPortfolio,
           startDate,
           endDate
         );
 
+        // 计算原策略收益率（使用基金原始权重，相同的股票池和价格数据）
+        const originalPortfolio = replicatedPortfolio.map(p => ({
+          ...p,
+          adjustedWeight: p.originalWeight  // 使用原始权重
+        }));
+        
+        const originalStrategyReturns = await this.calculatePortfolioReturns(
+          originalPortfolio,
+          startDate,
+          endDate
+        );
+
+        // 同时获取基金净值作为参考
         const fundNavReturn = await this.calculateReturnsFromNav(fundCode, startDate, endDate);
 
-        if (replicatedReturns && fundNavReturn) {
+        if (customStrategyReturns && originalStrategyReturns) {
           results.push({
             reportDate,
-            startDate: fundNavReturn.startDate,
-            endDate: fundNavReturn.endDate,
-            adjustedReturn: replicatedReturns.portfolioReturn,
-            adjustedStockCount: replicatedReturns.stockCount,
-            fundReturn: fundNavReturn.return,
-            fundStartNav: fundNavReturn.startNav,
-            fundEndNav: fundNavReturn.endNav,
+            startDate: customStrategyReturns.startDate || startDate,
+            endDate: customStrategyReturns.endDate || endDate,
+            // 自定义策略
+            customReturn: customStrategyReturns.portfolioReturn,
+            customStockCount: customStrategyReturns.stockCount,
+            // 原策略（使用相同股票和价格，只是权重不同）
+            originalReturn: originalStrategyReturns.portfolioReturn,
+            originalStockCount: originalStrategyReturns.stockCount,
+            // 基金净值（仅作参考）
+            fundReturn: fundNavReturn?.return || 0,
+            fundStartNav: fundNavReturn?.startNav || 0,
+            fundEndNav: fundNavReturn?.endNav || 0,
+            // 统计信息
             stockCount: replicatedPortfolio.length,
             totalStocks: reportHoldings.length,
             limitedStocks: 0,
-            excessReturn: replicatedReturns.portfolioReturn - fundNavReturn.return,
+            excessReturn: customStrategyReturns.portfolioReturn - originalStrategyReturns.portfolioReturn,
             adjustedHoldings: replicatedPortfolio.map(p => ({
               symbol: p.symbol,
               name: p.name,
@@ -570,10 +646,11 @@ class PortfolioService {
             }))
           });
 
-          console.log(`✅ 原基金收益: ${(fundNavReturn.return * 100).toFixed(2)}%`);
-          console.log(`✅ 复制组合收益: ${(replicatedReturns.portfolioReturn * 100).toFixed(2)}%`);
-          console.log(`✅ 超额收益: ${((replicatedReturns.portfolioReturn - fundNavReturn.return) * 100).toFixed(2)}%`);
-          console.log(`✅ 持仓: ${replicatedPortfolio.length}只 (完全复制)`);
+          console.log(`✅ 原策略收益: ${(originalStrategyReturns.portfolioReturn * 100).toFixed(2)}% (使用原始权重)`);
+          console.log(`✅ 自定义策略收益: ${(customStrategyReturns.portfolioReturn * 100).toFixed(2)}% (使用调整后权重)`);
+          console.log(`✅ 超额收益: ${((customStrategyReturns.portfolioReturn - originalStrategyReturns.portfolioReturn) * 100).toFixed(2)}%`);
+          console.log(`✅ 基金净值收益: ${(fundNavReturn?.return * 100 || 0).toFixed(2)}% (仅作参考)`);
+          console.log(`✅ 持仓: ${replicatedPortfolio.length}只`);
         } else {
           console.log(`⚠️  无法计算该期收益率`);
         }
@@ -582,34 +659,75 @@ class PortfolioService {
       }
     }
 
-    // 不需要再过滤，因为已经在循环中跳过了持仓数<=10的报告期
-    // 计算累计收益率：每个报告期的收益率累乘
-    let adjustedCumulative = 1;
+    // 计算累计收益率和风险指标
+    let customCumulative = 1;
+    let originalCumulative = 1;
     let fundCumulative = 1;
     
+    const customReturns = [];
+    const originalReturns = [];
+    const fundReturns = [];
+    
     results.forEach((r, index) => {
-      adjustedCumulative *= (1 + r.adjustedReturn);
+      customCumulative *= (1 + r.customReturn);
+      originalCumulative *= (1 + r.originalReturn);
       fundCumulative *= (1 + r.fundReturn);
       
-      r.adjustedCumulativeReturn = adjustedCumulative - 1;
+      r.customCumulativeReturn = customCumulative - 1;
+      r.originalCumulativeReturn = originalCumulative - 1;
       r.fundCumulativeReturn = fundCumulative - 1;
-      r.excessCumulativeReturn = r.adjustedCumulativeReturn - r.fundCumulativeReturn;
+      r.excessCumulativeReturn = r.customCumulativeReturn - r.originalCumulativeReturn;
       
-      console.log(`累计到${r.reportDate}: 复制组合累计${(r.adjustedCumulativeReturn * 100).toFixed(2)}%, 基金累计${(r.fundCumulativeReturn * 100).toFixed(2)}%`);
+      customReturns.push(r.customReturn);
+      originalReturns.push(r.originalReturn);
+      fundReturns.push(r.fundReturn);
+      
+      console.log(`累计到${r.reportDate}: 自定义${(r.customCumulativeReturn * 100).toFixed(2)}%, 原策略${(r.originalCumulativeReturn * 100).toFixed(2)}%, 超额${(r.excessCumulativeReturn * 100).toFixed(2)}%`);
     });
+
+    // 计算风险指标
+    const customRisk = this.calculateRiskMetrics(customReturns, results.length);
+    const originalRisk = this.calculateRiskMetrics(originalReturns, results.length);
+    const fundRisk = this.calculateRiskMetrics(fundReturns, results.length);
 
     console.log(`\n${'='.repeat(60)}`);
     console.log(`有效报告期数: ${results.length}`);
     console.log(`已跳过只公布前10大持仓的报告期`);
+    
     if (results.length > 0) {
       const lastPeriod = results[results.length - 1];
-      console.log(`\n调整后组合累计收益: ${(lastPeriod.adjustedCumulativeReturn * 100).toFixed(2)}%`);
-      console.log(`原基金累计收益: ${(lastPeriod.fundCumulativeReturn * 100).toFixed(2)}%`);
+      console.log(`\n【累计收益率】`);
+      console.log(`自定义策略: ${(lastPeriod.customCumulativeReturn * 100).toFixed(2)}%`);
+      console.log(`原策略: ${(lastPeriod.originalCumulativeReturn * 100).toFixed(2)}%`);
       console.log(`累计超额收益: ${(lastPeriod.excessCumulativeReturn * 100).toFixed(2)}%`);
+      console.log(`基金净值: ${(lastPeriod.fundCumulativeReturn * 100).toFixed(2)}% (仅作参考)`);
+      
+      if (customRisk) {
+        console.log(`\n【自定义策略风险指标】`);
+        console.log(`年化收益率: ${(customRisk.annualizedReturn * 100).toFixed(2)}%`);
+        console.log(`年化波动率: ${(customRisk.volatility * 100).toFixed(2)}%`);
+        console.log(`最大回撤: ${(customRisk.maxDrawdown * 100).toFixed(2)}%`);
+        console.log(`夏普比率: ${customRisk.sharpeRatio.toFixed(2)}`);
+        console.log(`索提诺比率: ${customRisk.sortinoRatio.toFixed(2)}`);
+      }
+      
+      if (originalRisk) {
+        console.log(`\n【原策略风险指标】`);
+        console.log(`年化收益率: ${(originalRisk.annualizedReturn * 100).toFixed(2)}%`);
+        console.log(`年化波动率: ${(originalRisk.volatility * 100).toFixed(2)}%`);
+        console.log(`最大回撤: ${(originalRisk.maxDrawdown * 100).toFixed(2)}%`);
+        console.log(`夏普比率: ${originalRisk.sharpeRatio.toFixed(2)}`);
+        console.log(`索提诺比率: ${originalRisk.sortinoRatio.toFixed(2)}`);
+      }
     }
     console.log(`${'='.repeat(60)}\n`);
 
-    return results;
+    return {
+      periods: results,
+      customRisk,
+      originalRisk,
+      fundRisk
+    };
   }
 }
 
