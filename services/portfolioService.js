@@ -203,12 +203,29 @@ class PortfolioService {
         const endPrice = prices[prices.length - 1].close;
         const stockReturn = (endPrice - startPrice) / startPrice;
         
+        // 计算期望的交易日数量（粗略估算：每月约20个交易日）
+        const daysDiff = Math.abs(
+          new Date(prices[prices.length - 1].trade_date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')) -
+          new Date(prices[0].trade_date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
+        ) / (1000 * 60 * 60 * 24);
+        const expectedTradingDays = Math.floor(daysDiff / 7 * 5);  // 粗略估算
+        const dataCompleteness = prices.length / Math.max(expectedTradingDays, 1);
+        
+        // 过滤条件：数据完整度低于50%或收益率异常高（可能是新股）
+        if (dataCompleteness < 0.5 || Math.abs(stockReturn) > 3.0) {
+          console.warn(`⚠️  ${stock.symbol} 数据异常，跳过该股票`);
+          console.warn(`   收益率: ${(stockReturn * 100).toFixed(2)}%`);
+          console.warn(`   数据点数: ${prices.length}/${expectedTradingDays} (完整度${(dataCompleteness*100).toFixed(1)}%)`);
+          console.warn(`   起始: ${prices[0].trade_date}, 结束: ${prices[prices.length - 1].trade_date}`);
+          continue;  // 跳过该股票
+        }
+        
         // 添加详细日志，检查异常收益率
-        if (Math.abs(stockReturn) > 2.0) {  // 收益率超过200%
-          console.warn(`⚠️  ${stock.symbol} 收益率异常: ${(stockReturn * 100).toFixed(2)}%`);
-          console.warn(`   起始: ${prices[0].trade_date} 价格${startPrice.toFixed(2)} (复权因子${prices[0].adj_factor})`);
-          console.warn(`   结束: ${prices[prices.length - 1].trade_date} 价格${endPrice.toFixed(2)} (复权因子${prices[prices.length - 1].adj_factor})`);
-          console.warn(`   原始价格: ${prices[0].original_close} -> ${prices[prices.length - 1].original_close}`);
+        if (Math.abs(stockReturn) > 1.0) {  // 收益率超过100%
+          console.warn(`⚠️  ${stock.symbol} 收益率较高: ${(stockReturn * 100).toFixed(2)}%`);
+          console.warn(`   起始: ${prices[0].trade_date} 价格${startPrice.toFixed(2)}`);
+          console.warn(`   结束: ${prices[prices.length - 1].trade_date} 价格${endPrice.toFixed(2)}`);
+          console.warn(`   数据点数: ${prices.length}, 权重: ${(stock.adjustedWeight * 100).toFixed(2)}%`);
         }
 
         stockReturns.push({
