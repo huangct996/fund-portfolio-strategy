@@ -47,6 +47,17 @@ class PortfolioService {
       return [];
     }
     
+    // 特殊情况：如果只有市值权重（市值权重=1），直接按市值比例分配
+    if (normalizedMvWeight === 1.0) {
+      const totalMv = validStocks.reduce((sum, s) => sum + s.marketValue, 0);
+      validStocks.forEach(stock => {
+        stock.compositeScore = stock.marketValue / totalMv;
+        stock.adjustedWeight = stock.marketValue / totalMv;
+        stock.isLimited = false;
+      });
+      return validStocks.sort((a, b) => b.marketValue - a.marketValue);
+    }
+    
     // 计算排名（值越大排名越高，排名分数越高）
     // 市值排名
     const sortedByMv = [...validStocks].sort((a, b) => b.marketValue - a.marketValue);
