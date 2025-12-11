@@ -81,6 +81,24 @@ class TushareService {
   }
 
   /**
+   * 日期加减天数
+   */
+  addDays(dateStr, days) {
+    const year = parseInt(dateStr.substring(0, 4));
+    const month = parseInt(dateStr.substring(4, 6)) - 1;
+    const day = parseInt(dateStr.substring(6, 8));
+    
+    const date = new Date(year, month, day);
+    date.setDate(date.getDate() + days);
+    
+    const newYear = date.getFullYear();
+    const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const newDay = String(date.getDate()).padStart(2, '0');
+    
+    return `${newYear}${newMonth}${newDay}`;
+  }
+
+  /**
    * 批量获取股票基本信息（包含名称、市值、股息率、质量因子）
    */
   async batchGetStockBasic(stockCodes, tradeDate) {
@@ -139,16 +157,45 @@ class TushareService {
       
       try {
         // 获取市值、股息率、PE、PB
-        const data = await this.callApi('daily_basic', {
+        // 注意：如果tradeDate不是交易日，需要查找前后最近的交易日
+        let data = await this.callApi('daily_basic', {
           ts_code: tsCode,
           trade_date: tradeDate,
           fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
         });
+        
+        // 如果指定日期没有数据，尝试获取该日期前后一周的数据
+        if (!data || data.length === 0) {
+          const startDate = this.addDays(tradeDate, -7);
+          const endDate = this.addDays(tradeDate, 7);
+          
+          data = await this.callApi('daily_basic', {
+            ts_code: tsCode,
+            start_date: startDate,
+            end_date: endDate,
+            fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
+          });
+          
+          // 选择最接近目标日期的数据
+          if (data && data.length > 0) {
+            data = [data.reduce((closest, item) => {
+              const closestDiff = Math.abs(parseInt(closest.trade_date) - parseInt(tradeDate));
+              const itemDiff = Math.abs(parseInt(item.trade_date) - parseInt(tradeDate));
+              return itemDiff < closestDiff ? item : closest;
+            })];
+          }
+        }
 
         if (data && data.length > 0) {
           if (!results[tsCode]) {
             results[tsCode] = {};
           }
+          
+          const actualDate = data[0].trade_date;
+          if (actualDate !== tradeDate) {
+            console.log(`  ${tsCode}: 使用 ${actualDate} 的数据（目标日期 ${tradeDate} 非交易日）`);
+          }
+          
           results[tsCode].totalMv = data[0].total_mv || 0;  // 总市值（万元）
           results[tsCode].dvRatio = data[0].dv_ratio || 0;  // 股息率（%）
           results[tsCode].peTtm = data[0].pe_ttm || 0;      // 市盈率TTM
@@ -162,6 +209,8 @@ class TushareService {
           results[tsCode].pbScore = pbScore;
           
           successCount++;
+        } else {
+          console.warn(`  ${tsCode}: 无法获取市值数据（目标日期 ${tradeDate} 前后一周无交易数据）`);
         }
         
         // 尝试获取ROE数据（财务指标）
