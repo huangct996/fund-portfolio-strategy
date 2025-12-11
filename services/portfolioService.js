@@ -389,9 +389,15 @@ class PortfolioService {
       const reportHoldings = groupedHoldings[reportDate];
       
       // 检查是否只公布了前10大持仓
+      let useLastPortfolio = false;
       if (reportHoldings.length <= 10) {
-        console.log(`\n报告期 ${reportDate}: 只公布前${reportHoldings.length}大持仓，跳过该报告期，维持上一期持仓`);
-        continue;  // 跳过该报告期，不调仓
+        if (lastValidPortfolio) {
+          console.log(`\n报告期 ${reportDate}: 只公布前${reportHoldings.length}大持仓，使用上一期持仓计算收益率（不调仓）`);
+          useLastPortfolio = true;
+        } else {
+          console.log(`\n报告期 ${reportDate}: 只公布前${reportHoldings.length}大持仓，且没有上一期持仓，跳过该报告期`);
+          continue;
+        }
       }
 
       // 根据报告期计算披露日期（一般是报告期后2个月）
@@ -474,20 +480,28 @@ class PortfolioService {
       console.log(`计算时间段: ${startDate} -> ${endDate}`);
 
       try {
-        // 获取股票代码列表
-        const stockCodes = reportHoldings.map(h => h.symbol);
+        let replicatedPortfolio;
         
-        // 获取股票名称和市值
-        const stockInfo = await tushareService.batchGetStockBasic(stockCodes, startDate);
-        
-        console.log(`获取到 ${Object.keys(stockInfo).length} 只股票的基本信息`);
-        
-        // 计算原始权重（基金持仓市值）
-        const totalOriginalMkv = reportHoldings.reduce((sum, h) => sum + (h.mkv || 0), 0);
-        
-        // 构建股票数据
-        let totalMarketValue = 0;
-        const portfolioWithMv = reportHoldings.map(h => {
+        // 如果使用上一期持仓，直接使用，不重新计算
+        if (useLastPortfolio) {
+          console.log(`📋 使用上一期持仓组合（${lastValidPortfolio.length}只股票），不调仓`);
+          replicatedPortfolio = lastValidPortfolio;
+        } else {
+          // 正常流程：获取持仓并计算权重
+          // 获取股票代码列表
+          const stockCodes = reportHoldings.map(h => h.symbol);
+          
+          // 获取股票名称和市值
+          const stockInfo = await tushareService.batchGetStockBasic(stockCodes, startDate);
+          
+          console.log(`获取到 ${Object.keys(stockInfo).length} 只股票的基本信息`);
+          
+          // 计算原始权重（基金持仓市值）
+          const totalOriginalMkv = reportHoldings.reduce((sum, h) => sum + (h.mkv || 0), 0);
+          
+          // 构建股票数据
+          let totalMarketValue = 0;
+          const portfolioWithMv = reportHoldings.map(h => {
           const tsCode = h.symbol.includes('.') ? h.symbol : 
                         (h.symbol.startsWith('6') || h.symbol.startsWith('5')) ? 
                         `${h.symbol}.SH` : `${h.symbol}.SZ`;
@@ -607,14 +621,18 @@ class PortfolioService {
               console.log(`  重新分配 ${(excessWeight * 100).toFixed(2)}% 给 ${unrestrictedCount} 只未受限股票（按市值比例）`);
             }
           }
+          }
+          
+          replicatedPortfolio = portfolioWithWeights.sort((a, b) => b.adjustedWeight - a.adjustedWeight);
+          const limitedCount = replicatedPortfolio.filter(s => s.isLimited).length;
+          
+          console.log(`有效持仓数: ${replicatedPortfolio.length}/${reportHoldings.length}`);
+          console.log(`受限股票数: ${limitedCount} (权重>10%)`);
+          console.log(`权重调整迭代次数: ${iterationCount}`);
+          
+          // 保存当前持仓组合，供下一期使用
+          lastValidPortfolio = replicatedPortfolio;
         }
-        
-        const replicatedPortfolio = portfolioWithWeights.sort((a, b) => b.adjustedWeight - a.adjustedWeight);
-        const limitedCount = replicatedPortfolio.filter(s => s.isLimited).length;
-        
-        console.log(`有效持仓数: ${replicatedPortfolio.length}/${reportHoldings.length}`);
-        console.log(`受限股票数: ${limitedCount} (权重>10%)`);
-        console.log(`权重调整迭代次数: ${iterationCount}`);
 
         // 计算自定义策略收益率（使用调整后的权重）
         const customStrategyReturns = await this.calculatePortfolioReturns(
