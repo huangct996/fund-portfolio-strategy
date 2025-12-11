@@ -412,28 +412,32 @@ class PortfolioService {
         
         // 找到下一个持仓数>10的报告期
         if (nextReportHoldings.length > 10) {
-          nextValidReportIndex = j;
-          break;
+          // 计算下一个报告期的披露日
+          const nextYear = nextReportDate.substring(0, 4);
+          const nextMonth = nextReportDate.substring(4, 6);
+          let nextDisclosureDate;
+          
+          if (nextMonth === '03') {
+            nextDisclosureDate = `${nextYear}0430`;
+          } else if (nextMonth === '06') {
+            nextDisclosureDate = `${nextYear}0828`;
+          } else if (nextMonth === '09') {
+            nextDisclosureDate = `${nextYear}1031`;
+          } else if (nextMonth === '12') {
+            const nextNextYear = parseInt(nextYear) + 1;
+            nextDisclosureDate = `${nextNextYear}0430`;
+          }
+          
+          // 只有当下一个披露日晚于当前披露日时，才使用这个报告期
+          if (nextDisclosureDate > startDate) {
+            nextValidReportIndex = j;
+            endDate = nextDisclosureDate;
+            break;
+          }
         }
       }
       
-      if (nextValidReportIndex !== -1) {
-        // 找到了下一个有效报告期，计算到该报告期的披露日
-        const nextReportDate = selectedReportDates[nextValidReportIndex];
-        const nextYear = nextReportDate.substring(0, 4);
-        const nextMonth = nextReportDate.substring(4, 6);
-        
-        if (nextMonth === '03') {
-          endDate = `${nextYear}0430`;
-        } else if (nextMonth === '06') {
-          endDate = `${nextYear}0828`;
-        } else if (nextMonth === '09') {
-          endDate = `${nextYear}1031`;
-        } else if (nextMonth === '12') {
-          const nextNextYear = parseInt(nextYear) + 1;
-          endDate = `${nextNextYear}0430`;
-        }
-      } else {
+      if (nextValidReportIndex === -1) {
         // 没有找到下一个有效报告期，计算到今天
         const today = new Date();
         endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
