@@ -305,11 +305,24 @@ class PortfolioService {
       return null;
     }
 
-    // 使用单位净值计算收益率（正确方法）
-    // 单位净值反映了基金在该时间段的实际涨跌
-    const returnRate = (endNav.unit_nav - startNav.unit_nav) / startNav.unit_nav;
+    // 检查是否有分红（累计净值增长但单位净值下降）
+    const unitNavChange = (endNav.unit_nav - startNav.unit_nav) / startNav.unit_nav;
+    const accumNavChange = (endNav.accum_nav - startNav.accum_nav) / startNav.accum_nav;
     
-    console.log(`基金净值: ${startNav.nav_date}(${startNav.unit_nav}) -> ${endNav.nav_date}(${endNav.unit_nav}), 收益率: ${(returnRate * 100).toFixed(2)}%`);
+    // 如果单位净值和累计净值变化差异很大（>10%），说明有分红
+    const hasDividend = Math.abs(unitNavChange - accumNavChange) > 0.1;
+    
+    let returnRate;
+    if (hasDividend) {
+      // 有分红时，使用累计净值计算（包含分红再投资）
+      returnRate = accumNavChange;
+      console.log(`基金净值: ${startNav.nav_date}(${startNav.unit_nav}/${startNav.accum_nav}) -> ${endNav.nav_date}(${endNav.unit_nav}/${endNav.accum_nav})`);
+      console.log(`⚠️  检测到分红，使用累计净值计算: ${(returnRate * 100).toFixed(2)}% (单位净值: ${(unitNavChange * 100).toFixed(2)}%)`);
+    } else {
+      // 无分红时，使用单位净值计算
+      returnRate = unitNavChange;
+      console.log(`基金净值: ${startNav.nav_date}(${startNav.unit_nav}) -> ${endNav.nav_date}(${endNav.unit_nav}), 收益率: ${(returnRate * 100).toFixed(2)}%`);
+    }
     
     return {
       startDate: startNav.nav_date,
@@ -318,7 +331,8 @@ class PortfolioService {
       endNav: endNav.unit_nav,
       accumStartNav: startNav.accum_nav,
       accumEndNav: endNav.accum_nav,
-      return: returnRate
+      return: returnRate,
+      hasDividend: hasDividend
     };
   }
 
