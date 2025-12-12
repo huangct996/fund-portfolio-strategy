@@ -1,10 +1,19 @@
 const axios = require('axios');
+const dbService = require('./dbService');
 require('dotenv').config();
 
 class TushareService {
   constructor() {
     this.token = process.env.TUSHARE_TOKEN;
     this.baseUrl = 'http://api.tushare.pro';
+    this.dbInitialized = false;
+  }
+
+  async ensureDbInitialized() {
+    if (!this.dbInitialized) {
+      await dbService.init();
+      this.dbInitialized = true;
+    }
   }
 
   /**
@@ -50,18 +59,38 @@ class TushareService {
   }
 
   /**
-   * 获取基金持仓数据
+   * 获取基金持仓数据（优先从数据库查询）
    */
   async getFundHoldings(fundCode) {
     try {
-      console.log(`正在获取基金持仓数据: ${fundCode}`);
-      const data = await this.callApi('fund_portfolio', {
+      await this.ensureDbInitialized();
+      
+      // 1. 先从数据库查询
+      console.log(`正在从数据库查询基金持仓数据: ${fundCode}`);
+      let data = await dbService.getFundPortfolio(fundCode);
+      
+      if (data && data.length > 0) {
+        console.log(`✅ 从数据库获取到 ${data.length} 条持仓记录`);
+        return data;
+      }
+      
+      // 2. 数据库没有，调用Tushare API
+      console.log(`数据库无数据，正在调用Tushare API: ${fundCode}`);
+      data = await this.callApi('fund_portfolio', {
         ts_code: fundCode
       });
       console.log(`获取到 ${data.length} 条持仓记录`);
+      
+      // 3. 保存到数据库
       if (data.length > 0) {
-        console.log('示例数据:', data[0]);
+        console.log('正在同步数据到数据库...');
+        await dbService.saveFundPortfolio(data);
+        console.log('✅ 数据已同步到数据库');
+        if (data.length > 0) {
+          console.log('示例数据:', data[0]);
+        }
       }
+      
       return data;
     } catch (error) {
       console.error('获取基金持仓失败:', error.message);
@@ -70,13 +99,32 @@ class TushareService {
   }
 
   /**
-   * 获取基金净值数据
+   * 获取基金净值数据（优先从数据库查询）
    */
   async getFundNav(fundCode, startDate = '20180101') {
-    const data = await this.callApi('fund_nav', {
+    await this.ensureDbInitialized();
+    
+    // 1. 先从数据库查询
+    let data = await dbService.getFundNav(fundCode, startDate);
+    
+    if (data && data.length > 0) {
+      console.log(`✅ 从数据库获取到 ${data.length} 条基金净值记录`);
+      return data.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+    }
+    
+    // 2. 数据库没有，调用Tushare API
+    console.log(`数据库无净值数据，正在调用Tushare API`);
+    data = await this.callApi('fund_nav', {
       ts_code: fundCode,
       start_date: startDate
     });
+    
+    // 3. 保存到数据库
+    if (data.length > 0) {
+      await dbService.saveFundNav(data);
+      console.log('✅ 净值数据已同步到数据库');
+    }
+    
     return data.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
   }
 
@@ -99,9 +147,10 @@ class TushareService {
   }
 
   /**
-   * 批量获取股票基本信息（包含名称、市值、股息率、质量因子）
+   * 批量获取股票基本信息（包含名称、市值、股息率、质量因子，优先从数据库查询）
    */
   async batchGetStockBasic(stockCodes, tradeDate) {
+    await this.ensureDbInitialized();
     const results = {};
     
     if (!stockCodes || stockCodes.length === 0) {
@@ -121,12 +170,36 @@ class TushareService {
       return code;
     });
 
+    // 先从数据库查询
+    const missingCodes = [];
+    for (const tsCode of tsCodes) {
+      const dbData = await dbService.getStockBasicInfo(tsCode, tradeDate);
+      if (dbData) {
+        results[tsCode] = {
+          name: dbData.name || tsCode,
+          totalMv: dbData.total_mv || 0,
+          dvRatio: dbData.dv_ratio || 0,
+          peTtm: dbData.pe_ttm || 0,
+          pb: dbData.pb || 0
+        };
+      } else {
+        missingCodes.push(tsCode);
+      }
+    }
+
+    if (missingCodes.length === 0) {
+      console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票基本信息`);
+      return results;
+    }
+
+    console.log(`数据库缺失 ${missingCodes.length}/${tsCodes.length} 只股票基本信息，从Tushare获取`);
+
     // 每次最多获取50只股票
     const batchSize = 50;
     
     // 1. 获取股票名称
-    for (let i = 0; i < tsCodes.length; i += batchSize) {
-      const batch = tsCodes.slice(i, i + batchSize);
+    for (let i = 0; i < missingCodes.length; i += batchSize) {
+      const batch = missingCodes.slice(i, i + batchSize);
       const tsCodeStr = batch.join(',');
       
       try {
@@ -149,11 +222,12 @@ class TushareService {
     }
 
     // 2. 获取股票市值、股息率、质量因子（逐个获取以避免权限问题）
-    console.log(`开始获取 ${tsCodes.length} 只股票的市值、股息率和质量因子数据...`);
+    console.log(`开始获取 ${missingCodes.length} 只股票的市值、股息率和质量因子数据...`);
     let successCount = 0;
+    const dataToSave = [];
     
-    for (let i = 0; i < tsCodes.length; i++) {
-      const tsCode = tsCodes[i];
+    for (let i = 0; i < missingCodes.length; i++) {
+      const tsCode = missingCodes[i];
       
       try {
         // 获取市值、股息率、PE、PB
@@ -208,6 +282,16 @@ class TushareService {
           results[tsCode].peScore = peScore;
           results[tsCode].pbScore = pbScore;
           
+          // 准备保存到数据库
+          dataToSave.push({
+            ts_code: tsCode,
+            trade_date: tradeDate,
+            total_mv: data[0].total_mv || 0,
+            dv_ratio: data[0].dv_ratio || 0,
+            pe_ttm: data[0].pe_ttm || 0,
+            pb: data[0].pb || 0
+          });
+          
           successCount++;
         } else {
           console.warn(`  ${tsCode}: 无法获取市值数据（目标日期 ${tradeDate} 前后一周无交易数据）`);
@@ -238,7 +322,13 @@ class TushareService {
       }
     }
     
-    console.log(`成功获取 ${successCount}/${tsCodes.length} 只股票的完整数据`);
+    console.log(`成功获取 ${successCount}/${missingCodes.length} 只股票的完整数据`);
+    
+    // 保存到数据库
+    if (dataToSave.length > 0) {
+      await dbService.saveStockBasicInfo(dataToSave);
+      console.log('✅ 股票基本信息已同步到数据库');
+    }
 
     return results;
   }
@@ -256,10 +346,11 @@ class TushareService {
   }
 
   /**
-   * 批量获取股票价格（使用前复权价格）
+   * 批量获取股票价格（使用前复权价格，优先从数据库查询）
    * 前复权：将历史价格按照分红、配股等因素调整，使价格连续可比
    */
   async batchGetStockPrices(stockCodes, startDate, endDate) {
+    await this.ensureDbInitialized();
     const results = {};
     
     if (!stockCodes || stockCodes.length === 0) {
@@ -279,16 +370,50 @@ class TushareService {
       return code;
     });
 
-    // 由于需要获取复权因子，只能逐个股票获取
-    // 每次最多获取50只股票的数据和复权因子
+    // 先尝试从数据库获取
+    const missingCodes = [];
+    for (const tsCode of tsCodes) {
+      const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
+      const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
+      
+      if (dailyData.length > 0 && adjFactorData.length > 0) {
+        // 数据库有完整数据
+        const adjFactorMap = {};
+        adjFactorData.forEach(item => {
+          adjFactorMap[item.trade_date] = item.adj_factor;
+        });
+        
+        results[tsCode] = dailyData.map(item => ({
+          ts_code: tsCode,
+          trade_date: item.trade_date,
+          open: item.open_price * (adjFactorMap[item.trade_date] || 1),
+          high: item.high_price * (adjFactorMap[item.trade_date] || 1),
+          low: item.low_price * (adjFactorMap[item.trade_date] || 1),
+          close: item.close_price * (adjFactorMap[item.trade_date] || 1),
+          adj_factor: adjFactorMap[item.trade_date] || 1,
+          original_close: item.close_price
+        })).sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+      } else {
+        missingCodes.push(tsCode);
+      }
+    }
+    
+    if (missingCodes.length > 0) {
+      console.log(`数据库缺失 ${missingCodes.length}/${tsCodes.length} 只股票数据，从Tushare获取`);
+    } else {
+      console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票数据`);
+      return results;
+    }
+
+    // 从Tushare API获取缺失的数据
     const batchSize = 50;
     
-    for (let i = 0; i < tsCodes.length; i += batchSize) {
-      const batch = tsCodes.slice(i, i + batchSize);
+    for (let i = 0; i < missingCodes.length; i += batchSize) {
+      const batch = missingCodes.slice(i, i + batchSize);
       const tsCodeStr = batch.join(',');
       
       try {
-        console.log(`批量获取股票 ${i + 1}-${Math.min(i + batchSize, tsCodes.length)} / ${tsCodes.length}`);
+        console.log(`批量获取股票 ${i + 1}-${Math.min(i + batchSize, missingCodes.length)} / ${missingCodes.length}`);
         
         // 获取日线数据
         const dailyData = await this.callApi('daily', {
@@ -303,6 +428,14 @@ class TushareService {
           start_date: startDate,
           end_date: endDate
         });
+        
+        // 保存到数据库
+        if (dailyData.length > 0) {
+          await dbService.saveStockDaily(dailyData);
+        }
+        if (adjFactorData.length > 0) {
+          await dbService.saveAdjFactor(adjFactorData);
+        }
 
         // 构建复权因子映射 {ts_code: {trade_date: adj_factor}}
         const adjFactorMap = {};
