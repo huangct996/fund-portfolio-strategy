@@ -177,11 +177,18 @@ class TushareService {
       if (dbData) {
         results[tsCode] = {
           name: dbData.name || tsCode,
-          totalMv: dbData.total_mv || 0,
-          dvRatio: dbData.dv_ratio || 0,
-          peTtm: dbData.pe_ttm || 0,
-          pb: dbData.pb || 0
+          totalMv: parseFloat(dbData.total_mv) || 0,
+          dvRatio: parseFloat(dbData.dv_ratio) || 0,
+          peTtm: parseFloat(dbData.pe_ttm) || 0,
+          pb: parseFloat(dbData.pb) || 0
         };
+        
+        // 计算质量因子
+        const peScore = results[tsCode].peTtm > 0 ? 1 / results[tsCode].peTtm : 0;
+        const pbScore = results[tsCode].pb > 0 ? 1 / results[tsCode].pb : 0;
+        results[tsCode].qualityFactor = (peScore + pbScore) / 2;
+        results[tsCode].peScore = peScore;
+        results[tsCode].pbScore = pbScore;
       } else {
         missingCodes.push(tsCode);
       }

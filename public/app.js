@@ -437,9 +437,9 @@ function renderHoldingsForPeriod(period) {
         if (currentConfig.useCompositeScore) {
             // 综合得分策略：显示得分相关列，无状态列
             rowHtml += `
-                <td class="composite-col">${(stock.compositeScore || 0).toFixed(4)}</td>
-                <td class="composite-col">${(stock.dvRatio || 0).toFixed(2)}%</td>
-                <td class="composite-col">${(stock.qualityFactor || 0).toFixed(4)}</td>
+                <td class="composite-col">${(parseFloat(stock.compositeScore) || 0).toFixed(4)}</td>
+                <td class="composite-col">${(parseFloat(stock.dvRatio) || 0).toFixed(2)}%</td>
+                <td class="composite-col">${(parseFloat(stock.qualityFactor) || 0).toFixed(4)}</td>
             `;
         } else {
             // 市值加权策略：显示状态列
