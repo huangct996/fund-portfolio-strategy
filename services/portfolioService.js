@@ -66,56 +66,32 @@ class PortfolioService {
       stock.qualityRank = validStocks.length - index;
     });
     
-    // 检测是否为纯单因子策略（某个权重=1，其他=0）
-    const isPureMvStrategy = normalizedMvWeight === 1;
-    const isPureDvStrategy = normalizedDvWeight === 1;
-    const isPureQualityStrategy = normalizedQualityWeight === 1;
+    // 通用计算公式：使用归一化的因子值
+    // 计算各因子的总和用于归一化
+    const totalMv = validStocks.reduce((sum, s) => sum + s.marketValue, 0);
+    const totalDv = validStocks.reduce((sum, s) => sum + (s.dvRatio || 0), 0);
+    const totalQuality = validStocks.reduce((sum, s) => sum + (s.qualityFactor || 0), 0);
     
-    // 计算综合得分或直接使用因子值
-    if (isPureMvStrategy) {
-      // 纯市值策略：直接使用市值比例，与市值加权策略保持一致
-      const totalMv = validStocks.reduce((sum, s) => sum + s.marketValue, 0);
-      validStocks.forEach(stock => {
-        stock.compositeScore = stock.marketValue / totalMv;  // 使用市值比例作为得分
-        stock.adjustedWeight = stock.compositeScore;
-        stock.isLimited = false;
-      });
-    } else if (isPureDvStrategy) {
-      // 纯股息率策略：直接使用股息率比例
-      const totalDv = validStocks.reduce((sum, s) => sum + (s.dvRatio || 0), 0);
-      validStocks.forEach(stock => {
-        stock.compositeScore = (stock.dvRatio || 0) / totalDv;
-        stock.adjustedWeight = stock.compositeScore;
-        stock.isLimited = false;
-      });
-    } else if (isPureQualityStrategy) {
-      // 纯质量因子策略：直接使用质量因子比例
-      const totalQuality = validStocks.reduce((sum, s) => sum + (s.qualityFactor || 0), 0);
-      validStocks.forEach(stock => {
-        stock.compositeScore = (stock.qualityFactor || 0) / totalQuality;
-        stock.adjustedWeight = stock.compositeScore;
-        stock.isLimited = false;
-      });
-    } else {
-      // 多因子混合策略：使用排名分数
-      validStocks.forEach(stock => {
-        const mvScore = stock.mvRank / validStocks.length;
-        const dvScore = stock.dvRank / validStocks.length;
-        const qualityScore = stock.qualityRank / validStocks.length;
-        
-        stock.compositeScore = 
-          mvScore * normalizedMvWeight + 
-          dvScore * normalizedDvWeight + 
-          qualityScore * normalizedQualityWeight;
-      });
+    // 计算综合得分（通用公式）
+    validStocks.forEach(stock => {
+      // 归一化各因子值（0-1范围）
+      const normalizedMv = totalMv > 0 ? stock.marketValue / totalMv : 0;
+      const normalizedDv = totalDv > 0 ? (stock.dvRatio || 0) / totalDv : 0;
+      const normalizedQuality = totalQuality > 0 ? (stock.qualityFactor || 0) / totalQuality : 0;
       
-      // 按综合得分分配权重
-      const totalScore = validStocks.reduce((sum, s) => sum + s.compositeScore, 0);
-      validStocks.forEach(stock => {
-        stock.adjustedWeight = stock.compositeScore / totalScore;
-        stock.isLimited = false;
-      });
-    }
+      // 综合得分 = 加权求和
+      stock.compositeScore = 
+        normalizedMv * normalizedMvWeight + 
+        normalizedDv * normalizedDvWeight + 
+        normalizedQuality * normalizedQualityWeight;
+    });
+    
+    // 按综合得分分配权重
+    const totalScore = validStocks.reduce((sum, s) => sum + s.compositeScore, 0);
+    validStocks.forEach(stock => {
+      stock.adjustedWeight = totalScore > 0 ? stock.compositeScore / totalScore : 0;
+      stock.isLimited = false;
+    });
     
     return validStocks.sort((a, b) => b.compositeScore - a.compositeScore);
   }

@@ -74,6 +74,17 @@
                 </div>
             </div>
 
+            <div id="marketValueConfig" class="config-section">
+                <h3>市值加权策略配置</h3>
+                <div class="weight-config">
+                    <div class="weight-item">
+                        <label>单只股票最大权重: <span id="mvMaxWeightValue">10%</span></label>
+                        <input type="range" id="mvMaxWeightSlider" min="5" max="30" step="1" value="10">
+                        <small style="color: #666;">限制单只股票的最大持仓比例，防止过度集中</small>
+                    </div>
+                </div>
+            </div>
+
             <div id="compositeWeights" class="config-section" style="display: none;">
                 <h3>综合得分权重配置</h3>
                 
@@ -120,6 +131,14 @@
                     <div class="weight-sum">
                         权重总和: <span id="weightSum">1.00</span>
                         <span id="weightWarning" style="color: #FF6B6B; display: none;">⚠️ 权重总和应为1.0</span>
+                    </div>
+                </div>
+                
+                <div class="weight-config">
+                    <div class="weight-item">
+                        <label>单只股票最大权重: <span id="maxWeightValue">10%</span></label>
+                        <input type="range" id="maxWeightSlider" min="5" max="30" step="1" value="10">
+                        <small style="color: #666;">限制单只股票的最大持仓比例，防止过度集中</small>
                     </div>
                 </div>
             </div>

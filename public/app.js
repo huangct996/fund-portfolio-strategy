@@ -8,7 +8,8 @@ let currentConfig = {
     mvWeight: 0.5,
     dvWeight: 0.3,
     qualityWeight: 0.2,
-    qualityFactorType: 'pe_pb'
+    qualityFactorType: 'pe_pb',
+    maxWeight: 0.10  // 单只股票最大权重，默认10%
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -141,6 +142,7 @@ async function fetchAllReturns(config) {
     params.append('dvWeight', config.dvWeight);
     params.append('qualityWeight', config.qualityWeight);
     params.append('qualityFactorType', config.qualityFactorType);
+    params.append('maxWeight', config.maxWeight || 0.10);
     
     const response = await fetch(`${API_BASE}/all-returns?${params}`);
     const result = await response.json();
@@ -211,8 +213,31 @@ function setupConfigPanel() {
     document.querySelectorAll('input[name="strategy"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             const compositeWeights = document.getElementById('compositeWeights');
-            compositeWeights.style.display = e.target.value === 'composite' ? 'block' : 'none';
+            const marketValueConfig = document.getElementById('marketValueConfig');
+            if (e.target.value === 'composite') {
+                compositeWeights.style.display = 'block';
+                marketValueConfig.style.display = 'none';
+            } else {
+                compositeWeights.style.display = 'none';
+                marketValueConfig.style.display = 'block';
+            }
         });
+    });
+    
+    // 市值加权策略权重上限滑块
+    const mvMaxWeightSlider = document.getElementById('mvMaxWeightSlider');
+    const mvMaxWeightValue = document.getElementById('mvMaxWeightValue');
+    mvMaxWeightSlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        mvMaxWeightValue.textContent = value + '%';
+    });
+    
+    // 综合得分策略权重上限滑块
+    const maxWeightSlider = document.getElementById('maxWeightSlider');
+    const maxWeightValue = document.getElementById('maxWeightValue');
+    maxWeightSlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        maxWeightValue.textContent = value + '%';
     });
     
     // 质量因子选择
@@ -307,20 +332,29 @@ async function applyConfiguration() {
     const dvWeight = parseFloat(document.getElementById('dvWeight').value);
     const qualityWeight = parseFloat(document.getElementById('qualityWeight').value);
     
+    // 获取权重上限
+    let maxWeight;
+    if (useCompositeScore) {
+        maxWeight = parseInt(document.getElementById('maxWeightSlider').value) / 100;
+    } else {
+        maxWeight = parseInt(document.getElementById('mvMaxWeightSlider').value) / 100;
+    }
+    
     // 验证权重和
     if (useCompositeScore && Math.abs(mvWeight + dvWeight + qualityWeight - 1.0) > 0.01) {
         alert('权重总和必须为1.0');
         return;
     }
     
-    // 更新配置
+    // 保存配置
     currentConfig = {
         reportPeriods: selectedPeriods,
         useCompositeScore,
         mvWeight,
         dvWeight,
         qualityWeight,
-        qualityFactorType
+        qualityFactorType,
+        maxWeight
     };
     
     // 重新加载数据

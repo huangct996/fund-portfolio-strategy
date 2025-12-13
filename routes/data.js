@@ -91,8 +91,12 @@ router.get('/all-returns', async (req, res) => {
       mvWeight,
       dvWeight,
       qualityWeight,
-      qualityFactorType
+      qualityFactorType,
+      maxWeight
     } = req.query;
+    
+    // 使用用户配置的maxWeight，如果没有则使用环境变量的默认值
+    const effectiveMaxWeight = maxWeight ? parseFloat(maxWeight) : MAX_WEIGHT;
     
     const options = {
       reportPeriods: reportPeriods ? reportPeriods.split(',') : [],
@@ -105,7 +109,7 @@ router.get('/all-returns', async (req, res) => {
       qualityFactorType: qualityFactorType || 'pe_pb'
     };
     
-    const result = await portfolioService.calculateAllPeriodReturns(FUND_CODE, MAX_WEIGHT, options);
+    const result = await portfolioService.calculateAllPeriodReturns(FUND_CODE, effectiveMaxWeight, options);
     res.json({
       success: true,
       data: {
