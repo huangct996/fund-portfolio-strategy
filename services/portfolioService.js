@@ -713,6 +713,10 @@ class PortfolioService {
         }));
         
         console.log(`原策略权重归一化: 总权重 ${(totalOriginalWeight * 100).toFixed(2)}% → 100%`);
+        console.log(`原策略前5只股票权重:`);
+        originalPortfolio.slice(0, 5).forEach(p => {
+          console.log(`  ${p.symbol}: 原始权重${(p.originalWeight*100).toFixed(2)}%, 归一化后${(p.adjustedWeight*100).toFixed(2)}%`);
+        });
         
         const originalStrategyReturns = await this.calculatePortfolioReturns(
           originalPortfolio,

@@ -364,29 +364,38 @@ class TushareService {
       return code;
     });
 
-    // 先尝试从数据库获取
+    // 先尝试从数据库获取，但要验证数据完整性
     const missingCodes = [];
     for (const tsCode of tsCodes) {
       const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
       const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
       
-      if (dailyData.length > 0 && adjFactorData.length > 0) {
+      // 验证数据完整性：需要同时有日线数据和复权因子，且数量匹配
+      if (dailyData.length > 0 && adjFactorData.length > 0 && dailyData.length === adjFactorData.length) {
         // 数据库有完整数据
         const adjFactorMap = {};
         adjFactorData.forEach(item => {
           adjFactorMap[item.trade_date] = item.adj_factor;
         });
         
-        results[tsCode] = dailyData.map(item => ({
-          ts_code: tsCode,
-          trade_date: item.trade_date,
-          open: item.open_price * (adjFactorMap[item.trade_date] || 1),
-          high: item.high_price * (adjFactorMap[item.trade_date] || 1),
-          low: item.low_price * (adjFactorMap[item.trade_date] || 1),
-          close: item.close_price * (adjFactorMap[item.trade_date] || 1),
-          adj_factor: adjFactorMap[item.trade_date] || 1,
-          original_close: item.close_price
-        })).sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+        // 验证每个交易日都有对应的复权因子
+        const hasCompleteData = dailyData.every(item => adjFactorMap[item.trade_date]);
+        
+        if (hasCompleteData) {
+          results[tsCode] = dailyData.map(item => ({
+            ts_code: tsCode,
+            trade_date: item.trade_date,
+            open: item.open_price * (adjFactorMap[item.trade_date] || 1),
+            high: item.high_price * (adjFactorMap[item.trade_date] || 1),
+            low: item.low_price * (adjFactorMap[item.trade_date] || 1),
+            close: item.close_price * (adjFactorMap[item.trade_date] || 1),
+            adj_factor: adjFactorMap[item.trade_date] || 1,
+            original_close: item.close_price
+          })).sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+        } else {
+          // 数据不完整，需要重新获取
+          missingCodes.push(tsCode);
+        }
       } else {
         missingCodes.push(tsCode);
       }
