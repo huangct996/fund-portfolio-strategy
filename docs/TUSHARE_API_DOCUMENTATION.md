@@ -27,10 +27,10 @@
 | ann_date | string | 公告日期 | 格式：YYYYMMDD |
 | end_date | string | 报告期 | 格式：YYYYMMDD |
 | symbol | string | 股票代码 | 不带后缀，如：601939 |
-| mkv | float | 持仓市值（元） | 单位：元 |
+| mkv | float | 持有股票市值（元） | 单位：元，**不用于权重计算** |
 | amount | float | 持仓数量（股） | 单位：股 |
-| stk_mkv_ratio | float | 占净值比例（%） | **关键字段**，用于计算原策略权重 |
-| stk_float_ratio | float | 占流通股比例（%） | - |
+| stk_mkv_ratio | float | 占股票市值比 | **关键字段**，百分比（如5.6表示5.6%），实际含义为占基金净资产值比例，用于计算原策略权重 |
+| stk_float_ratio | float | 占流通股本比例 | 百分比 |
 
 ### 使用场景
 - 获取基金在每个报告期的持仓明细
