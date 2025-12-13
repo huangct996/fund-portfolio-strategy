@@ -136,7 +136,11 @@
             <div class="info-note">
                 <strong>✅ 回测逻辑：</strong>每个报告期披露后根据策略调整持仓，持有到下一个报告期披露日。只有真实的最后一期才持有到今天。<br>
                 <strong>📅 横轴说明：</strong>横坐标为每个报告期的<strong>持有结束日期</strong>（即下一期披露日），纵坐标为从第一个报告期开始的累计收益率。<br>
-                <strong>📊 计算方式：</strong>股票收益率采用<strong>前复权价格</strong>计算，自动处理分红、配股等因素，确保收益率准确可比。
+                <strong>📊 计算方式：</strong>股票收益率采用<strong>前复权价格</strong>计算，自动处理分红、配股等因素，确保收益率准确可比。<br>
+                <strong>🔄 调仓时点：</strong>在每个报告期<strong>公告日的下一个交易日</strong>进行调仓，使用当日收盘价买入/卖出。<br>
+                <strong>📈 原策略说明：</strong>使用基金公告的<strong>实际持仓权重</strong>（stk_mkv_ratio字段），与自定义策略使用<strong>相同的股票池和价格数据</strong>，确保公平对比。<br>
+                <strong>⚠️ 数据过滤：</strong>自动过滤无市值数据的股票（通常是新股，上市时间晚于报告期），过滤后的股票权重会重新归一化到100%。<br>
+                <strong>💰 交易成本：</strong>当前回测<strong>不考虑</strong>交易成本和印花税，实际收益会略低于回测结果。
             </div>
 
             <div class="chart-container">

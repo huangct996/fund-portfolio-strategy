@@ -415,6 +415,14 @@ function renderHoldingsForPeriod(period) {
     // 填充策略持仓表格（按策略权重排序）
     const adjustedBody = document.getElementById('adjustedHoldingsTable');
     adjustedBody.innerHTML = '';
+    
+    // 检查数据是否存在
+    if (!period.adjustedHoldings || period.adjustedHoldings.length === 0) {
+        console.error('策略持仓数据为空:', period);
+        adjustedBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #FF6B6B;">⚠️ 策略持仓数据为空，请检查后端返回数据</td></tr>';
+        return;
+    }
+    
     const sortedByAdjusted = [...period.adjustedHoldings].sort((a, b) => b.adjustedWeight - a.adjustedWeight);
     sortedByAdjusted.forEach((stock, index) => {
         const tr = document.createElement('tr');
