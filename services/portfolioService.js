@@ -66,24 +66,56 @@ class PortfolioService {
       stock.qualityRank = validStocks.length - index;
     });
     
-    // 计算综合得分（归一化排名分数）
-    validStocks.forEach(stock => {
-      const mvScore = stock.mvRank / validStocks.length;
-      const dvScore = stock.dvRank / validStocks.length;
-      const qualityScore = stock.qualityRank / validStocks.length;
-      
-      stock.compositeScore = 
-        mvScore * normalizedMvWeight + 
-        dvScore * normalizedDvWeight + 
-        qualityScore * normalizedQualityWeight;
-    });
+    // 检测是否为纯单因子策略（某个权重=1，其他=0）
+    const isPureMvStrategy = normalizedMvWeight === 1;
+    const isPureDvStrategy = normalizedDvWeight === 1;
+    const isPureQualityStrategy = normalizedQualityWeight === 1;
     
-    // 按综合得分分配权重
-    const totalScore = validStocks.reduce((sum, s) => sum + s.compositeScore, 0);
-    validStocks.forEach(stock => {
-      stock.adjustedWeight = stock.compositeScore / totalScore;
-      stock.isLimited = false;
-    });
+    // 计算综合得分或直接使用因子值
+    if (isPureMvStrategy) {
+      // 纯市值策略：直接使用市值比例，与市值加权策略保持一致
+      const totalMv = validStocks.reduce((sum, s) => sum + s.marketValue, 0);
+      validStocks.forEach(stock => {
+        stock.compositeScore = stock.marketValue / totalMv;  // 使用市值比例作为得分
+        stock.adjustedWeight = stock.compositeScore;
+        stock.isLimited = false;
+      });
+    } else if (isPureDvStrategy) {
+      // 纯股息率策略：直接使用股息率比例
+      const totalDv = validStocks.reduce((sum, s) => sum + (s.dvRatio || 0), 0);
+      validStocks.forEach(stock => {
+        stock.compositeScore = (stock.dvRatio || 0) / totalDv;
+        stock.adjustedWeight = stock.compositeScore;
+        stock.isLimited = false;
+      });
+    } else if (isPureQualityStrategy) {
+      // 纯质量因子策略：直接使用质量因子比例
+      const totalQuality = validStocks.reduce((sum, s) => sum + (s.qualityFactor || 0), 0);
+      validStocks.forEach(stock => {
+        stock.compositeScore = (stock.qualityFactor || 0) / totalQuality;
+        stock.adjustedWeight = stock.compositeScore;
+        stock.isLimited = false;
+      });
+    } else {
+      // 多因子混合策略：使用排名分数
+      validStocks.forEach(stock => {
+        const mvScore = stock.mvRank / validStocks.length;
+        const dvScore = stock.dvRank / validStocks.length;
+        const qualityScore = stock.qualityRank / validStocks.length;
+        
+        stock.compositeScore = 
+          mvScore * normalizedMvWeight + 
+          dvScore * normalizedDvWeight + 
+          qualityScore * normalizedQualityWeight;
+      });
+      
+      // 按综合得分分配权重
+      const totalScore = validStocks.reduce((sum, s) => sum + s.compositeScore, 0);
+      validStocks.forEach(stock => {
+        stock.adjustedWeight = stock.compositeScore / totalScore;
+        stock.isLimited = false;
+      });
+    }
     
     return validStocks.sort((a, b) => b.compositeScore - a.compositeScore);
   }
@@ -619,9 +651,9 @@ class PortfolioService {
         
         if (useCompositeScore) {
           console.log(`使用综合得分策略 - 市值权重:${scoreWeights.mvWeight}, 股息率权重:${scoreWeights.dvWeight}, 质量因子权重:${scoreWeights.qualityWeight}, 质量因子类型:${qualityFactorType}`);
-          console.log(`综合得分策略不应用10%权重上限`);
           portfolioWithWeights = this.calculateCompositeScore(validPortfolio, scoreWeights, qualityFactorType);
-          applyWeightLimit = false;  // 综合得分策略不应用权重上限
+          // 统一应用权重上限逻辑
+          applyWeightLimit = true;
         } else {
           console.log(`使用市值加权策略`);
           const validTotalMv = validPortfolio.reduce((sum, p) => sum + p.marketValue, 0);
@@ -630,7 +662,7 @@ class PortfolioService {
             adjustedWeight: p.marketValue / validTotalMv,
             isLimited: false
           })).sort((a, b) => b.adjustedWeight - a.adjustedWeight);
-          applyWeightLimit = true;  // 市值加权策略应用权重上限
+          applyWeightLimit = true;
         }
         
         // 仅在市值加权策略下应用10%权重上限限制
