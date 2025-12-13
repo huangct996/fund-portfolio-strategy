@@ -568,14 +568,15 @@ class PortfolioService {
           const mv = info.totalMv || 0;
           totalMarketValue += mv;
           
-          // 原策略权重：优先使用stk_mkv_ratio（占净值比例），如果没有则用mkv计算
+          // 原策略权重：使用stk_mkv_ratio（占净值比例）
+          // stk_mkv_ratio是百分比，需要除以100转换为小数
           let originalWeight = 0;
           if (h.stk_mkv_ratio != null && h.stk_mkv_ratio > 0) {
-            // stk_mkv_ratio是百分比，需要除以100
             originalWeight = h.stk_mkv_ratio / 100;
-          } else if (h.mkv != null && h.mkv > 0) {
-            // 如果没有stk_mkv_ratio，使用mkv计算（需要后续归一化）
-            originalWeight = h.mkv;  // 暂存mkv，后续统一归一化
+          } else {
+            // 如果stk_mkv_ratio为0或null，说明该股票权重很小或数据缺失
+            // 不使用mkv字段，因为mkv单位是元，不能直接作为权重
+            originalWeight = 0;
           }
           
           return {
