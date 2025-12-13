@@ -253,6 +253,13 @@ class TushareService {
           fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
         });
         
+        if (!data || data.length === 0) {
+          console.log(`  ⚠️ API返回数据为空，日期范围: ${startDate} - ${endDate}`);
+          console.log(`  股票代码: ${batch.slice(0, 3).join(', ')}...`);
+        } else {
+          console.log(`  ✅ 获取到 ${data.length} 条数据`);
+        }
+        
         // 按股票代码分组
         const dataByCode = {};
         data.forEach(item => {

@@ -553,8 +553,9 @@ class PortfolioService {
           // 获取股票代码列表
           const stockCodes = reportHoldings.map(h => h.symbol);
           
-          // 获取股票名称和市值
-          const stockInfo = await tushareService.batchGetStockBasic(stockCodes, startDate);
+          // 获取股票名称和市值（使用报告期日期，而不是调仓日期）
+          // 因为我们需要的是报告期时点的市值数据
+          const stockInfo = await tushareService.batchGetStockBasic(stockCodes, reportDate);
           
           console.log(`获取到 ${Object.keys(stockInfo).length} 只股票的基本信息`);
           
