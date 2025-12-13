@@ -222,82 +222,78 @@ class TushareService {
         });
 
         await new Promise(resolve => setTimeout(resolve, 200));
-        
       } catch (error) {
         console.warn(`批量获取股票基本信息失败:`, error.message);
       }
     }
 
-    // 2. 批量获取股票市值、股息率、质量因子（减少API调用次数）
+    // 2. 批量获取股票市值、股息率、质量因子
     console.log(`开始批量获取 ${missingCodes.length} 只股票的市值、股息率和质量因子数据...`);
     let successCount = 0;
     const dataToSave = [];
     
-    // 先尝试批量获取指定日期的数据
-    const startDate = this.addDays(tradeDate, -7);
-    const endDate = this.addDays(tradeDate, 7);
-    
-    // 每次批量获取50只股票
-    for (let i = 0; i < missingCodes.length; i += batchSize) {
-      const batch = missingCodes.slice(i, i + batchSize);
-      const tsCodeStr = batch.join(',');
+    try {
+      // 尝试多个日期，找到最接近的交易日
+      const datesToTry = [
+        tradeDate,
+        this.addDays(tradeDate, -1),
+        this.addDays(tradeDate, -2),
+        this.addDays(tradeDate, -3),
+        this.addDays(tradeDate, 1),
+        this.addDays(tradeDate, 2),
+        this.addDays(tradeDate, 3)
+      ];
       
-      try {
-        console.log(`批量获取市值数据 ${i + 1}-${Math.min(i + batchSize, missingCodes.length)} / ${missingCodes.length}`);
-        
-        // 批量获取一周内的数据（覆盖非交易日的情况）
-        const data = await this.callApi('daily_basic', {
-          ts_code: tsCodeStr,
-          start_date: startDate,
-          end_date: endDate,
-          fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
-        });
-        
-        if (!data || data.length === 0) {
-          console.log(`  ⚠️ API返回数据为空，日期范围: ${startDate} - ${endDate}`);
-          console.log(`  股票代码: ${batch.slice(0, 3).join(', ')}...`);
-        } else {
-          console.log(`  ✅ 获取到 ${data.length} 条数据`);
+      let allStockData = null;
+      let actualTradeDate = null;
+      
+      for (const date of datesToTry) {
+        try {
+          console.log(`尝试获取交易日 ${date} 的市值数据...`);
+          const data = await this.callApi('daily_basic', {
+            trade_date: date,
+            fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
+          });
+          
+          if (data && data.length > 0) {
+            console.log(`✅ 获取到 ${data.length} 只股票的数据（交易日: ${date}）`);
+            allStockData = data;
+            actualTradeDate = date;
+            break;
+          }
+        } catch (error) {
+          console.log(`  日期 ${date} 查询失败: ${error.message}`);
         }
         
-        // 按股票代码分组
-        const dataByCode = {};
-        data.forEach(item => {
-          if (!dataByCode[item.ts_code]) {
-            dataByCode[item.ts_code] = [];
-          }
-          dataByCode[item.ts_code].push(item);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      if (!allStockData) {
+        console.log(`⚠️ 无法找到目标日期 ${tradeDate} 附近的交易日数据`);
+      } else {
+        // 将数据转换为Map，方便查找
+        const dataMap = {};
+        allStockData.forEach(item => {
+          dataMap[item.ts_code] = item;
         });
         
-        // 处理每只股票的数据
-        batch.forEach(tsCode => {
-          const stockData = dataByCode[tsCode];
+        // 处理每只需要的股票
+        missingCodes.forEach(tsCode => {
+          const stockData = dataMap[tsCode];
           
-          if (stockData && stockData.length > 0) {
-            // 选择最接近目标日期的数据
-            const closestData = stockData.reduce((closest, item) => {
-              const closestDiff = Math.abs(parseInt(closest.trade_date) - parseInt(tradeDate));
-              const itemDiff = Math.abs(parseInt(item.trade_date) - parseInt(tradeDate));
-              return itemDiff < closestDiff ? item : closest;
-            });
-            
+          if (stockData) {
             if (!results[tsCode]) {
               results[tsCode] = {};
             }
             
-            const actualDate = closestData.trade_date;
-            if (actualDate !== tradeDate) {
-              console.log(`  ${tsCode}: 使用 ${actualDate} 的数据（目标日期 ${tradeDate} 非交易日）`);
-            }
+            results[tsCode].totalMv = parseFloat(stockData.total_mv) || 0;
+            results[tsCode].dvRatio = parseFloat(stockData.dv_ratio) || 0;
+            results[tsCode].peTtm = parseFloat(stockData.pe_ttm) || 0;
+            results[tsCode].pb = parseFloat(stockData.pb) || 0;
             
-            results[tsCode].totalMv = closestData.total_mv || 0;
-            results[tsCode].dvRatio = closestData.dv_ratio || 0;
-            results[tsCode].peTtm = closestData.pe_ttm || 0;
-            results[tsCode].pb = closestData.pb || 0;
-            
-            // 默认质量因子：PE+PB综合
-            const peScore = closestData.pe_ttm > 0 ? 1 / closestData.pe_ttm : 0;
-            const pbScore = closestData.pb > 0 ? 1 / closestData.pb : 0;
+            // 计算质量因子
+            const peScore = results[tsCode].peTtm > 0 ? 1 / results[tsCode].peTtm : 0;
+            const pbScore = results[tsCode].pb > 0 ? 1 / results[tsCode].pb : 0;
             results[tsCode].qualityFactor = (peScore + pbScore) / 2;
             results[tsCode].peScore = peScore;
             results[tsCode].pbScore = pbScore;
@@ -306,28 +302,22 @@ class TushareService {
             dataToSave.push({
               ts_code: tsCode,
               trade_date: tradeDate,
-              total_mv: closestData.total_mv || 0,
-              dv_ratio: closestData.dv_ratio || 0,
-              pe_ttm: closestData.pe_ttm || 0,
-              pb: closestData.pb || 0
+              total_mv: results[tsCode].totalMv,
+              dv_ratio: results[tsCode].dvRatio,
+              pe_ttm: results[tsCode].peTtm,
+              pb: results[tsCode].pb
             });
             
             successCount++;
-          } else {
-            // 无市值数据通常是因为股票上市时间晚于查询日期，这是正常的
-            // 不需要警告，系统会自动过滤这些股票
           }
         });
         
-        // 批次间延迟，避免频率限制
-        if (i + batchSize < missingCodes.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        if (actualTradeDate !== tradeDate) {
+          console.log(`注意: 使用 ${actualTradeDate} 的数据（目标日期 ${tradeDate} 非交易日）`);
         }
-        
-      } catch (error) {
-        console.warn(`批量获取市值数据失败:`, error.message);
-        // 如果批量失败，跳过这批股票
       }
+    } catch (error) {
+      console.warn(`批量获取市值数据失败:`, error.message);
     }
     
     console.log(`成功获取 ${successCount}/${missingCodes.length} 只股票的完整数据`);
