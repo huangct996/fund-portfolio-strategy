@@ -238,7 +238,15 @@ class PortfolioService {
     );
 
     console.log(`✅ 成功计算 ${stockReturns.length}/${portfolio.length} 只股票`);
+    console.log(`   有效权重总和: ${validWeightSum.toFixed(4)}`);
     console.log(`✅ 调整后组合收益率: ${(portfolioReturn * 100).toFixed(2)}%`);
+    
+    // 显示权重前5的股票
+    const topStocks = stockReturns.sort((a, b) => b.normalizedWeight - a.normalizedWeight).slice(0, 5);
+    console.log(`   权重前5股票:`);
+    topStocks.forEach(s => {
+      console.log(`     ${s.symbol}: 权重${(s.normalizedWeight*100).toFixed(2)}%, 收益${(s.return*100).toFixed(2)}%`);
+    });
     
     // 如果组合收益率异常，显示贡献最大的股票
     if (Math.abs(portfolioReturn) > 0.5) {  // 超过50%
