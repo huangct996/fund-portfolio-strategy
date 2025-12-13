@@ -221,104 +221,97 @@ class TushareService {
       }
     }
 
-    // 2. 获取股票市值、股息率、质量因子（逐个获取以避免权限问题）
-    console.log(`开始获取 ${missingCodes.length} 只股票的市值、股息率和质量因子数据...`);
+    // 2. 批量获取股票市值、股息率、质量因子（减少API调用次数）
+    console.log(`开始批量获取 ${missingCodes.length} 只股票的市值、股息率和质量因子数据...`);
     let successCount = 0;
     const dataToSave = [];
     
-    for (let i = 0; i < missingCodes.length; i++) {
-      const tsCode = missingCodes[i];
+    // 先尝试批量获取指定日期的数据
+    const startDate = this.addDays(tradeDate, -7);
+    const endDate = this.addDays(tradeDate, 7);
+    
+    // 每次批量获取50只股票
+    for (let i = 0; i < missingCodes.length; i += batchSize) {
+      const batch = missingCodes.slice(i, i + batchSize);
+      const tsCodeStr = batch.join(',');
       
       try {
-        // 获取市值、股息率、PE、PB
-        // 注意：如果tradeDate不是交易日，需要查找前后最近的交易日
-        let data = await this.callApi('daily_basic', {
-          ts_code: tsCode,
-          trade_date: tradeDate,
+        console.log(`批量获取市值数据 ${i + 1}-${Math.min(i + batchSize, missingCodes.length)} / ${missingCodes.length}`);
+        
+        // 批量获取一周内的数据（覆盖非交易日的情况）
+        const data = await this.callApi('daily_basic', {
+          ts_code: tsCodeStr,
+          start_date: startDate,
+          end_date: endDate,
           fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
         });
         
-        // 如果指定日期没有数据，尝试获取该日期前后一周的数据
-        if (!data || data.length === 0) {
-          const startDate = this.addDays(tradeDate, -7);
-          const endDate = this.addDays(tradeDate, 7);
+        // 按股票代码分组
+        const dataByCode = {};
+        data.forEach(item => {
+          if (!dataByCode[item.ts_code]) {
+            dataByCode[item.ts_code] = [];
+          }
+          dataByCode[item.ts_code].push(item);
+        });
+        
+        // 处理每只股票的数据
+        batch.forEach(tsCode => {
+          const stockData = dataByCode[tsCode];
           
-          data = await this.callApi('daily_basic', {
-            ts_code: tsCode,
-            start_date: startDate,
-            end_date: endDate,
-            fields: 'ts_code,trade_date,total_mv,dv_ratio,pe_ttm,pb'
-          });
-          
-          // 选择最接近目标日期的数据
-          if (data && data.length > 0) {
-            data = [data.reduce((closest, item) => {
+          if (stockData && stockData.length > 0) {
+            // 选择最接近目标日期的数据
+            const closestData = stockData.reduce((closest, item) => {
               const closestDiff = Math.abs(parseInt(closest.trade_date) - parseInt(tradeDate));
               const itemDiff = Math.abs(parseInt(item.trade_date) - parseInt(tradeDate));
               return itemDiff < closestDiff ? item : closest;
-            })];
+            });
+            
+            if (!results[tsCode]) {
+              results[tsCode] = {};
+            }
+            
+            const actualDate = closestData.trade_date;
+            if (actualDate !== tradeDate) {
+              console.log(`  ${tsCode}: 使用 ${actualDate} 的数据（目标日期 ${tradeDate} 非交易日）`);
+            }
+            
+            results[tsCode].totalMv = closestData.total_mv || 0;
+            results[tsCode].dvRatio = closestData.dv_ratio || 0;
+            results[tsCode].peTtm = closestData.pe_ttm || 0;
+            results[tsCode].pb = closestData.pb || 0;
+            
+            // 默认质量因子：PE+PB综合
+            const peScore = closestData.pe_ttm > 0 ? 1 / closestData.pe_ttm : 0;
+            const pbScore = closestData.pb > 0 ? 1 / closestData.pb : 0;
+            results[tsCode].qualityFactor = (peScore + pbScore) / 2;
+            results[tsCode].peScore = peScore;
+            results[tsCode].pbScore = pbScore;
+            
+            // 准备保存到数据库
+            dataToSave.push({
+              ts_code: tsCode,
+              trade_date: tradeDate,
+              total_mv: closestData.total_mv || 0,
+              dv_ratio: closestData.dv_ratio || 0,
+              pe_ttm: closestData.pe_ttm || 0,
+              pb: closestData.pb || 0
+            });
+            
+            successCount++;
+          } else {
+            console.warn(`  ${tsCode}: 无法获取市值数据`);
           }
-        }
-
-        if (data && data.length > 0) {
-          if (!results[tsCode]) {
-            results[tsCode] = {};
-          }
-          
-          const actualDate = data[0].trade_date;
-          if (actualDate !== tradeDate) {
-            console.log(`  ${tsCode}: 使用 ${actualDate} 的数据（目标日期 ${tradeDate} 非交易日）`);
-          }
-          
-          results[tsCode].totalMv = data[0].total_mv || 0;  // 总市值（万元）
-          results[tsCode].dvRatio = data[0].dv_ratio || 0;  // 股息率（%）
-          results[tsCode].peTtm = data[0].pe_ttm || 0;      // 市盈率TTM
-          results[tsCode].pb = data[0].pb || 0;              // 市净率
-          
-          // 默认质量因子：PE+PB综合
-          const peScore = data[0].pe_ttm > 0 ? 1 / data[0].pe_ttm : 0;
-          const pbScore = data[0].pb > 0 ? 1 / data[0].pb : 0;
-          results[tsCode].qualityFactor = (peScore + pbScore) / 2;
-          results[tsCode].peScore = peScore;
-          results[tsCode].pbScore = pbScore;
-          
-          // 准备保存到数据库
-          dataToSave.push({
-            ts_code: tsCode,
-            trade_date: tradeDate,
-            total_mv: data[0].total_mv || 0,
-            dv_ratio: data[0].dv_ratio || 0,
-            pe_ttm: data[0].pe_ttm || 0,
-            pb: data[0].pb || 0
-          });
-          
-          successCount++;
-        } else {
-          console.warn(`  ${tsCode}: 无法获取市值数据（目标日期 ${tradeDate} 前后一周无交易数据）`);
-        }
+        });
         
-        // 尝试获取ROE数据（财务指标）
-        try {
-          const finData = await this.callApi('fina_indicator', {
-            ts_code: tsCode,
-            period: tradeDate.substring(0, 6) + '31',  // 转换为季度末日期
-            fields: 'ts_code,end_date,roe'
-          });
-          
-          if (finData && finData.length > 0 && results[tsCode]) {
-            results[tsCode].roe = finData[0].roe || 0;  // ROE（%）
-          }
-        } catch (error) {
-          // ROE数据获取失败不影响主流程
-        }
-
-        // 每10个请求延迟一下
-        if ((i + 1) % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+        // 批次间延迟，避免频率限制
+        if (i + batchSize < missingCodes.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
         
       } catch (error) {
-        console.warn(`获取 ${tsCode} 数据失败:`, error.message);
+        console.warn(`批量获取市值数据失败:`, error.message);
+        // 如果批量失败，跳过这批股票
       }
     }
     
