@@ -450,14 +450,17 @@ class PortfolioService {
       const reportDate = selectedReportDates[i];
       const reportHoldings = groupedHoldings[reportDate];
       
-      // 检查是否只公布了前10大持仓
+      // 检查是否只公布了部分持仓（通过权重总和判断）
+      // 如果权重总和<50%，说明是部分披露（一季报/三季报通常只披露前10-15大持仓）
+      const totalWeight = reportHoldings.reduce((sum, h) => sum + (parseFloat(h.stk_mkv_ratio) || 0), 0);
       let useLastPortfolio = false;
-      if (reportHoldings.length <= 10) {
+      
+      if (totalWeight < 50) {
         if (lastValidPortfolio) {
-          console.log(`\n报告期 ${reportDate}: 只公布前${reportHoldings.length}大持仓，使用上一期持仓计算收益率（不调仓）`);
+          console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），使用上一期持仓计算收益率（不调仓）`);
           useLastPortfolio = true;
         } else {
-          console.log(`\n报告期 ${reportDate}: 只公布前${reportHoldings.length}大持仓，且没有上一期持仓，跳过该报告期`);
+          console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），且没有上一期持仓，跳过该报告期`);
           continue;
         }
       }
