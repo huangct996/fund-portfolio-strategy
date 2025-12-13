@@ -558,9 +558,6 @@ class PortfolioService {
           
           console.log(`获取到 ${Object.keys(stockInfo).length} 只股票的基本信息`);
           
-          // 计算原始权重（基金持仓市值）
-          const totalOriginalMkv = reportHoldings.reduce((sum, h) => sum + (h.mkv || 0), 0);
-          
           // 构建股票数据
           let totalMarketValue = 0;
           const portfolioWithMv = reportHoldings.map(h => {
@@ -570,6 +567,17 @@ class PortfolioService {
           const info = stockInfo[tsCode] || {};
           const mv = info.totalMv || 0;
           totalMarketValue += mv;
+          
+          // 原策略权重：优先使用stk_mkv_ratio（占净值比例），如果没有则用mkv计算
+          let originalWeight = 0;
+          if (h.stk_mkv_ratio != null && h.stk_mkv_ratio > 0) {
+            // stk_mkv_ratio是百分比，需要除以100
+            originalWeight = h.stk_mkv_ratio / 100;
+          } else if (h.mkv != null && h.mkv > 0) {
+            // 如果没有stk_mkv_ratio，使用mkv计算（需要后续归一化）
+            originalWeight = h.mkv;  // 暂存mkv，后续统一归一化
+          }
+          
           return {
             symbol: h.symbol,
             name: info.name || h.symbol,
@@ -582,7 +590,7 @@ class PortfolioService {
             roe: info.roe || 0,
             peTtm: info.peTtm || 0,
             pb: info.pb || 0,
-            originalWeight: (h.mkv || 0) / totalOriginalMkv,
+            originalWeight: originalWeight,
             adjustedWeight: 0,
             isLimited: false
           };
@@ -706,10 +714,22 @@ class PortfolioService {
 
         // 计算原策略收益率（使用基金原始权重，相同的股票池和价格数据）
         // 注意：由于有些股票被过滤（无市值数据），需要重新归一化原始权重
-        const totalOriginalWeight = replicatedPortfolio.reduce((sum, p) => sum + p.originalWeight, 0);
+        const totalOriginalWeight = replicatedPortfolio.reduce((sum, p) => sum + (p.originalWeight || 0), 0);
+        
+        if (totalOriginalWeight === 0 || isNaN(totalOriginalWeight)) {
+          console.error(`❌ 原策略权重总和为0或NaN，无法计算原策略收益率`);
+          console.error(`   这通常是因为基金持仓数据中缺少stk_mkv_ratio和mkv字段`);
+          console.error(`   前5只股票的原始权重:`);
+          replicatedPortfolio.slice(0, 5).forEach(p => {
+            console.error(`     ${p.symbol}: originalWeight=${p.originalWeight}`);
+          });
+          // 跳过这个报告期
+          continue;
+        }
+        
         const originalPortfolio = replicatedPortfolio.map(p => ({
           ...p,
-          adjustedWeight: totalOriginalWeight > 0 ? p.originalWeight / totalOriginalWeight : 0  // 归一化原始权重
+          adjustedWeight: p.originalWeight / totalOriginalWeight  // 归一化原始权重
         }));
         
         console.log(`原策略权重归一化: 总权重 ${(totalOriginalWeight * 100).toFixed(2)}% → 100%`);
