@@ -697,10 +697,14 @@ class PortfolioService {
         );
 
         // 计算原策略收益率（使用基金原始权重，相同的股票池和价格数据）
+        // 注意：由于有些股票被过滤（无市值数据），需要重新归一化原始权重
+        const totalOriginalWeight = replicatedPortfolio.reduce((sum, p) => sum + p.originalWeight, 0);
         const originalPortfolio = replicatedPortfolio.map(p => ({
           ...p,
-          adjustedWeight: p.originalWeight  // 使用原始权重
+          adjustedWeight: totalOriginalWeight > 0 ? p.originalWeight / totalOriginalWeight : 0  // 归一化原始权重
         }));
+        
+        console.log(`原策略权重归一化: 总权重 ${(totalOriginalWeight * 100).toFixed(2)}% → 100%`);
         
         const originalStrategyReturns = await this.calculatePortfolioReturns(
           originalPortfolio,
