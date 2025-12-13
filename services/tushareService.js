@@ -300,7 +300,8 @@ class TushareService {
             
             successCount++;
           } else {
-            console.warn(`  ${tsCode}: 无法获取市值数据`);
+            // 无市值数据通常是因为股票上市时间晚于查询日期，这是正常的
+            // 不需要警告，系统会自动过滤这些股票
           }
         });
         

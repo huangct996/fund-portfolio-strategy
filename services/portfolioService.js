@@ -588,7 +588,8 @@ class PortfolioService {
         // 记录被过滤的股票
         const filteredStocks = portfolioWithMv.filter(p => p.marketValue === 0);
         if (filteredStocks.length > 0) {
-          console.log(`⚠️  ${filteredStocks.length} 只股票因无市值数据被过滤: ${filteredStocks.map(s => s.symbol).join(', ')}`);
+          console.log(`⚠️  ${filteredStocks.length} 只股票因无市值数据被过滤（通常是新股，上市时间晚于报告期）`);
+          console.log(`   被过滤股票: ${filteredStocks.map(s => s.symbol).slice(0, 10).join(', ')}${filteredStocks.length > 10 ? '...' : ''}`);
         }
         
         // 根据策略分配权重
