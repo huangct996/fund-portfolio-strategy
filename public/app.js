@@ -410,6 +410,9 @@ function renderHoldingsForPeriod(period) {
     const reportDateFormatted = formatDate(period.reportDate);
     document.getElementById('originalHoldingsTitle').textContent = `基金持仓 (${reportDateFormatted})`;
     
+    // 更新报告期详细信息
+    updatePeriodInfo(period);
+    
     // 更新提示信息
     const holdingsNote = document.getElementById('holdingsNote');
     if (currentConfig.useCompositeScore) {
@@ -653,4 +656,48 @@ function formatPercent(value) {
     if (value === null || value === undefined) return '-';
     const percent = (value * 100).toFixed(2);
     return `${percent >= 0 ? '+' : ''}${percent}%`;
+}
+
+function updatePeriodInfo(period) {
+    // 计算披露日期
+    const year = period.reportDate.substring(0, 4);
+    const month = period.reportDate.substring(4, 6);
+    let disclosureDate;
+    
+    if (month === '03') {
+        disclosureDate = `${year}-04-30`;
+    } else if (month === '06') {
+        disclosureDate = `${year}-08-28`;
+    } else if (month === '09') {
+        disclosureDate = `${year}-10-31`;
+    } else if (month === '12') {
+        const nextYear = parseInt(year) + 1;
+        disclosureDate = `${nextYear}-04-30`;
+    }
+    
+    // 计算基金权重总和
+    const totalWeight = period.adjustedHoldings.reduce((sum, h) => sum + (h.originalWeight || 0), 0);
+    
+    // 判断是否调仓
+    const isRebalance = totalWeight >= 0.5;
+    
+    // 更新各个字段
+    document.getElementById('periodDate').textContent = formatDate(period.reportDate);
+    document.getElementById('disclosureDate').textContent = disclosureDate;
+    document.getElementById('startDate').textContent = period.startDate ? formatDate(period.startDate) : '-';
+    document.getElementById('endDate').textContent = period.endDate ? formatDate(period.endDate) : '-';
+    document.getElementById('stockCount').textContent = `${period.adjustedHoldings.length} 只`;
+    
+    // 期间收益率
+    const customReturn = formatPercent(period.customReturn);
+    const originalReturn = formatPercent(period.originalReturn);
+    document.getElementById('periodReturn').innerHTML = `自定义策略: <strong>${customReturn}</strong> | 原策略: <strong>${originalReturn}</strong>`;
+    
+    document.getElementById('totalWeight').textContent = `${(totalWeight * 100).toFixed(2)}%`;
+    
+    if (isRebalance) {
+        document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（正常调仓）</span>';
+    } else {
+        document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #FF6B6B; font-weight: 600;">❌ 否（使用上一期持仓）</span>';
+    }
 }

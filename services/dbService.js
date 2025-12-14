@@ -93,6 +93,7 @@ class DatabaseService {
         CREATE TABLE IF NOT EXISTS stock_basic_info (
           id INT AUTO_INCREMENT PRIMARY KEY,
           ts_code VARCHAR(20) NOT NULL COMMENT '股票代码',
+          name VARCHAR(50) COMMENT '股票名称',
           trade_date VARCHAR(8) NOT NULL COMMENT '交易日期',
           total_mv DECIMAL(20, 2) COMMENT '总市值（万元）',
           dv_ratio DECIMAL(10, 4) COMMENT '股息率（%）',
@@ -291,9 +292,10 @@ class DatabaseService {
       for (const item of data) {
         await connection.execute(`
           INSERT INTO stock_basic_info 
-          (ts_code, trade_date, total_mv, dv_ratio, pe_ttm, pb)
-          VALUES (?, ?, ?, ?, ?, ?)
+          (ts_code, name, trade_date, total_mv, dv_ratio, pe_ttm, pb)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
             total_mv = VALUES(total_mv),
             dv_ratio = VALUES(dv_ratio),
             pe_ttm = VALUES(pe_ttm),
@@ -301,6 +303,7 @@ class DatabaseService {
             updated_at = CURRENT_TIMESTAMP
         `, [
           item.ts_code,
+          item.name || null,
           item.trade_date,
           item.total_mv,
           item.dv_ratio,

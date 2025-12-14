@@ -324,6 +324,56 @@
                 <select id="holdingsPeriodSelect" class="period-select"></select>
             </div>
             
+            <!-- 报告期详细信息说明（可折叠） -->
+            <details class="period-info-explanation" style="margin: 15px 0;">
+                <summary>📅 当前报告期详细信息</summary>
+                <div class="period-info-content">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">📋 报告期：</span>
+                            <span class="info-value" id="periodDate">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">📢 披露日期：</span>
+                            <span class="info-value" id="disclosureDate">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">⏱️ 持有起始日：</span>
+                            <span class="info-value" id="startDate">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">⏱️ 持有结束日：</span>
+                            <span class="info-value" id="endDate">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">📊 持仓股票数：</span>
+                            <span class="info-value" id="stockCount">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">📈 期间收益率：</span>
+                            <span class="info-value" id="periodReturn">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">💰 基金权重总和：</span>
+                            <span class="info-value" id="totalWeight">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">🔄 是否调仓：</span>
+                            <span class="info-value" id="rebalanceStatus">-</span>
+                        </div>
+                    </div>
+                    <div class="period-note">
+                        <strong>💡 说明：</strong>
+                        <ul>
+                            <li><strong>披露日期：</strong>基金公告该报告期持仓的日期（一季报/年报：4月30日，中报：8月28日，三季报：10月31日）</li>
+                            <li><strong>持有起始日：</strong>在披露日的下一个交易日进行调仓，使用当日收盘价买入/卖出</li>
+                            <li><strong>持有结束日：</strong>持有到下一个报告期披露日（如果是最后一期，则持有到今天）</li>
+                            <li><strong>是否调仓：</strong>如果权重总和&lt;50%（部分披露），则使用上一期持仓，不调仓</li>
+                        </ul>
+                    </div>
+                </div>
+            </details>
+            
             <div class="info-note" id="holdingsNote">
                 <strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓。
             </div>

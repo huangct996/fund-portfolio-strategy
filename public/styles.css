@@ -725,3 +725,92 @@ tbody tr:hover {
     color: #EF476F;
     font-weight: 600;
 }
+
+/* 报告期详细信息样式 */
+.period-info-explanation {
+    background: #F8F9FA;
+    border: 2px solid #E0E0E0;
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.period-info-explanation summary {
+    background: linear-gradient(135deg, #06D6A0 0%, #118AB2 100%);
+    color: white;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: background 0.3s ease;
+}
+
+.period-info-explanation summary::-webkit-details-marker {
+    display: none;
+}
+
+.period-info-explanation summary:hover {
+    background: linear-gradient(135deg, #05C090 0%, #0F7A9F 100%);
+}
+
+.period-info-explanation[open] summary {
+    border-bottom: 2px solid #E0E0E0;
+}
+
+.period-info-content {
+    padding: 20px;
+    background: white;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.info-item {
+    background: #F8F9FA;
+    padding: 12px 15px;
+    border-radius: 8px;
+    border-left: 4px solid #06D6A0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #2C3E50;
+}
+
+.info-value {
+    color: #667EEA;
+    font-weight: 600;
+    font-size: 1.05rem;
+}
+
+.period-note {
+    background: #E8F5E9;
+    border-left: 4px solid #06D6A0;
+    padding: 15px;
+    border-radius: 4px;
+    line-height: 1.8;
+}
+
+.period-note ul {
+    margin: 10px 0 0 20px;
+    padding-left: 0;
+}
+
+.period-note li {
+    margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}

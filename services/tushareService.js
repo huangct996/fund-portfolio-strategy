@@ -301,6 +301,7 @@ class TushareService {
             // 准备保存到数据库
             dataToSave.push({
               ts_code: tsCode,
+              name: results[tsCode].name || tsCode,
               trade_date: tradeDate,
               total_mv: results[tsCode].totalMv,
               dv_ratio: results[tsCode].dvRatio,
