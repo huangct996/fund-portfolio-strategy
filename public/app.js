@@ -660,22 +660,6 @@ function formatPercent(value) {
 }
 
 function updatePeriodInfo(period) {
-    // 计算披露日期
-    const year = period.reportDate.substring(0, 4);
-    const month = period.reportDate.substring(4, 6);
-    let disclosureDate;
-    
-    if (month === '03') {
-        disclosureDate = `${year}-04-30`;
-    } else if (month === '06') {
-        disclosureDate = `${year}-08-28`;
-    } else if (month === '09') {
-        disclosureDate = `${year}-10-31`;
-    } else if (month === '12') {
-        const nextYear = parseInt(year) + 1;
-        disclosureDate = `${nextYear}-04-30`;
-    }
-    
     // 计算基金权重总和
     const totalWeight = period.adjustedHoldings.reduce((sum, h) => sum + (h.originalWeight || 0), 0);
     
@@ -684,7 +668,8 @@ function updatePeriodInfo(period) {
     
     // 更新各个字段
     document.getElementById('periodDate').textContent = formatDate(period.reportDate);
-    document.getElementById('disclosureDate').textContent = disclosureDate;
+    // 使用后端返回的披露日期，如果没有则显示'-'
+    document.getElementById('disclosureDate').textContent = period.disclosureDate ? formatDate(period.disclosureDate) : '-';
     document.getElementById('startDate').textContent = period.startDate ? formatDate(period.startDate) : '-';
     document.getElementById('endDate').textContent = period.endDate ? formatDate(period.endDate) : '-';
     document.getElementById('stockCount').textContent = `${period.adjustedHoldings.length} 只`;
