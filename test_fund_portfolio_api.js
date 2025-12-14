@@ -61,7 +61,7 @@ async function testFundPortfolioAPI() {
     console.log('【报告期详情】');
     console.log(`共 ${endDates.length} 个报告期\n`);
 
-    endDates.slice(0, 5).forEach(endDate => {
+    endDates.slice(0, 10).forEach(endDate => {
       const holdings = groupedByEndDate[endDate];
       const firstHolding = holdings[0];
       const totalWeight = holdings.reduce((sum, h) => sum + (parseFloat(h.stk_mkv_ratio) || 0), 0);
