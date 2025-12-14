@@ -152,11 +152,137 @@
         <section id="chartsSection" class="card" style="display: none;">
             <h2>收益对比曲线</h2>
             
-            <div class="info-note">
-                <strong>✅ 回测逻辑：</strong>每个报告期披露后根据策略调整持仓，持有到下一个报告期披露日。只有真实的最后一期才持有到今天。<br>
-                <strong>📋 持仓说明：</strong>一季报和三季报通常只披露前10-15大持仓（权重总和约27%-39%），此时<strong>使用上一期的完整持仓，不调仓</strong>。中报和年报披露完整持仓（权重总和接近100%），此时正常调仓。<br>
-                <strong>📅 横轴说明：</strong>横坐标为每个报告期的<strong>持有结束日期</strong>（即下一期披露日），纵坐标为从第一个报告期开始的累计收益率。<br>
-                <strong>📊 计算方式：</strong>股票收益率采用<strong>前复权价格</strong>计算，自动处理分红、配股等因素，确保收益率准确可比。<br>
+            <!-- 业务逻辑说明（可折叠） -->
+            <details class="logic-explanation" open>
+                <summary>📖 对比分析逻辑说明</summary>
+                <div class="logic-content">
+                    <div class="logic-section">
+                        <h4>⏱️ 对比时间段计算</h4>
+                        <div class="logic-item">
+                            <strong>起始日期：</strong>报告期的披露日期（投资者只能在披露后才能根据持仓信息调仓）
+                            <table class="logic-table">
+                                <tr>
+                                    <th>报告期类型</th>
+                                    <th>报告期</th>
+                                    <th>披露日期</th>
+                                </tr>
+                                <tr>
+                                    <td>一季报</td>
+                                    <td>03-31</td>
+                                    <td>当年 04-30</td>
+                                </tr>
+                                <tr>
+                                    <td>中报</td>
+                                    <td>06-30</td>
+                                    <td>当年 08-28</td>
+                                </tr>
+                                <tr>
+                                    <td>三季报</td>
+                                    <td>09-30</td>
+                                    <td>当年 10-31</td>
+                                </tr>
+                                <tr>
+                                    <td>年报</td>
+                                    <td>12-31</td>
+                                    <td>次年 04-30</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="logic-item">
+                            <strong>结束日期：</strong>
+                            <ul>
+                                <li><strong>有下一个有效报告期</strong> → 下一个有效报告期的披露日期</li>
+                                <li><strong>当前是最后一期</strong> → 今天</li>
+                            </ul>
+                            <div class="example-box">
+                                <strong>示例：</strong><br>
+                                报告期 20230630 → 起始日 20230828（中报披露日）<br>
+                                下一期 20230930 → 结束日 20231031（三季报披露日）<br>
+                                <span class="highlight">→ 对比时间段：2023-08-28 至 2023-10-31</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="logic-section">
+                        <h4>📊 策略对比方式</h4>
+                        <div class="logic-item">
+                            <strong>持仓来源：</strong>两种策略使用<strong>完全相同的股票池</strong>（都来自该报告期披露的基金持仓）
+                        </div>
+                        <div class="logic-item">
+                            <strong>权重差异：</strong>
+                            <table class="logic-table">
+                                <tr>
+                                    <th>策略类型</th>
+                                    <th>权重来源</th>
+                                    <th>计算方式</th>
+                                </tr>
+                                <tr>
+                                    <td><strong>原策略</strong></td>
+                                    <td>基金实际权重</td>
+                                    <td>使用 stk_mkv_ratio（占基金净资产比例）<br>权重归一化到100%</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>自定义策略</strong></td>
+                                    <td>用户配置的策略</td>
+                                    <td><strong>市值加权：</strong>按市值比例分配<br><strong>综合得分：</strong>按归一化因子值加权</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="logic-item">
+                            <strong>收益率计算：</strong>两种策略在<strong>相同的时间段</strong>内计算收益率
+                            <div class="formula-box">
+                                超额收益 = 自定义策略收益率 - 原策略收益率
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="logic-section">
+                        <h4>📋 部分披露处理</h4>
+                        <div class="logic-item">
+                            <strong>判断标准：</strong>权重总和 &lt; 50%（一季报/三季报通常只披露前10-15只）
+                        </div>
+                        <div class="logic-item">
+                            <strong>处理方式：</strong>
+                            <ul>
+                                <li>使用上一个完整披露期的持仓</li>
+                                <li>不调仓，继续持有</li>
+                                <li>时间段仍从当前报告期的披露日开始</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="logic-section">
+                        <h4>📈 累计收益率计算</h4>
+                        <div class="logic-item">
+                            选择多个报告期时，系统会分段计算每个报告期的收益率，然后<strong>复利累计</strong>：
+                            <div class="formula-box">
+                                累计收益率 = (1 + r₁) × (1 + r₂) × (1 + r₃) × ... - 1
+                            </div>
+                            <div class="example-box">
+                                <strong>示例：</strong><br>
+                                第1期: +10% → 1.10<br>
+                                第2期: +5% → 1.05<br>
+                                第3期: -3% → 0.97<br>
+                                <span class="highlight">累计收益率 = 1.10 × 1.05 × 0.97 - 1 = 11.87%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="logic-section">
+                        <h4>💡 其他说明</h4>
+                        <div class="logic-item">
+                            <ul>
+                                <li><strong>前复权价格：</strong>股票收益率采用前复权价格计算，自动处理分红、配股等因素</li>
+                                <li><strong>横轴说明：</strong>横坐标为每个报告期的持有结束日期（即下一期披露日）</li>
+                                <li><strong>纵轴说明：</strong>纵坐标为从第一个报告期开始的累计收益率</li>
+                                <li><strong>基金净值：</strong>仅作参考对比，不影响策略收益率计算</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            
+            <div class="info-note" style="margin-top: 15px;">
                 <strong>🔄 调仓时点：</strong>在每个报告期<strong>公告日的下一个交易日</strong>进行调仓，使用当日收盘价买入/卖出。<br>
                 <strong>📈 原策略说明：</strong>使用基金公告的<strong>实际持仓权重</strong>（stk_mkv_ratio字段），与自定义策略使用<strong>相同的股票池和价格数据</strong>，确保公平对比。<br>
                 <strong>⚠️ 调仓判断：</strong>通过权重总和判断是否为部分披露：权重总和<50%时使用上一期持仓（不调仓），权重总和≥50%时正常调仓。<br>

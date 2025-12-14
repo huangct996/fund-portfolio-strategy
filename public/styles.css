@@ -586,3 +586,142 @@ tbody tr:hover {
         flex-direction: column;
     }
 }
+
+/* 业务逻辑说明样式 */
+.logic-explanation {
+    background: #F8F9FA;
+    border: 2px solid #E0E0E0;
+    border-radius: 12px;
+    padding: 0;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.logic-explanation summary {
+    background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+    color: white;
+    padding: 15px 20px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: background 0.3s ease;
+}
+
+.logic-explanation summary::-webkit-details-marker {
+    display: none;
+}
+
+.logic-explanation summary:hover {
+    background: linear-gradient(135deg, #5568D3 0%, #6A3F8F 100%);
+}
+
+.logic-explanation[open] summary {
+    border-bottom: 2px solid #E0E0E0;
+}
+
+.logic-content {
+    padding: 20px;
+    background: white;
+}
+
+.logic-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #E8E8E8;
+}
+
+.logic-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.logic-section h4 {
+    color: #667EEA;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #667EEA;
+}
+
+.logic-item {
+    margin-bottom: 15px;
+    line-height: 1.8;
+}
+
+.logic-item:last-child {
+    margin-bottom: 0;
+}
+
+.logic-item strong {
+    color: #2C3E50;
+}
+
+.logic-item ul {
+    margin: 10px 0 10px 20px;
+    padding-left: 20px;
+}
+
+.logic-item li {
+    margin-bottom: 8px;
+}
+
+.logic-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.logic-table th {
+    background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.logic-table td {
+    padding: 12px;
+    border-bottom: 1px solid #E8E8E8;
+}
+
+.logic-table tr:last-child td {
+    border-bottom: none;
+}
+
+.logic-table tr:hover {
+    background: #F8F9FA;
+}
+
+.example-box {
+    background: #FFF9E6;
+    border-left: 4px solid #FFD166;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    line-height: 1.8;
+}
+
+.formula-box {
+    background: #E8F5E9;
+    border-left: 4px solid #06D6A0;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2C3E50;
+}
+
+.highlight {
+    color: #EF476F;
+    font-weight: 600;
+}
