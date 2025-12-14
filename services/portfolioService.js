@@ -816,14 +816,23 @@ class PortfolioService {
     const fundReturns = [];
     
     results.forEach((r, index) => {
-      customCumulative *= (1 + r.customReturn);
-      originalCumulative *= (1 + r.originalReturn);
-      fundCumulative *= (1 + r.fundReturn);
-      
-      r.customCumulativeReturn = customCumulative - 1;
-      r.originalCumulativeReturn = originalCumulative - 1;
-      r.fundCumulativeReturn = fundCumulative - 1;
-      r.excessCumulativeReturn = r.customCumulativeReturn - r.originalCumulativeReturn;
+      if (index === 0) {
+        // 第一个报告期：在披露日建仓，累计收益率为0（基点值）
+        r.customCumulativeReturn = 0;
+        r.originalCumulativeReturn = 0;
+        r.fundCumulativeReturn = 0;
+        r.excessCumulativeReturn = 0;
+      } else {
+        // 后续报告期：累加收益率
+        customCumulative *= (1 + r.customReturn);
+        originalCumulative *= (1 + r.originalReturn);
+        fundCumulative *= (1 + r.fundReturn);
+        
+        r.customCumulativeReturn = customCumulative - 1;
+        r.originalCumulativeReturn = originalCumulative - 1;
+        r.fundCumulativeReturn = fundCumulative - 1;
+        r.excessCumulativeReturn = r.customCumulativeReturn - r.originalCumulativeReturn;
+      }
       
       customReturns.push(r.customReturn);
       originalReturns.push(r.originalReturn);
