@@ -468,9 +468,11 @@ class PortfolioService {
           console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），使用上一期持仓计算收益率（不调仓）`);
           useLastPortfolio = true;
         } else {
-          console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），且没有上一期持仓，跳过该报告期`);
+          console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），且没有上一期持仓，跳过该报告期（累计收益率从下一个完整披露报告期开始计算）`);
           continue;
         }
+      } else {
+        console.log(`\n报告期 ${reportDate}: 完整披露（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%）`);
       }
 
       // 使用数据库中的ann_date作为披露日期（实际公告日期）
