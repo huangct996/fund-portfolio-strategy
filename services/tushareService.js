@@ -172,6 +172,8 @@ class TushareService {
 
     // 先从数据库查询
     const missingCodes = [];
+    const missingNames = [];  // 缺少名称的股票代码
+    
     for (const tsCode of tsCodes) {
       const dbData = await dbService.getStockBasicInfo(tsCode, tradeDate);
       if (dbData) {
@@ -183,6 +185,11 @@ class TushareService {
           pb: parseFloat(dbData.pb) || 0
         };
         
+        // 如果数据库中没有股票名称，标记为需要获取
+        if (!dbData.name) {
+          missingNames.push(tsCode);
+        }
+        
         // 计算质量因子
         const peScore = results[tsCode].peTtm > 0 ? 1 / results[tsCode].peTtm : 0;
         const pbScore = results[tsCode].pb > 0 ? 1 / results[tsCode].pb : 0;
@@ -191,6 +198,33 @@ class TushareService {
         results[tsCode].pbScore = pbScore;
       } else {
         missingCodes.push(tsCode);
+      }
+    }
+    
+    // 如果有缺少名称的股票，从API获取
+    if (missingNames.length > 0) {
+      console.log(`数据库中 ${missingNames.length} 只股票缺少名称，从Tushare获取...`);
+      const batchSize = 50;
+      for (let i = 0; i < missingNames.length; i += batchSize) {
+        const batch = missingNames.slice(i, i + batchSize);
+        const tsCodeStr = batch.join(',');
+        
+        try {
+          const data = await this.callApi('stock_basic', {
+            ts_code: tsCodeStr,
+            fields: 'ts_code,name'
+          });
+
+          data.forEach(item => {
+            if (results[item.ts_code]) {
+              results[item.ts_code].name = item.name;
+            }
+          });
+
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (error) {
+          console.warn(`批量获取股票名称失败:`, error.message);
+        }
       }
     }
 
