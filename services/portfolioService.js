@@ -473,22 +473,13 @@ class PortfolioService {
         }
       }
 
-      // 根据报告期计算披露日期（一般是报告期后2个月）
-      const year = reportDate.substring(0, 4);
-      const month = reportDate.substring(4, 6);
-      let disclosureDate;
+      // 使用数据库中的ann_date作为披露日期（实际公告日期）
+      // 所有同一报告期的持仓记录应该有相同的ann_date
+      const disclosureDate = reportHoldings[0].ann_date;
       
-      if (month === '03') {  // 一季报，4月底披露
-        disclosureDate = `${year}0430`;
-      } else if (month === '06') {  // 中报，8月底披露
-        disclosureDate = `${year}0828`;
-      } else if (month === '09') {  // 三季报，10月底披露
-        disclosureDate = `${year}1031`;
-      } else if (month === '12') {  // 年报，次年4月底披露
-        const nextYear = parseInt(year) + 1;
-        disclosureDate = `${nextYear}0430`;
-      } else {
-        disclosureDate = reportDate;
+      if (!disclosureDate) {
+        console.error(`报告期 ${reportDate} 缺少披露日期(ann_date)，跳过`);
+        continue;
       }
       
       const startDate = disclosureDate;
@@ -507,20 +498,12 @@ class PortfolioService {
         
         // 找到下一个持仓数>10的报告期
         if (nextReportHoldings.length > 10) {
-          // 计算下一个报告期的披露日
-          const nextYear = nextReportDate.substring(0, 4);
-          const nextMonth = nextReportDate.substring(4, 6);
-          let nextDisclosureDate;
+          // 使用数据库中的ann_date作为下一个报告期的披露日
+          const nextDisclosureDate = nextReportHoldings[0].ann_date;
           
-          if (nextMonth === '03') {
-            nextDisclosureDate = `${nextYear}0430`;
-          } else if (nextMonth === '06') {
-            nextDisclosureDate = `${nextYear}0828`;
-          } else if (nextMonth === '09') {
-            nextDisclosureDate = `${nextYear}1031`;
-          } else if (nextMonth === '12') {
-            const nextNextYear = parseInt(nextYear) + 1;
-            nextDisclosureDate = `${nextNextYear}0430`;
+          if (!nextDisclosureDate) {
+            console.warn(`下一个报告期 ${nextReportDate} 缺少披露日期，跳过`);
+            continue;
           }
           
           // 只有当下一个披露日晚于当前披露日时，才使用这个报告期
