@@ -513,9 +513,10 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     // 横轴使用披露日期（每个报告期公布持仓的日期）
     // 直接使用每个报告期的披露日期和累计收益率，不添加起始点
     const labels = data.map(d => formatDate(d.disclosureDate));
-    const customData = data.map(d => (d.customCumulativeReturn || d.customReturn) * 100);
-    const originalData = data.map(d => (d.originalCumulativeReturn || d.originalReturn) * 100);
-    const fundData = data.map(d => (d.fundCumulativeReturn || d.fundReturn) * 100);
+    // 注意：不能使用 || 运算符，因为0是falsy值，会导致第一个点显示错误
+    const customData = data.map(d => (d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
+    const originalData = data.map(d => (d.originalCumulativeReturn !== undefined ? d.originalCumulativeReturn : d.originalReturn) * 100);
+    const fundData = data.map(d => (d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
     
     chartInstance = new Chart(ctx, {
         type: 'line',
