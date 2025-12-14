@@ -499,6 +499,16 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
         chartInstance = null;
     }
     
+    // 调试：查看第一个报告期的数据
+    if (data.length > 0) {
+        console.log('第一个报告期数据:', {
+            reportDate: data[0].reportDate,
+            disclosureDate: data[0].disclosureDate,
+            customCumulativeReturn: data[0].customCumulativeReturn,
+            originalCumulativeReturn: data[0].originalCumulativeReturn
+        });
+    }
+    
     // 显示累计收益率：自定义策略 vs 原策略
     // 横轴使用披露日期（每个报告期公布持仓的日期）
     // 直接使用每个报告期的披露日期和累计收益率，不添加起始点

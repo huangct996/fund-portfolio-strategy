@@ -154,51 +154,50 @@
             
             <!-- 业务逻辑说明（可折叠） -->
             <details class="logic-explanation" open>
-                <summary>📖 对比分析逻辑说明</summary>
+                <summary>📖 回测逻辑说明</summary>
                 <div class="logic-content">
                     <div class="logic-section">
-                        <h4>⏱️ 对比时间段计算</h4>
+                        <h4>📅 报告期筛选规则</h4>
                         <div class="logic-item">
-                            <strong>起始日期：</strong>报告期的披露日期（投资者只能在披露后才能根据持仓信息调仓）
-                            <table class="logic-table">
-                                <tr>
-                                    <th>报告期类型</th>
-                                    <th>报告期</th>
-                                    <th>披露日期</th>
-                                </tr>
-                                <tr>
-                                    <td>一季报</td>
-                                    <td>03-31</td>
-                                    <td>当年 04-30</td>
-                                </tr>
-                                <tr>
-                                    <td>中报</td>
-                                    <td>06-30</td>
-                                    <td>当年 08-28</td>
-                                </tr>
-                                <tr>
-                                    <td>三季报</td>
-                                    <td>09-30</td>
-                                    <td>当年 10-31</td>
-                                </tr>
-                                <tr>
-                                    <td>年报</td>
-                                    <td>12-31</td>
-                                    <td>次年 04-30</td>
-                                </tr>
-                            </table>
+                            <strong>完整披露判断标准：</strong>
+                            <ul>
+                                <li>权重总和 ≥ 50% <strong>且</strong> 持仓数量 > 10只</li>
+                                <li>只有完整披露的报告期才会被纳入回测</li>
+                            </ul>
                         </div>
                         <div class="logic-item">
-                            <strong>结束日期：</strong>
+                            <strong>部分披露处理：</strong>
+                            <ul>
+                                <li><strong>第一个报告期是部分披露</strong> → 跳过，从下一个完整披露报告期开始建仓</li>
+                                <li><strong>中间报告期是部分披露</strong> → 使用上一期持仓（不调仓），继续持有</li>
+                            </ul>
+                        </div>
+                        <div class="logic-item">
+                            <strong>披露日期来源：</strong>使用Tushare API返回的实际公告日期（ann_date），而不是推测的标准披露日期
+                            <div class="example-box">
+                                <strong>示例：</strong><br>
+                                报告期 20190110 → 实际披露日 20190114（来自Tushare数据）<br>
+                                报告期 20190630 → 实际披露日 20190829（来自Tushare数据）
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="logic-section">
+                        <h4>⏱️ 持有时间段计算</h4>
+                        <div class="logic-item">
+                            <strong>持有起始日：</strong>报告期的披露日期（在披露日的下一个交易日建仓）
+                        </div>
+                        <div class="logic-item">
+                            <strong>持有结束日：</strong>
                             <ul>
                                 <li><strong>有下一个有效报告期</strong> → 下一个有效报告期的披露日期</li>
                                 <li><strong>当前是最后一期</strong> → 今天</li>
                             </ul>
                             <div class="example-box">
                                 <strong>示例：</strong><br>
-                                报告期 20230630 → 起始日 20230828（中报披露日）<br>
-                                下一期 20230930 → 结束日 20231031（三季报披露日）<br>
-                                <span class="highlight">→ 对比时间段：2023-08-28 至 2023-10-31</span>
+                                报告期 20230630 → 持有起始日 20230829（实际披露日）<br>
+                                下一期 20230930 → 持有结束日 20231022（下一期实际披露日）<br>
+                                <span class="highlight">→ 持有时间段：2023-08-29 至 2023-10-22</span>
                             </div>
                         </div>
                     </div>
@@ -224,14 +223,19 @@
                                 <tr>
                                     <td><strong>自定义策略</strong></td>
                                     <td>用户配置的策略</td>
-                                    <td><strong>市值加权：</strong>按市值比例分配<br><strong>综合得分：</strong>按归一化因子值加权</td>
+                                    <td><strong>市值加权：</strong>按市值比例分配<br><strong>综合得分：</strong>按归一化因子值加权<br>应用单只股票最大权重限制（默认10%）</td>
                                 </tr>
                             </table>
                         </div>
                         <div class="logic-item">
-                            <strong>收益率计算：</strong>两种策略在<strong>相同的时间段</strong>内计算收益率
+                            <strong>期间收益率：</strong>持有起始日到持有结束日的单期收益率
+                        </div>
+                        <div class="logic-item">
+                            <strong>累计收益率：</strong>从第一个完整披露报告期开始，使用复利公式累加
                             <div class="formula-box">
-                                超额收益 = 自定义策略收益率 - 原策略收益率
+                                第一个报告期累计收益率 = 0%（建仓基点）<br>
+                                后续报告期累计收益率 = (1 + 上期累计收益率) × (1 + 本期期间收益率) - 1<br>
+                                超额收益 = 自定义策略累计收益率 - 原策略累计收益率
                             </div>
                         </div>
                     </div>
