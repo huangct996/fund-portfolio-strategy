@@ -672,9 +672,9 @@ function updatePeriodInfo(period) {
     document.getElementById('endDate').textContent = period.endDate ? formatDate(period.endDate) : '-';
     document.getElementById('stockCount').textContent = `${period.adjustedHoldings.length} 只`;
     
-    // 累计收益率（从第一个报告期开始到当前报告期结束日的累计收益）
-    const customReturn = formatPercent(period.customCumulativeReturn || period.customReturn);
-    const originalReturn = formatPercent(period.originalCumulativeReturn || period.originalReturn);
+    // 期间收益率（持有起始日到持有结束日的单期收益率）
+    const customReturn = formatPercent(period.customReturn);
+    const originalReturn = formatPercent(period.originalReturn);
     document.getElementById('periodReturn').innerHTML = `自定义策略: <strong>${customReturn}</strong> | 原策略: <strong>${originalReturn}</strong>`;
     
     document.getElementById('totalWeight').textContent = `${(totalWeight * 100).toFixed(2)}%`;
