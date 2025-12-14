@@ -500,10 +500,10 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     }
     
     // 显示累计收益率：自定义策略 vs 原策略
-    // 横轴使用实际的时间点：第一个点用startDate，后续点用endDate
-    // 注意：多个报告期可能有相同的endDate，图表上会显示多个点
+    // 横轴使用披露日期（每个报告期公布持仓的日期）
+    // 第一个点是起始点（累计收益率为0），从第一个报告期的披露日开始
     const labels = data.length > 0 
-        ? [formatDate(data[0].startDate), ...data.map(d => formatDate(d.endDate))]
+        ? [formatDate(data[0].disclosureDate), ...data.map(d => formatDate(d.disclosureDate))]
         : [];
     const customData = [0, ...data.map(d => (d.customCumulativeReturn || d.customReturn) * 100)];
     const originalData = [0, ...data.map(d => (d.originalCumulativeReturn || d.originalReturn) * 100)];

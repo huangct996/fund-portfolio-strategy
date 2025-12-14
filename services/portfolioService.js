@@ -763,6 +763,7 @@ class PortfolioService {
         if (customStrategyReturns && originalStrategyReturns) {
           results.push({
             reportDate,
+            disclosureDate,  // 添加披露日期
             startDate: customStrategyReturns.startDate || startDate,
             endDate: customStrategyReturns.endDate || endDate,
             // 自定义策略
