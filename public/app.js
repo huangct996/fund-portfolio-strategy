@@ -501,6 +501,7 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
     
     // 显示累计收益率：自定义策略 vs 原策略
     // 横轴使用实际的时间点：第一个点用startDate，后续点用endDate
+    // 注意：多个报告期可能有相同的endDate，图表上会显示多个点
     const labels = data.length > 0 
         ? [formatDate(data[0].startDate), ...data.map(d => formatDate(d.endDate))]
         : [];
@@ -688,7 +689,7 @@ function updatePeriodInfo(period) {
     document.getElementById('endDate').textContent = period.endDate ? formatDate(period.endDate) : '-';
     document.getElementById('stockCount').textContent = `${period.adjustedHoldings.length} 只`;
     
-    // 期间收益率（显示累计收益率，与图表一致）
+    // 累计收益率（从第一个报告期开始到当前报告期结束日的累计收益）
     const customReturn = formatPercent(period.customCumulativeReturn || period.customReturn);
     const originalReturn = formatPercent(period.originalCumulativeReturn || period.originalReturn);
     document.getElementById('periodReturn').innerHTML = `自定义策略: <strong>${customReturn}</strong> | 原策略: <strong>${originalReturn}</strong>`;
