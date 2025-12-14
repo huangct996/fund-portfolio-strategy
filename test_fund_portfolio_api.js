@@ -64,10 +64,14 @@ async function testFundPortfolioAPI() {
     endDates.slice(0, 5).forEach(endDate => {
       const holdings = groupedByEndDate[endDate];
       const firstHolding = holdings[0];
+      const totalWeight = holdings.reduce((sum, h) => sum + (parseFloat(h.stk_mkv_ratio) || 0), 0);
+      const isPartial = totalWeight < 50;
       
       console.log(`报告期: ${endDate}`);
       console.log(`  披露日期(ann_date): ${firstHolding.ann_date}`);
       console.log(`  持仓数量: ${holdings.length} 只`);
+      console.log(`  权重总和: ${totalWeight.toFixed(2)}%`);
+      console.log(`  是否部分披露: ${isPartial ? '是 ⚠️' : '否 ✅'}`);
       console.log(`  前3只股票:`);
       holdings.slice(0, 3).forEach((h, i) => {
         console.log(`    ${i+1}. ${h.symbol}: 权重=${h.stk_mkv_ratio}%, 市值=${h.mkv}元`);

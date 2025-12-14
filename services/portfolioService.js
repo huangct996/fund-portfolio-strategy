@@ -458,17 +458,19 @@ class PortfolioService {
       const reportDate = selectedReportDates[i];
       const reportHoldings = groupedHoldings[reportDate];
       
-      // 检查是否只公布了部分持仓（通过权重总和判断）
-      // 如果权重总和<50%，说明是部分披露（一季报/三季报通常只披露前10-15大持仓）
+      // 检查是否只公布了部分持仓
+      // 判断标准：权重总和<50% 或 持仓数量<=10只
+      // 完整披露的报告期通常有50+只股票，权重总和接近100%
       const totalWeight = reportHoldings.reduce((sum, h) => sum + (parseFloat(h.stk_mkv_ratio) || 0), 0);
+      const isPartialDisclosure = totalWeight < 50 || reportHoldings.length <= 10;
       let useLastPortfolio = false;
       
-      if (totalWeight < 50) {
+      if (isPartialDisclosure) {
         if (lastValidPortfolio) {
-          console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），使用上一期持仓计算收益率（不调仓）`);
+          console.log(`\n报告期 ${reportDate}: 部分披露（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），使用上一期持仓计算收益率（不调仓）`);
           useLastPortfolio = true;
         } else {
-          console.log(`\n报告期 ${reportDate}: 只公布部分持仓（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），且没有上一期持仓，跳过该报告期（累计收益率从下一个完整披露报告期开始计算）`);
+          console.log(`\n报告期 ${reportDate}: 部分披露（${reportHoldings.length}只，权重总和${totalWeight.toFixed(1)}%），且没有上一期持仓，跳过该报告期（累计收益率从下一个完整披露报告期开始计算）`);
           continue;
         }
       } else {
