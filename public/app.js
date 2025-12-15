@@ -776,15 +776,18 @@ function displayConstituents(data) {
     if (loadingEl) loadingEl.style.display = 'none';
     if (resultEl) resultEl.style.display = 'block';
     
-    // 更新统计信息（添加null检查）
+    // 更新统计信息（添加null检查和类型转换）
     const resultDateEl = document.getElementById('resultDate');
     if (resultDateEl) resultDateEl.textContent = formatDate(data.date);
     
     const resultCountEl = document.getElementById('resultCount');
-    if (resultCountEl) resultCountEl.textContent = `${data.count} 只`;
+    if (resultCountEl) resultCountEl.textContent = `${data.count || 0} 只`;
     
     const resultTotalWeightEl = document.getElementById('resultTotalWeight');
-    if (resultTotalWeightEl) resultTotalWeightEl.textContent = `${data.totalWeight.toFixed(2)}%`;
+    if (resultTotalWeightEl) {
+        const totalWeight = parseFloat(data.totalWeight) || 0;
+        resultTotalWeightEl.textContent = `${totalWeight.toFixed(2)}%`;
+    }
     
     // 填充表格
     const tbody = document.getElementById('constituentsTableBody');
@@ -795,13 +798,19 @@ function displayConstituents(data) {
     
     tbody.innerHTML = '';
     
+    if (!data.constituents || data.constituents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">暂无数据</td></tr>';
+        return;
+    }
+    
     data.constituents.forEach((stock, index) => {
         const tr = document.createElement('tr');
+        const weight = parseFloat(stock.weight) || 0;
         tr.innerHTML = `
             <td>${index + 1}</td>
-            <td>${stock.con_code}</td>
-            <td>${stock.name}</td>
-            <td>${stock.weight.toFixed(2)}%</td>
+            <td>${stock.con_code || '-'}</td>
+            <td>${stock.name || '-'}</td>
+            <td>${weight.toFixed(2)}%</td>
         `;
         tbody.appendChild(tr);
     });
