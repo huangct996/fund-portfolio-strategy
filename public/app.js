@@ -238,6 +238,9 @@ function setupConfigPanel() {
     
     // 重置按钮
     document.getElementById('resetConfig').addEventListener('click', resetConfiguration);
+    
+    // 指数成分股查询按钮
+    document.getElementById('queryConstituents').addEventListener('click', queryIndexConstituents);
 }
 
 function updateFactorDescription(factorType) {
@@ -659,4 +662,64 @@ function updatePeriodInfo(period) {
     
     // 指数策略按实际调仓日期调仓，无需判断是否调仓
     document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（按指数调仓日期）</span>';
+}
+
+// 查询指数成分股
+async function queryIndexConstituents() {
+    const queryDate = document.getElementById('queryDate').value;
+    
+    if (!queryDate) {
+        alert('请选择调仓日期');
+        return;
+    }
+    
+    // 转换日期格式：YYYY-MM-DD -> YYYYMMDD
+    const dateStr = queryDate.replace(/-/g, '');
+    
+    // 显示加载状态
+    document.getElementById('constituentsLoading').style.display = 'block';
+    document.getElementById('constituentsResult').style.display = 'none';
+    document.getElementById('constituentsError').style.display = 'none';
+    
+    try {
+        const response = await fetch(`${API_BASE}/index-constituents?date=${dateStr}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || '查询失败');
+        }
+        
+        // 显示结果
+        displayConstituents(result.data);
+        
+    } catch (error) {
+        document.getElementById('constituentsLoading').style.display = 'none';
+        document.getElementById('constituentsError').style.display = 'block';
+        document.getElementById('constituentsErrorMessage').textContent = error.message;
+    }
+}
+
+function displayConstituents(data) {
+    document.getElementById('constituentsLoading').style.display = 'none';
+    document.getElementById('constituentsResult').style.display = 'block';
+    
+    // 更新统计信息
+    document.getElementById('resultDate').textContent = formatDate(data.date);
+    document.getElementById('resultCount').textContent = `${data.count} 只`;
+    document.getElementById('resultTotalWeight').textContent = `${data.totalWeight.toFixed(2)}%`;
+    
+    // 填充表格
+    const tbody = document.getElementById('constituentsTableBody');
+    tbody.innerHTML = '';
+    
+    data.constituents.forEach((stock, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${stock.con_code}</td>
+            <td>${stock.name}</td>
+            <td>${stock.weight.toFixed(2)}%</td>
+        `;
+        tbody.appendChild(tr);
+    });
 }

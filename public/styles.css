@@ -848,6 +848,36 @@ tbody tr:hover {
     border-color: #999;
 }
 
+/* 指数成分股查询模块样式 */
+.index-constituents-section {
+    margin-top: 20px;
+}
+
+.index-constituents-section summary {
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-weight: 600;
+    padding: 15px;
+    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.index-constituents-section summary:hover {
+    background: linear-gradient(135deg, #e0e7ef, #b3c3d9);
+}
+
+.constituents-content {
+    padding: 20px;
+}
+
+.date-query-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 @media (max-width: 768px) {
     .info-grid {
         grid-template-columns: 1fr;
@@ -859,5 +889,15 @@ tbody tr:hover {
     
     .date-item {
         min-width: 100%;
+    }
+    
+    .date-query-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .date-query-section button {
+        margin-left: 0 !important;
+        margin-top: 10px;
     }
 }

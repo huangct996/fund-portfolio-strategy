@@ -120,4 +120,77 @@ router.get('/index-returns', async (req, res) => {
   }
 });
 
+/**
+ * 查询指定日期的指数成分股
+ * 查询参数:
+ * - date: 调仓日期，格式YYYYMMDD
+ */
+router.get('/index-constituents', async (req, res) => {
+  try {
+    const { date } = req.query;
+    
+    if (!date) {
+      return res.json({
+        success: false,
+        error: '请提供调仓日期参数'
+      });
+    }
+    
+    // 获取指定日期的指数成分股权重
+    const constituents = await tushareService.getIndexWeightByDate(INDEX_CODE, date);
+    
+    if (!constituents || constituents.length === 0) {
+      return res.json({
+        success: false,
+        error: `未找到日期 ${date} 的成分股数据`
+      });
+    }
+    
+    // 计算权重总和
+    const totalWeight = constituents.reduce((sum, c) => sum + (c.weight || 0), 0);
+    
+    // 获取股票名称
+    const stockCodes = constituents.map(c => c.con_code);
+    const stockNames = {};
+    
+    // 批量获取股票名称（从数据库或API）
+    for (const code of stockCodes) {
+      try {
+        const stockInfo = await tushareService.getStockBasicInfo([code], date);
+        if (stockInfo && stockInfo.length > 0) {
+          stockNames[code] = stockInfo[0].name || code;
+        } else {
+          stockNames[code] = code;
+        }
+      } catch (error) {
+        stockNames[code] = code;
+      }
+    }
+    
+    // 添加股票名称并按权重排序
+    const result = constituents.map(c => ({
+      con_code: c.con_code,
+      name: stockNames[c.con_code] || c.con_code,
+      weight: c.weight,
+      trade_date: c.trade_date
+    })).sort((a, b) => b.weight - a.weight);
+    
+    res.json({
+      success: true,
+      data: {
+        date: date,
+        constituents: result,
+        count: result.length,
+        totalWeight: totalWeight
+      }
+    });
+  } catch (error) {
+    console.error('查询指数成分股失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

@@ -166,47 +166,44 @@
                 <summary>📖 回测逻辑说明</summary>
                 <div class="logic-content">
                     <div class="logic-section">
-                        <h4>📅 报告期筛选规则</h4>
+                        <h4>📊 数据来源</h4>
                         <div class="logic-item">
-                            <strong>完整披露判断标准：</strong>
+                            <strong>指数成分股：</strong>使用h30269.CSI（中证红利低波100指数）的成分股和权重数据
                             <ul>
-                                <li>权重总和 ≥ 50% <strong>且</strong> 持仓数量 > 10只</li>
-                                <li>只有完整披露的报告期才会被纳入回测</li>
+                                <li>数据来源：Tushare API的index_weight接口</li>
+                                <li>包含字段：成分股代码（con_code）、权重（weight）、调仓日期（trade_date）</li>
                             </ul>
                         </div>
                         <div class="logic-item">
-                            <strong>部分披露处理：</strong>
+                            <strong>调仓时机：</strong>按照指数的实际调仓日期进行调仓
                             <ul>
-                                <li><strong>第一个报告期是部分披露</strong> → 跳过，从下一个完整披露报告期开始建仓</li>
-                                <li><strong>中间报告期是部分披露</strong> → 使用上一期持仓（不调仓），继续持有</li>
+                                <li>调仓日期来自Tushare API返回的trade_date字段</li>
+                                <li>不是固定的季度调仓，而是指数实际调整成分股的日期</li>
                             </ul>
-                        </div>
-                        <div class="logic-item">
-                            <strong>披露日期来源：</strong>使用Tushare API返回的实际公告日期（ann_date），而不是推测的标准披露日期
-                            <div class="example-box">
-                                <strong>示例：</strong><br>
-                                报告期 20190110 → 实际披露日 20190114（来自Tushare数据）<br>
-                                报告期 20190630 → 实际披露日 20190829（来自Tushare数据）
-                            </div>
                         </div>
                     </div>
                     
                     <div class="logic-section">
-                        <h4>⏱️ 持有时间段计算</h4>
+                        <h4>⏱️ 回测时间范围</h4>
                         <div class="logic-item">
-                            <strong>持有起始日：</strong>报告期的披露日期（在披露日的下一个交易日建仓）
+                            <strong>时间选择：</strong>用户可以自由选择回测的开始和结束日期
+                            <ul>
+                                <li><strong>留空开始日期：</strong>从指数最早的调仓日开始</li>
+                                <li><strong>留空结束日期：</strong>到指数最新的调仓日结束</li>
+                                <li><strong>指定日期范围：</strong>只使用该范围内的调仓日期</li>
+                            </ul>
                         </div>
                         <div class="logic-item">
-                            <strong>持有结束日：</strong>
+                            <strong>持有时间段：</strong>
                             <ul>
-                                <li><strong>有下一个有效报告期</strong> → 下一个有效报告期的披露日期</li>
-                                <li><strong>当前是最后一期</strong> → 今天</li>
+                                <li><strong>持有起始日：</strong>调仓日当天建仓（使用收盘价）</li>
+                                <li><strong>持有结束日：</strong>下一个调仓日（或回测结束日期）</li>
                             </ul>
                             <div class="example-box">
                                 <strong>示例：</strong><br>
-                                报告期 20230630 → 持有起始日 20230829（实际披露日）<br>
-                                下一期 20230930 → 持有结束日 20231022（下一期实际披露日）<br>
-                                <span class="highlight">→ 持有时间段：2023-08-29 至 2023-10-22</span>
+                                调仓日 20230630 → 持有起始日 20230630<br>
+                                下一个调仓日 20230930 → 持有结束日 20230930<br>
+                                <span class="highlight">→ 持有时间段：2023-06-30 至 2023-09-30</span>
                             </div>
                         </div>
                     </div>
@@ -214,7 +211,7 @@
                     <div class="logic-section">
                         <h4>📊 策略对比方式</h4>
                         <div class="logic-item">
-                            <strong>持仓来源：</strong>两种策略使用<strong>完全相同的股票池</strong>（都来自该报告期披露的基金持仓）
+                            <strong>成分股来源：</strong>三种策略使用<strong>完全相同的成分股</strong>（都来自h30269.CSI指数）
                         </div>
                         <div class="logic-item">
                             <strong>权重差异：</strong>
@@ -225,14 +222,19 @@
                                     <th>计算方式</th>
                                 </tr>
                                 <tr>
-                                    <td><strong>原策略</strong></td>
-                                    <td>基金实际权重</td>
-                                    <td>使用 stk_mkv_ratio（占基金净资产比例）<br>权重归一化到100%</td>
+                                    <td><strong>h30269.CSI指数</strong></td>
+                                    <td>指数原始权重</td>
+                                    <td>使用index_weight接口返回的weight字段<br>完全复制指数配置</td>
                                 </tr>
                                 <tr>
                                     <td><strong>自定义策略</strong></td>
                                     <td>用户配置的策略</td>
                                     <td><strong>市值加权：</strong>按市值比例分配<br><strong>综合得分：</strong>按归一化因子值加权<br>应用单只股票最大权重限制（默认10%）</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>512890.SH基金净值</strong></td>
+                                    <td>基金实际净值</td>
+                                    <td>使用fund_nav接口返回的单位净值<br>包含交易成本和管理费</td>
                                 </tr>
                             </table>
                         </div>
@@ -240,44 +242,30 @@
                             <strong>期间收益率：</strong>持有起始日到持有结束日的单期收益率
                         </div>
                         <div class="logic-item">
-                            <strong>累计收益率：</strong>从第一个完整披露报告期开始，使用复利公式累加
+                            <strong>累计收益率：</strong>从第一个调仓期开始，使用复利公式累加
                             <div class="formula-box">
-                                第一个报告期累计收益率 = 0%（建仓基点）<br>
-                                后续报告期累计收益率 = (1 + 上期累计收益率) × (1 + 本期期间收益率) - 1<br>
-                                超额收益 = 自定义策略累计收益率 - 原策略累计收益率
+                                第一个调仓期累计收益率 = 0%（建仓基点）<br>
+                                后续调仓期累计收益率 = (1 + 上期累计收益率) × (1 + 本期期间收益率) - 1<br>
+                                跟踪误差 = 自定义策略累计收益率 - 指数累计收益率
                             </div>
                         </div>
                     </div>
                     
                     <div class="logic-section">
-                        <h4>📋 部分披露处理</h4>
+                        <h4>🔍 数据过滤</h4>
                         <div class="logic-item">
-                            <strong>判断标准：</strong>权重总和 &lt; 50%（一季报/三季报通常只披露前10-15只）
-                        </div>
-                        <div class="logic-item">
-                            <strong>处理方式：</strong>
+                            <strong>自动过滤：</strong>
                             <ul>
-                                <li>使用上一个完整披露期的持仓</li>
-                                <li>不调仓，继续持有</li>
-                                <li>时间段仍从当前报告期的披露日开始</li>
+                                <li>过滤无市值数据的股票（通常是新股，上市时间晚于调仓日）</li>
+                                <li>过滤后的股票权重会重新归一化到100%</li>
                             </ul>
                         </div>
                     </div>
                     
                     <div class="logic-section">
-                        <h4>📈 累计收益率计算</h4>
+                        <h4>💰 交易成本</h4>
                         <div class="logic-item">
-                            选择多个报告期时，系统会分段计算每个报告期的收益率，然后<strong>复利累计</strong>：
-                            <div class="formula-box">
-                                累计收益率 = (1 + r₁) × (1 + r₂) × (1 + r₃) × ... - 1
-                            </div>
-                            <div class="example-box">
-                                <strong>示例：</strong><br>
-                                第1期: +10% → 1.10<br>
-                                第2期: +5% → 1.05<br>
-                                第3期: -3% → 0.97<br>
-                                <span class="highlight">累计收益率 = 1.10 × 1.05 × 0.97 - 1 = 11.87%</span>
-                            </div>
+                            当前回测<strong>不考虑</strong>交易成本和印花税，实际收益会略低于回测结果。
                         </div>
                     </div>
                     
@@ -439,6 +427,62 @@
                     </div>
                 </div>
             </div>
+        </section>
+
+        <!-- 指数成分股查询模块 -->
+        <section class="card">
+            <details class="index-constituents-section">
+                <summary>🔍 指数成分股查询（按调仓日期）</summary>
+                <div class="constituents-content">
+                    <div class="info-note" style="margin-bottom: 15px;">
+                        <strong>📌 说明：</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px;">
+                            <li>查询h30269.CSI指数在特定调仓日期的成分股及权重</li>
+                            <li>数据来源：Tushare API的index_weight接口</li>
+                            <li>权重单位：百分比（%）</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="date-query-section">
+                        <div class="date-item">
+                            <label for="queryDate">选择调仓日期：</label>
+                            <input type="date" id="queryDate" class="date-input">
+                            <button id="queryConstituents" class="btn-primary" style="margin-left: 10px;">查询成分股</button>
+                        </div>
+                    </div>
+                    
+                    <div id="constituentsResult" style="display: none; margin-top: 20px;">
+                        <h3 style="color: #2E86AB;">成分股列表</h3>
+                        <div class="info-note" style="margin-bottom: 10px;">
+                            <strong>调仓日期：</strong><span id="resultDate">-</span> | 
+                            <strong>成分股数量：</strong><span id="resultCount">-</span> | 
+                            <strong>权重总和：</strong><span id="resultTotalWeight">-</span>
+                        </div>
+                        <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>排名</th>
+                                        <th>股票代码</th>
+                                        <th>股票名称</th>
+                                        <th>权重（%）</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="constituentsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="constituentsLoading" style="display: none; text-align: center; padding: 40px;">
+                        <div class="spinner"></div>
+                        <p>正在查询成分股数据...</p>
+                    </div>
+                    
+                    <div id="constituentsError" style="display: none; padding: 20px; background: #FFF3CD; border-radius: 8px; margin-top: 20px;">
+                        <p style="color: #856404; margin: 0;"><strong>⚠️ </strong><span id="constituentsErrorMessage"></span></p>
+                    </div>
+                </div>
+            </details>
         </section>
 
         <div id="error" class="error" style="display: none;">
