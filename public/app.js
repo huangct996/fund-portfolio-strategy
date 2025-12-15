@@ -75,26 +75,28 @@ async function loadData() {
         const returnsResult = await fetchAllReturns(currentConfig);
         allReturnsData = returnsResult.periods;
         const customRisk = returnsResult.customRisk;
-        const originalRisk = returnsResult.originalRisk;
+        const indexRisk = returnsResult.indexRisk;
+        const trackingError = returnsResult.trackingError;
         
         console.log('获取到的数据:', allReturnsData);
         console.log('数据条数:', allReturnsData.length);
         console.log('自定义策略风险指标:', customRisk);
-        console.log('原策略风险指标:', originalRisk);
+        console.log('指数风险指标:', indexRisk);
+        console.log('跟踪误差:', trackingError);
         
         if (!allReturnsData || allReturnsData.length === 0) {
             throw new Error('未获取到收益率数据');
         }
 
         // 绘制收益对比曲线
-        drawCumulativeReturnChart(allReturnsData, customRisk, originalRisk);
+        drawCumulativeReturnChart(allReturnsData, customRisk, indexRisk);
         document.getElementById('chartsSection').style.display = 'block';
 
         // 显示持仓明细
         displayHoldingsTable(allReturnsData);
         
         // 显示风险指标
-        displayRiskMetrics(customRisk, originalRisk);
+        displayRiskMetrics(customRisk, indexRisk, trackingError);
 
         showLoading(false);
     } catch (error) {
@@ -144,7 +146,7 @@ async function fetchAllReturns(config) {
     params.append('qualityFactorType', config.qualityFactorType);
     params.append('maxWeight', config.maxWeight || 0.10);
     
-    const response = await fetch(`${API_BASE}/all-returns?${params}`);
+    const response = await fetch(`${API_BASE}/index-returns?${params}`);
     const result = await response.json();
     
     if (!result.success) {
@@ -490,7 +492,7 @@ function renderHoldingsForPeriod(period) {
     });
 }
 
-function drawCumulativeReturnChart(data, customRisk, originalRisk) {
+function drawCumulativeReturnChart(data, customRisk, indexRisk) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
     // 销毁旧图表实例（如果存在）
@@ -499,23 +501,23 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
         chartInstance = null;
     }
     
-    // 调试：查看第一个报告期的数据
+    // 调试：查看第一个调仓期的数据
     if (data.length > 0) {
-        console.log('第一个报告期数据:', {
-            reportDate: data[0].reportDate,
-            disclosureDate: data[0].disclosureDate,
+        console.log('第一个调仓期数据:', {
+            rebalanceDate: data[0].rebalanceDate,
             customCumulativeReturn: data[0].customCumulativeReturn,
-            originalCumulativeReturn: data[0].originalCumulativeReturn
+            indexCumulativeReturn: data[0].indexCumulativeReturn,
+            trackingError: data[0].trackingError
         });
     }
     
     // 显示累计收益率：自定义策略 vs 原策略
     // 横轴使用披露日期（每个报告期公布持仓的日期）
     // 直接使用每个报告期的披露日期和累计收益率，不添加起始点
-    const labels = data.map(d => formatDate(d.disclosureDate));
+    const labels = data.map(d => formatDate(d.rebalanceDate));
     // 注意：不能使用 || 运算符，因为0是falsy值，会导致第一个点显示错误
     const customData = data.map(d => (d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
-    const originalData = data.map(d => (d.originalCumulativeReturn !== undefined ? d.originalCumulativeReturn : d.originalReturn) * 100);
+    const indexData = data.map(d => (d.indexCumulativeReturn !== undefined ? d.indexCumulativeReturn : d.indexReturn) * 100);
     const fundData = data.map(d => (d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
     
     chartInstance = new Chart(ctx, {
@@ -533,8 +535,8 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
                     tension: 0.4
                 },
                 {
-                    label: '原策略（基金持仓权重）',
-                    data: originalData,
+                    label: 'h30269.CSI指数',
+                    data: indexData,
                     borderColor: '#F18F01',
                     backgroundColor: 'rgba(241, 143, 1, 0.1)',
                     borderWidth: 3,
@@ -542,7 +544,7 @@ function drawCumulativeReturnChart(data, customRisk, originalRisk) {
                     tension: 0.4
                 },
                 {
-                    label: '基金净值（参考）',
+                    label: '512890.SH基金净值',
                     data: fundData,
                     borderColor: '#A23B72',
                     backgroundColor: 'rgba(162, 59, 114, 0.1)',
@@ -596,8 +598,8 @@ function formatDate(dateStr) {
     return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}`;
 }
 
-function displayRiskMetrics(customRisk, originalRisk) {
-    if (!customRisk || !originalRisk) return;
+function displayRiskMetrics(customRisk, indexRisk, trackingError) {
+    if (!customRisk || !indexRisk) return;
     
     const riskSection = document.getElementById('riskMetrics');
     if (!riskSection) return;
@@ -605,7 +607,7 @@ function displayRiskMetrics(customRisk, originalRisk) {
     riskSection.style.display = 'block';
     
     const customMetrics = document.getElementById('customRiskMetrics');
-    const originalMetrics = document.getElementById('originalRiskMetrics');
+    const indexMetrics = document.getElementById('indexRiskMetrics');
     
     customMetrics.innerHTML = `
         <div class="risk-item">
@@ -634,32 +636,41 @@ function displayRiskMetrics(customRisk, originalRisk) {
         </div>
     `;
     
-    originalMetrics.innerHTML = `
-        <div class="risk-item">
-            <span class="risk-label">累计收益率:</span>
-            <span class="risk-value">${(originalRisk.totalReturn * 100).toFixed(2)}%</span>
-        </div>
+    indexMetrics.innerHTML = `
         <div class="risk-item">
             <span class="risk-label">年化收益率:</span>
-            <span class="risk-value">${(originalRisk.annualizedReturn * 100).toFixed(2)}%</span>
+            <span class="risk-value">${(indexRisk.annualizedReturn * 100).toFixed(2)}%</span>
         </div>
         <div class="risk-item">
             <span class="risk-label">年化波动率:</span>
-            <span class="risk-value">${(originalRisk.volatility * 100).toFixed(2)}%</span>
+            <span class="risk-value">${(indexRisk.volatility * 100).toFixed(2)}%</span>
         </div>
         <div class="risk-item">
             <span class="risk-label">最大回撤:</span>
-            <span class="risk-value" style="color: #FF6B6B;">${(originalRisk.maxDrawdown * 100).toFixed(2)}%</span>
+            <span class="risk-value" style="color: #FF6B6B;">${(indexRisk.maxDrawdown * 100).toFixed(2)}%</span>
         </div>
         <div class="risk-item">
             <span class="risk-label">夏普比率:</span>
-            <span class="risk-value">${originalRisk.sharpeRatio.toFixed(2)}</span>
-        </div>
-        <div class="risk-item">
-            <span class="risk-label">索提诺比率:</span>
-            <span class="risk-value">${originalRisk.sortinoRatio.toFixed(2)}</span>
+            <span class="risk-value">${indexRisk.sharpeRatio.toFixed(2)}</span>
         </div>
     `;
+    
+    // 显示跟踪误差
+    if (trackingError) {
+        const trackingErrorDiv = document.getElementById('trackingErrorMetrics');
+        if (trackingErrorDiv) {
+            trackingErrorDiv.innerHTML = `
+                <div class="risk-item">
+                    <span class="risk-label">年化跟踪误差:</span>
+                    <span class="risk-value">${(trackingError.trackingError * 100).toFixed(2)}%</span>
+                </div>
+                <div class="risk-item">
+                    <span class="risk-label">平均偏离:</span>
+                    <span class="risk-value">${(trackingError.avgDifference * 100).toFixed(2)}%</span>
+                </div>
+            `;
+        }
+    }
 }
 
 function formatPercent(value) {

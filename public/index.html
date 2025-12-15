@@ -287,15 +287,16 @@
             </details>
             
             <div class="info-note" style="margin-top: 15px;">
-                <strong>🔄 调仓时点：</strong>在每个报告期<strong>公告日的下一个交易日</strong>进行调仓，使用当日收盘价买入/卖出。<br>
-                <strong>📈 原策略说明：</strong>使用基金公告的<strong>实际持仓权重</strong>（stk_mkv_ratio字段），与自定义策略使用<strong>相同的股票池和价格数据</strong>，确保公平对比。<br>
-                <strong>⚠️ 调仓判断：</strong>通过权重总和判断是否为部分披露：权重总和<50%时使用上一期持仓（不调仓），权重总和≥50%时正常调仓。<br>
-                <strong>🔍 数据过滤：</strong>自动过滤无市值数据的股票（通常是新股，上市时间晚于报告期），过滤后的股票权重会重新归一化到100%。<br>
+                <strong>🔄 调仓时点：</strong>按照h30269.CSI指数的实际调仓日期进行调仓，使用调仓日收盘价买入/卖出。<br>
+                <strong>📈 指数策略：</strong>使用h30269.CSI指数的<strong>成分股和原始权重</strong>，完全复制指数配置。<br>
+                <strong>🎯 自定义策略：</strong>使用h30269.CSI指数的<strong>成分股</strong>，但按用户配置的策略（市值加权/综合得分）<strong>重新计算权重</strong>。<br>
+                <strong>📊 512890.SH基金净值：</strong>作为参考基准，反映红利低波ETF的实际表现（包含交易成本和管理费）。<br>
+                <strong>🔍 数据过滤：</strong>自动过滤无市值数据的股票（通常是新股），过滤后的股票权重会重新归一化到100%。<br>
                 <strong>💰 交易成本：</strong>当前回测<strong>不考虑</strong>交易成本和印花税，实际收益会略低于回测结果。
             </div>
 
             <div class="chart-container">
-                <h3>累计收益率对比（按报告期调仓）</h3>
+                <h3>累计收益率对比（按指数调仓日期）</h3>
                 <canvas id="cumulativeReturnChart"></canvas>
             </div>
         </section>
@@ -304,18 +305,22 @@
             <h2>风险指标对比</h2>
             
             <div class="info-note">
-                <strong>📈 对比说明：</strong>原策略使用基金原始持仓权重，自定义策略使用调整后的权重。
-                两者使用<strong>完全相同的股票池和价格数据</strong>，确保公平对比。
+                <strong>📈 对比说明：</strong>自定义策略使用h30269.CSI成分股，按配置的权重策略调整权重。
+                指数策略使用h30269.CSI成分股和原始权重。两者使用<strong>完全相同的股票池和价格数据</strong>，确保公平对比。
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px;">
                 <div>
                     <h3 style="color: #2E86AB;">自定义策略</h3>
                     <div id="customRiskMetrics" class="risk-metrics-container"></div>
                 </div>
                 <div>
-                    <h3 style="color: #F18F01;">原策略（基金持仓权重）</h3>
-                    <div id="originalRiskMetrics" class="risk-metrics-container"></div>
+                    <h3 style="color: #F18F01;">h30269.CSI指数</h3>
+                    <div id="indexRiskMetrics" class="risk-metrics-container"></div>
+                </div>
+                <div>
+                    <h3 style="color: #06D6A0;">跟踪误差</h3>
+                    <div id="trackingErrorMetrics" class="risk-metrics-container"></div>
                 </div>
             </div>
         </section>
