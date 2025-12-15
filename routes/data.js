@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const tushareService = require('../services/tushareService');
 const portfolioService = require('../services/portfolioService');
+const indexPortfolioService = require('../services/indexPortfolioService');
 
-const FUND_CODE = process.env.FUND_CODE || '512890.OF';
+const FUND_CODE = process.env.FUND_CODE || '512890.SH';
+const INDEX_CODE = process.env.INDEX_CODE || 'h30269.CSI';
 const MAX_WEIGHT = parseFloat(process.env.MAX_WEIGHT) || 0.10;
 
 /**
@@ -25,45 +27,20 @@ router.get('/fund-info', async (req, res) => {
 });
 
 /**
- * 获取所有可用的报告期（包含持仓数量信息）
+ * 获取指数的所有调仓日期
  */
-router.get('/report-periods', async (req, res) => {
+router.get('/rebalance-dates', async (req, res) => {
   try {
-    const holdings = await tushareService.getFundHoldings(FUND_CODE);
-    
-    // 按报告期分组
-    const groupedHoldings = {};
-    holdings.forEach(h => {
-      if (!groupedHoldings[h.end_date]) {
-        groupedHoldings[h.end_date] = [];
-      }
-      groupedHoldings[h.end_date].push(h);
-    });
-    
-    // 找出第一个完整披露的报告期
-    const allPeriods = Object.keys(groupedHoldings).sort();
-    let firstValidPeriod = null;
-    for (let i = 0; i < allPeriods.length; i++) {
-      if (groupedHoldings[allPeriods[i]].length > 10) {
-        firstValidPeriod = allPeriods[i];
-        break;
-      }
-    }
-    
-    // 构建报告期信息
-    const periodInfo = allPeriods.map(period => ({
-      date: period,
-      holdingCount: groupedHoldings[period].length,
-      isPartial: groupedHoldings[period].length <= 10,
-      isFirstValid: period === firstValidPeriod
-    }));
+    const dates = await tushareService.getIndexWeightDates(INDEX_CODE);
     
     res.json({
       success: true,
       data: {
-        periods: allPeriods,  // 保持兼容性
-        periodInfo: periodInfo,
-        firstValidPeriod: firstValidPeriod
+        dates: dates,
+        indexCode: INDEX_CODE,
+        firstDate: dates.length > 0 ? dates[0] : null,
+        lastDate: dates.length > 0 ? dates[dates.length - 1] : null,
+        totalCount: dates.length
       }
     });
   } catch (error) {
@@ -75,18 +52,18 @@ router.get('/report-periods', async (req, res) => {
 });
 
 /**
- * 获取所有报告期收益率
+ * 计算基于指数成分股的回测收益率
  * 查询参数:
- * - reportPeriods: 报告期列表，逗号分隔，如 "20250630,20241231"
  * - useCompositeScore: 是否使用综合得分策略，true/false
  * - mvWeight: 市值权重，0-1之间
  * - dvWeight: 股息率权重，0-1之间
  * - qualityWeight: 质量因子权重，0-1之间
+ * - qualityFactorType: 质量因子类型
+ * - maxWeight: 单只股票最大权重
  */
-router.get('/all-returns', async (req, res) => {
+router.get('/index-returns', async (req, res) => {
   try {
     const {
-      reportPeriods,
       useCompositeScore,
       mvWeight,
       dvWeight,
@@ -98,8 +75,10 @@ router.get('/all-returns', async (req, res) => {
     // 使用用户配置的maxWeight，如果没有则使用环境变量的默认值
     const effectiveMaxWeight = maxWeight ? parseFloat(maxWeight) : MAX_WEIGHT;
     
-    const options = {
-      reportPeriods: reportPeriods ? reportPeriods.split(',') : [],
+    // 设置indexPortfolioService的maxWeight
+    indexPortfolioService.maxWeight = effectiveMaxWeight;
+    
+    const config = {
       useCompositeScore: useCompositeScore === 'true',
       scoreWeights: {
         mvWeight: parseFloat(mvWeight) || 0.5,
@@ -109,18 +88,27 @@ router.get('/all-returns', async (req, res) => {
       qualityFactorType: qualityFactorType || 'pe_pb'
     };
     
-    const result = await portfolioService.calculateAllPeriodReturns(FUND_CODE, effectiveMaxWeight, options);
+    const result = await indexPortfolioService.calculateIndexBasedReturns(
+      INDEX_CODE,
+      FUND_CODE,
+      config
+    );
+    
     res.json({
       success: true,
       data: {
         periods: result.periods || [],
         customRisk: result.customRisk || null,
-        originalRisk: result.originalRisk || null,
+        indexRisk: result.indexRisk || null,
         fundRisk: result.fundRisk || null,
-        options: options  // 返回使用的配置
+        trackingError: result.trackingError || null,
+        indexCode: INDEX_CODE,
+        fundCode: FUND_CODE,
+        config: config
       }
     });
   } catch (error) {
+    console.error('计算指数回测收益率失败:', error);
     res.json({
       success: false,
       error: error.message
