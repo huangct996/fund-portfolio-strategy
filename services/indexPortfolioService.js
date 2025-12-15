@@ -197,7 +197,10 @@ class IndexPortfolioService {
         marketValue: p.marketValue,
         dvRatio: p.dvRatio,
         peTtm: p.peTtm,
-        pb: p.pb
+        pb: p.pb,
+        compositeScore: p.compositeScore || 0,
+        qualityFactor: p.qualityFactor || 0,
+        isLimited: p.isLimited || false
       }))
     };
   }
@@ -261,18 +264,56 @@ class IndexPortfolioService {
   }
 
   /**
-   * 计算综合得分（复用原有逻辑）
+   * 计算综合得分
    */
   calculateCompositeScore(stocks, weights, qualityFactorType) {
-    // 这里复用portfolioService.js中的逻辑
-    // 为了简化，暂时使用市值加权
+    const { mvWeight, dvWeight, qualityWeight } = weights;
+    
+    // 计算质量因子
+    stocks.forEach(stock => {
+      let qualityFactor = 0;
+      
+      if (qualityFactorType === 'roe') {
+        qualityFactor = stock.roe || 0;
+      } else if (qualityFactorType === 'pe') {
+        qualityFactor = stock.peTtm > 0 ? 1 / stock.peTtm : 0;
+      } else if (qualityFactorType === 'pb') {
+        qualityFactor = stock.pb > 0 ? 1 / stock.pb : 0;
+      } else {
+        // pe_pb综合
+        const peScore = stock.peTtm > 0 ? 1 / stock.peTtm : 0;
+        const pbScore = stock.pb > 0 ? 1 / stock.pb : 0;
+        qualityFactor = (peScore + pbScore) / 2;
+      }
+      
+      stock.qualityFactor = qualityFactor;
+    });
+    
+    // 归一化各因子
     const totalMv = stocks.reduce((sum, s) => sum + s.marketValue, 0);
-    return stocks.map(s => ({
-      ...s,
-      adjustedWeight: s.marketValue / totalMv,
-      compositeScore: s.marketValue,
-      isLimited: false
-    }));
+    const totalDv = stocks.reduce((sum, s) => sum + s.dvRatio, 0);
+    const totalQuality = stocks.reduce((sum, s) => sum + s.qualityFactor, 0);
+    
+    // 计算综合得分
+    return stocks.map(s => {
+      const mvScore = totalMv > 0 ? s.marketValue / totalMv : 0;
+      const dvScore = totalDv > 0 ? s.dvRatio / totalDv : 0;
+      const qualityScore = totalQuality > 0 ? s.qualityFactor / totalQuality : 0;
+      
+      const compositeScore = mvScore * mvWeight + dvScore * dvWeight + qualityScore * qualityWeight;
+      
+      return {
+        ...s,
+        compositeScore,
+        adjustedWeight: 0,
+        isLimited: false
+      };
+    }).map(s => {
+      // 根据综合得分分配权重
+      const totalScore = stocks.reduce((sum, stock) => sum + stock.compositeScore, 0);
+      s.adjustedWeight = totalScore > 0 ? s.compositeScore / totalScore : 0;
+      return s;
+    });
   }
 
   /**
