@@ -216,12 +216,18 @@ async function main() {
     
     completed++;
     
-    // 每10个测试保存一次中间结果
+    // 每完成一个测试就保存结果
+    const markdown = generateMarkdownTable(results);
+    const outputPath = path.join(__dirname, 'docs', 'strategy_test_results.md');
+    fs.writeFileSync(outputPath, markdown, 'utf-8');
+    
+    // 同时保存JSON格式
+    const jsonPath = path.join(__dirname, 'docs', 'strategy_test_results.json');
+    fs.writeFileSync(jsonPath, JSON.stringify(results, null, 2), 'utf-8');
+    
+    // 每10个测试输出一次保存提示
     if (completed % 10 === 0) {
-      const markdown = generateMarkdownTable(results);
-      const outputPath = path.join(__dirname, 'docs', 'strategy_test_results_temp.md');
-      fs.writeFileSync(outputPath, markdown, 'utf-8');
-      console.log(`\n已保存中间结果到 ${outputPath}`);
+      console.log(`\n✅ 已保存测试结果 (${completed}/${testCases.length})`);
     }
   }
   
