@@ -662,13 +662,13 @@ function updatePeriodInfo(period) {
     if (periodDateEl) periodDateEl.textContent = formatDate(period.rebalanceDate);
     
     const disclosureDateEl = document.getElementById('disclosureDate');
-    if (disclosureDateEl) disclosureDateEl.textContent = period.rebalanceDate ? formatDate(period.rebalanceDate) : '-';
+    if (disclosureDateEl) disclosureDateEl.textContent = period.endDate ? formatDate(period.endDate) : '-';
     
-    const startDateEl = document.getElementById('startDate');
-    if (startDateEl) startDateEl.textContent = period.startDate ? formatDate(period.startDate) : '-';
+    const holdingStartDateEl = document.getElementById('holdingStartDate');
+    if (holdingStartDateEl) holdingStartDateEl.textContent = period.startDate ? formatDate(period.startDate) : '-';
     
-    const endDateEl = document.getElementById('endDate');
-    if (endDateEl) endDateEl.textContent = period.endDate ? formatDate(period.endDate) : '-';
+    const holdingEndDateEl = document.getElementById('holdingEndDate');
+    if (holdingEndDateEl) holdingEndDateEl.textContent = period.endDate ? formatDate(period.endDate) : '-';
     
     const stockCountEl = document.getElementById('stockCount');
     if (stockCountEl) stockCountEl.textContent = `${period.stockCount || (period.holdings ? period.holdings.length : 0)} 只`;
@@ -725,17 +725,27 @@ async function loadRebalanceDates() {
 
 // 查询指数成分股
 async function queryIndexConstituents() {
-    const queryDate = document.getElementById('queryDate').value;
+    const queryDateEl = document.getElementById('queryDate');
+    if (!queryDateEl) {
+        console.error('找不到queryDate元素');
+        return;
+    }
+    
+    const queryDate = queryDateEl.value;
     
     if (!queryDate) {
         alert('请选择调仓日期');
         return;
     }
     
-    // 显示加载状态
-    document.getElementById('constituentsLoading').style.display = 'block';
-    document.getElementById('constituentsResult').style.display = 'none';
-    document.getElementById('constituentsError').style.display = 'none';
+    // 显示加载状态（添加null检查）
+    const loadingEl = document.getElementById('constituentsLoading');
+    const resultEl = document.getElementById('constituentsResult');
+    const errorEl = document.getElementById('constituentsError');
+    
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (resultEl) resultEl.style.display = 'none';
+    if (errorEl) errorEl.style.display = 'none';
     
     try {
         const response = await fetch(`${API_BASE}/index-constituents?date=${queryDate}`);
@@ -749,26 +759,40 @@ async function queryIndexConstituents() {
         displayConstituents(result.data);
         
     } catch (error) {
-        document.getElementById('constituentsLoading').style.display = 'none';
-        document.getElementById('constituentsError').style.display = 'block';
+        const loadingEl = document.getElementById('constituentsLoading');
+        const errorEl = document.getElementById('constituentsError');
         const errorMsg = document.getElementById('constituentsErrorMessage');
-        if (errorMsg) {
-            errorMsg.textContent = error.message;
-        }
+        
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'block';
+        if (errorMsg) errorMsg.textContent = error.message;
     }
 }
 
 function displayConstituents(data) {
-    document.getElementById('constituentsLoading').style.display = 'none';
-    document.getElementById('constituentsResult').style.display = 'block';
+    const loadingEl = document.getElementById('constituentsLoading');
+    const resultEl = document.getElementById('constituentsResult');
     
-    // 更新统计信息
-    document.getElementById('resultDate').textContent = formatDate(data.date);
-    document.getElementById('resultCount').textContent = `${data.count} 只`;
-    document.getElementById('resultTotalWeight').textContent = `${data.totalWeight.toFixed(2)}%`;
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (resultEl) resultEl.style.display = 'block';
+    
+    // 更新统计信息（添加null检查）
+    const resultDateEl = document.getElementById('resultDate');
+    if (resultDateEl) resultDateEl.textContent = formatDate(data.date);
+    
+    const resultCountEl = document.getElementById('resultCount');
+    if (resultCountEl) resultCountEl.textContent = `${data.count} 只`;
+    
+    const resultTotalWeightEl = document.getElementById('resultTotalWeight');
+    if (resultTotalWeightEl) resultTotalWeightEl.textContent = `${data.totalWeight.toFixed(2)}%`;
     
     // 填充表格
     const tbody = document.getElementById('constituentsTableBody');
+    if (!tbody) {
+        console.error('找不到constituentsTableBody元素');
+        return;
+    }
+    
     tbody.innerHTML = '';
     
     data.constituents.forEach((stock, index) => {

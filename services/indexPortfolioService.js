@@ -391,8 +391,20 @@ class IndexPortfolioService {
       const code = stock.con_code || stock.symbol;
       const prices = priceData[code];
       
-      if (!prices || prices.length < 2) {
-        console.warn(`⚠️  ${code} 价格数据不足，跳过`);
+      if (!prices || prices.length === 0) {
+        console.warn(`⚠️  ${code} 无价格数据，跳过`);
+        continue;
+      }
+      
+      // 如果只有一条数据，收益率为0
+      if (prices.length === 1) {
+        stockReturns.push({
+          symbol: code,
+          return: 0,
+          weight: stock.adjustedWeight,
+          normalizedWeight: stock.adjustedWeight
+        });
+        validWeightSum += stock.adjustedWeight;
         continue;
       }
 
