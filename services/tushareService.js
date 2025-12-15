@@ -526,6 +526,88 @@ class TushareService {
 
     return results;
   }
+
+  /**
+   * 获取指数成分股权重数据（优先从数据库查询）
+   */
+  async getIndexWeight(indexCode) {
+    try {
+      await this.ensureDbInitialized();
+      
+      // 1. 先从数据库查询
+      console.log(`正在从数据库查询指数成分股权重: ${indexCode}`);
+      let data = await dbService.getIndexWeight(indexCode);
+      
+      if (data && data.length > 0) {
+        console.log(`✅ 从数据库获取到 ${data.length} 条成分股权重记录`);
+        return data;
+      }
+      
+      // 2. 数据库没有，调用Tushare API
+      console.log(`数据库无数据，正在调用Tushare API: ${indexCode}`);
+      data = await this.callApi('index_weight', {
+        index_code: indexCode
+      });
+      
+      if (!data || data.length === 0) {
+        console.warn(`⚠️  未获取到指数成分股数据: ${indexCode}`);
+        return [];
+      }
+      
+      console.log(`✅ 从API获取到 ${data.length} 条成分股权重记录`);
+      
+      // 3. 保存到数据库
+      await dbService.saveIndexWeight(data);
+      console.log(`✅ 已保存到数据库`);
+      
+      return data;
+    } catch (error) {
+      console.error(`获取指数成分股权重失败 (${indexCode}):`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取指数的所有调仓日期
+   */
+  async getIndexWeightDates(indexCode) {
+    try {
+      await this.ensureDbInitialized();
+      
+      // 确保数据已加载
+      await this.getIndexWeight(indexCode);
+      
+      // 获取所有调仓日期
+      const dates = await dbService.getIndexWeightDates(indexCode);
+      console.log(`✅ 指数 ${indexCode} 共有 ${dates.length} 个调仓日期`);
+      
+      return dates;
+    } catch (error) {
+      console.error(`获取指数调仓日期失败 (${indexCode}):`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取指定日期的指数成分股权重
+   */
+  async getIndexWeightByDate(indexCode, tradeDate) {
+    try {
+      await this.ensureDbInitialized();
+      
+      const data = await dbService.getIndexWeight(indexCode, tradeDate);
+      
+      if (!data || data.length === 0) {
+        console.warn(`⚠️  未找到指定日期的成分股权重: ${indexCode} @ ${tradeDate}`);
+        return [];
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`获取指定日期成分股权重失败 (${indexCode} @ ${tradeDate}):`, error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new TushareService();

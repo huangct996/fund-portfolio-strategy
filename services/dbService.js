@@ -123,6 +123,23 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='基金净值表'
       `);
 
+      // 6. 指数成分股权重表
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS index_weight (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          index_code VARCHAR(20) NOT NULL COMMENT '指数代码',
+          con_code VARCHAR(20) NOT NULL COMMENT '成分股代码',
+          trade_date VARCHAR(8) NOT NULL COMMENT '交易日期（调仓日期）',
+          weight DECIMAL(10, 6) COMMENT '权重（%）',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_index_weight (index_code, trade_date, con_code),
+          KEY idx_index_code (index_code),
+          KEY idx_trade_date (trade_date),
+          KEY idx_con_code (con_code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数成分股权重表'
+      `);
+
       console.log('✅ 数据库表创建/检查完成');
     } finally {
       connection.release();
@@ -353,6 +370,65 @@ class DatabaseService {
           item.nav_date,
           item.unit_nav,
           item.accum_nav
+        ]);
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // ==================== 指数成分股权重相关 ====================
+  
+  async getIndexWeight(indexCode, tradeDate = null) {
+    let query = 'SELECT * FROM index_weight WHERE index_code = ?';
+    const params = [indexCode];
+    
+    if (tradeDate) {
+      query += ' AND trade_date = ?';
+      params.push(tradeDate);
+    }
+    
+    query += ' ORDER BY trade_date DESC, weight DESC';
+    
+    const [rows] = await this.pool.execute(query, params);
+    return rows;
+  }
+
+  async getIndexWeightDates(indexCode) {
+    const [rows] = await this.pool.execute(`
+      SELECT DISTINCT trade_date 
+      FROM index_weight 
+      WHERE index_code = ?
+      ORDER BY trade_date ASC
+    `, [indexCode]);
+    return rows.map(r => r.trade_date);
+  }
+
+  async saveIndexWeight(data) {
+    if (!data || data.length === 0) return;
+
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const item of data) {
+        await connection.execute(`
+          INSERT INTO index_weight 
+          (index_code, con_code, trade_date, weight)
+          VALUES (?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            weight = VALUES(weight),
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+          item.index_code,
+          item.con_code,
+          item.trade_date,
+          item.weight
         ]);
       }
 
