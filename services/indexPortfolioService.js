@@ -524,6 +524,7 @@ class IndexPortfolioService {
     
     // 获取基金的起始净值（第一期的startNav）
     const initialFundNav = results[0]?.fundStartNav || 1;
+    let lastValidFundNav = initialFundNav;  // 记录最后一个有效的基金净值
 
     results.forEach((r, index) => {
       if (index === 0) {
@@ -532,23 +533,32 @@ class IndexPortfolioService {
         r.indexCumulativeReturn = 0;
         r.fundCumulativeReturn = 0;
         r.trackingError = 0;
+        
+        if (r.fundEndNav) {
+          lastValidFundNav = r.fundEndNav;
+        }
       } else {
         // 后续调仓期：累加收益率
         customCumulative *= (1 + r.customReturn);
         indexCumulative *= (1 + r.indexReturn);
         
         // 基金净值：使用当前净值相对于初始净值的涨幅
-        // 不累乘，因为净值本身就反映了累计收益
-        const currentFundNav = r.fundEndNav || initialFundNav;
+        // 如果当前期有有效净值，使用当前净值；否则使用上一期的净值
+        const currentFundNav = r.fundEndNav || lastValidFundNav;
         const fundCumulativeReturn = (currentFundNav - initialFundNav) / initialFundNav;
         
         r.customCumulativeReturn = customCumulative - 1;
         r.indexCumulativeReturn = indexCumulative - 1;
         r.fundCumulativeReturn = fundCumulativeReturn;
         r.trackingError = r.customCumulativeReturn - r.indexCumulativeReturn;
+        
+        // 更新最后有效净值
+        if (r.fundEndNav) {
+          lastValidFundNav = r.fundEndNav;
+        }
       }
 
-      console.log(`调仓期${index + 1} ${r.rebalanceDate}: 自定义${(r.customCumulativeReturn * 100).toFixed(2)}%, 指数${(r.indexCumulativeReturn * 100).toFixed(2)}%, 跟踪误差${(r.trackingError * 100).toFixed(2)}%`);
+      console.log(`调仓期${index + 1} ${r.rebalanceDate}: 自定义${(r.customCumulativeReturn * 100).toFixed(2)}%, 指数${(r.indexCumulativeReturn * 100).toFixed(2)}%, 基金${(r.fundCumulativeReturn * 100).toFixed(2)}%, 跟踪误差${(r.trackingError * 100).toFixed(2)}%`);
     });
   }
 
