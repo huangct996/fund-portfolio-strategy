@@ -8,21 +8,21 @@ const START_DATE = '20181130';
 const END_DATE = '20251215';
 const WEIGHT_STEP = 0.05;
 const QUALITY_FACTOR_TYPES = ['pe_pb', 'pe', 'pb', 'roe'];
-const MAX_WEIGHTS = [0.05, 0.10];
+const MAX_WEIGHTS = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10];  // 5%-10%，步长1%
 
 // 生成所有有效的权重组合（总和为1）
 function generateWeightCombinations() {
   const combinations = [];
   
-  // 遍历所有可能的市值权重
-  for (let mv = 0; mv <= 1; mv += WEIGHT_STEP) {
-    // 遍历所有可能的股息率权重
-    for (let dv = 0; dv <= 1 - mv; dv += WEIGHT_STEP) {
+  // 市值权重范围：0.5-1.0
+  for (let mv = 0.5; mv <= 1.0; mv += WEIGHT_STEP) {
+    // 股息率权重范围：0-0.5
+    for (let dv = 0; dv <= 0.5; dv += WEIGHT_STEP) {
       // 计算质量因子权重（确保总和为1）
       const quality = 1 - mv - dv;
       
-      // 由于浮点数精度问题，检查是否接近有效值
-      if (Math.abs(quality - Math.round(quality / WEIGHT_STEP) * WEIGHT_STEP) < 0.001 && quality >= 0) {
+      // 质量因子权重必须在0-0.5范围内
+      if (quality >= 0 && quality <= 0.5 && Math.abs(quality - Math.round(quality / WEIGHT_STEP) * WEIGHT_STEP) < 0.001) {
         combinations.push({
           mvWeight: parseFloat(mv.toFixed(2)),
           dvWeight: parseFloat(dv.toFixed(2)),
@@ -216,17 +216,16 @@ async function main() {
     
     completed++;
     
-    // 每完成一个测试就保存结果
-    const markdown = generateMarkdownTable(results);
-    const outputPath = path.join(__dirname, 'docs', 'strategy_test_results.md');
-    fs.writeFileSync(outputPath, markdown, 'utf-8');
-    
-    // 同时保存JSON格式
-    const jsonPath = path.join(__dirname, 'docs', 'strategy_test_results.json');
-    fs.writeFileSync(jsonPath, JSON.stringify(results, null, 2), 'utf-8');
-    
-    // 每10个测试输出一次保存提示
-    if (completed % 10 === 0) {
+    // 每5次测试保存一次结果
+    if (completed % 5 === 0) {
+      const markdown = generateMarkdownTable(results);
+      const outputPath = path.join(__dirname, 'docs', 'strategy_test_results.md');
+      fs.writeFileSync(outputPath, markdown, 'utf-8');
+      
+      // 同时保存JSON格式
+      const jsonPath = path.join(__dirname, 'docs', 'strategy_test_results.json');
+      fs.writeFileSync(jsonPath, JSON.stringify(results, null, 2), 'utf-8');
+      
       console.log(`\n✅ 已保存测试结果 (${completed}/${testCases.length})`);
     }
   }
