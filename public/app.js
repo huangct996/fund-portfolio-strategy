@@ -680,30 +680,27 @@ function formatPercent(value) {
 }
 
 function updatePeriodInfo(period) {
-    // 计算基金权重总和
-    const totalWeight = period.adjustedHoldings.reduce((sum, h) => sum + (h.originalWeight || 0), 0);
-    
-    // 判断是否调仓
-    const isRebalance = totalWeight >= 0.5;
+    // 计算指数权重总和
+    const totalWeight = period.holdings ? period.holdings.reduce((sum, h) => sum + (h.indexWeight || 0), 0) : 0;
     
     // 更新各个字段
-    document.getElementById('periodDate').textContent = formatDate(period.reportDate);
-    // 使用后端返回的披露日期，如果没有则显示'-'
-    document.getElementById('disclosureDate').textContent = period.disclosureDate ? formatDate(period.disclosureDate) : '-';
+    document.getElementById('periodDate').textContent = formatDate(period.rebalanceDate);
+    document.getElementById('disclosureDate').textContent = period.rebalanceDate ? formatDate(period.rebalanceDate) : '-';
     document.getElementById('startDate').textContent = period.startDate ? formatDate(period.startDate) : '-';
     document.getElementById('endDate').textContent = period.endDate ? formatDate(period.endDate) : '-';
-    document.getElementById('stockCount').textContent = `${period.adjustedHoldings.length} 只`;
+    document.getElementById('stockCount').textContent = `${period.stockCount || 0} 只`;
     
     // 期间收益率（持有起始日到持有结束日的单期收益率）
     const customReturn = formatPercent(period.customReturn);
-    const originalReturn = formatPercent(period.originalReturn);
-    document.getElementById('periodReturn').innerHTML = `自定义策略: <strong>${customReturn}</strong> | 原策略: <strong>${originalReturn}</strong>`;
+    const indexReturn = formatPercent(period.indexReturn);
+    document.getElementById('periodReturn').innerHTML = `自定义策略: <strong>${customReturn}</strong> | 指数: <strong>${indexReturn}</strong>`;
     
-    document.getElementById('totalWeight').textContent = `${(totalWeight * 100).toFixed(2)}%`;
+    document.getElementById('totalWeight').textContent = `${totalWeight.toFixed(2)}%`;
     
-    if (isRebalance) {
-        document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（正常调仓）</span>';
-    } else {
-        document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #FF6B6B; font-weight: 600;">❌ 否（使用上一期持仓）</span>';
-    }
+    // 跟踪误差
+    const trackingError = period.trackingError ? formatPercent(period.trackingError) : '-';
+    document.getElementById('trackingErrorValue').textContent = trackingError;
+    
+    // 指数策略按实际调仓日期调仓，无需判断是否调仓
+    document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（按指数调仓日期）</span>';
 }

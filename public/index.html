@@ -363,7 +363,11 @@
                             <span class="info-value" id="periodReturn">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">💰 基金权重总和：</span>
+                            <span class="info-label">� 跟踪误差：</span>
+                            <span class="info-value" id="trackingErrorValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">� 指数权重总和：</span>
                             <span class="info-value" id="totalWeight">-</span>
                         </div>
                         <div class="info-item">
@@ -374,12 +378,12 @@
                     <div class="period-note">
                         <strong>💡 说明：</strong>
                         <ul>
-                            <li><strong>披露日期：</strong>基金公告该报告期持仓的日期（一季报/年报：4月30日，中报：8月28日，三季报：10月31日）</li>
-                            <li><strong>持有起始日：</strong>在披露日的下一个交易日进行调仓，使用当日收盘价买入/卖出</li>
-                            <li><strong>持有结束日：</strong>持有到下一个报告期披露日（如果是最后一期，则持有到今天）</li>
-                            <li><strong>累计收益率：</strong>从第一个报告期开始到当前报告期结束日的累计收益率</li>
-                            <li><strong>是否调仓：</strong>如果权重总和&lt;50%（部分披露），则使用上一期持仓，不调仓</li>
-                            <li><strong>⚠️ 注意：</strong>多个报告期可能有相同的结束日期（如2019-01-10和2019-03-31都在2019-08-28结束），图表上会显示多个点，每个点对应不同报告期的累计收益率</li>
+                            <li><strong>调仓日期：</strong>h30269.CSI指数的实际调仓日期（来自Tushare API的trade_date字段）</li>
+                            <li><strong>持有起始日：</strong>在调仓日建仓，使用当日收盘价买入</li>
+                            <li><strong>持有结束日：</strong>持有到下一个调仓日（如果是最后一期，则持有到今天）</li>
+                            <li><strong>期间收益率：</strong>持有起始日到持有结束日的单期收益率</li>
+                            <li><strong>跟踪误差：</strong>自定义策略相对于指数策略的累计收益率偏离</li>
+                            <li><strong>指数权重总和：</strong>h30269.CSI指数成分股的权重总和（应接近100%）</li>
                         </ul>
                     </div>
                 </div>
