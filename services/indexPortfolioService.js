@@ -215,14 +215,14 @@ class IndexPortfolioService {
     const enrichedStocks = [];
     for (const weight of indexWeights) {
       const info = stockInfoMap[weight.con_code];
-      if (info && info.total_mv > 0) {
+      if (info && info.totalMv > 0) {
         enrichedStocks.push({
           con_code: weight.con_code,
           name: info.name || weight.con_code,
           indexWeight: weight.weight,  // 指数权重（百分比）
-          marketValue: info.total_mv,
-          dvRatio: info.dv_ratio || 0,
-          peTtm: info.pe_ttm || 0,
+          marketValue: info.totalMv,
+          dvRatio: info.dvRatio || 0,
+          peTtm: info.peTtm || 0,
           pb: info.pb || 0
         });
       }
