@@ -326,21 +326,21 @@
             <h2>持仓明细</h2>
             
             <div class="period-selector-holdings">
-                <label><strong>选择报告期：</strong></label>
+                <label><strong>选择调仓期：</strong></label>
                 <select id="holdingsPeriodSelect" class="period-select"></select>
             </div>
             
-            <!-- 报告期详细信息说明（可折叠） -->
+            <!-- 调仓期详细信息说明（可折叠） -->
             <details class="period-info-explanation" style="margin: 15px 0;">
-                <summary>📅 当前报告期详细信息</summary>
+                <summary>📅 当前调仓期详细信息</summary>
                 <div class="period-info-content">
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">📋 报告期：</span>
+                            <span class="info-label">📋 调仓日期：</span>
                             <span class="info-value" id="periodDate">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">📢 披露日期：</span>
+                            <span class="info-label">📢 下一调仓日：</span>
                             <span class="info-value" id="disclosureDate">-</span>
                         </div>
                         <div class="info-item">
@@ -444,11 +444,13 @@
                     </div>
                     
                     <div class="date-query-section">
-                        <div class="date-item">
+                        <div class="date-item" style="flex: 1;">
                             <label for="queryDate">选择调仓日期：</label>
-                            <input type="date" id="queryDate" class="date-input">
-                            <button id="queryConstituents" class="btn-primary" style="margin-left: 10px;">查询成分股</button>
+                            <select id="queryDate" class="period-select" style="width: 100%; max-width: 300px;">
+                                <option value="">请先加载调仓日期...</option>
+                            </select>
                         </div>
+                        <button id="queryConstituents" class="btn-primary" style="margin-left: 10px;">查询成分股</button>
                     </div>
                     
                     <div id="constituentsResult" style="display: none; margin-top: 20px;">

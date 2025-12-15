@@ -241,6 +241,9 @@ function setupConfigPanel() {
     
     // 指数成分股查询按钮
     document.getElementById('queryConstituents').addEventListener('click', queryIndexConstituents);
+    
+    // 加载调仓日期列表
+    loadRebalanceDates();
 }
 
 function updateFactorDescription(factorType) {
@@ -664,6 +667,37 @@ function updatePeriodInfo(period) {
     document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（按指数调仓日期）</span>';
 }
 
+// 加载调仓日期列表
+async function loadRebalanceDates() {
+    try {
+        const response = await fetch(`${API_BASE}/rebalance-dates`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data || result.data.length === 0) {
+            return;
+        }
+        
+        const select = document.getElementById('queryDate');
+        if (!select) return;
+        
+        // 清空并填充选项
+        select.innerHTML = '<option value="">请选择调仓日期...</option>';
+        
+        // 按日期降序排列（最新的在前）
+        const dates = result.data.sort((a, b) => b.localeCompare(a));
+        
+        dates.forEach(date => {
+            const option = document.createElement('option');
+            option.value = date;
+            option.textContent = formatDate(date);
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('加载调仓日期失败:', error);
+    }
+}
+
 // 查询指数成分股
 async function queryIndexConstituents() {
     const queryDate = document.getElementById('queryDate').value;
@@ -673,16 +707,13 @@ async function queryIndexConstituents() {
         return;
     }
     
-    // 转换日期格式：YYYY-MM-DD -> YYYYMMDD
-    const dateStr = queryDate.replace(/-/g, '');
-    
     // 显示加载状态
     document.getElementById('constituentsLoading').style.display = 'block';
     document.getElementById('constituentsResult').style.display = 'none';
     document.getElementById('constituentsError').style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE}/index-constituents?date=${dateStr}`);
+        const response = await fetch(`${API_BASE}/index-constituents?date=${queryDate}`);
         const result = await response.json();
         
         if (!result.success) {
@@ -695,7 +726,10 @@ async function queryIndexConstituents() {
     } catch (error) {
         document.getElementById('constituentsLoading').style.display = 'none';
         document.getElementById('constituentsError').style.display = 'block';
-        document.getElementById('constituentsErrorMessage').textContent = error.message;
+        const errorMsg = document.getElementById('constituentsErrorMessage');
+        if (errorMsg) {
+            errorMsg.textContent = error.message;
+        }
     }
 }
 
