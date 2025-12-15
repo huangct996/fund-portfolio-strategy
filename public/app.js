@@ -68,8 +68,11 @@ function showPlaceholder() {
     ctx.fillText('请配置策略参数后点击"应用配置并计算"按钮', chartCanvas.width / 2, chartCanvas.height / 2);
     
     // 清空持仓表格
-    document.getElementById('originalHoldingsTable').innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #999;">等待计算...</td></tr>';
-    document.getElementById('adjustedHoldingsTable').innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #999;">等待计算...</td></tr>';
+    const indexTable = document.getElementById('indexHoldingsTable');
+    const adjustedTable = document.getElementById('adjustedHoldingsTable');
+    
+    if (indexTable) indexTable.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #999;">等待计算...</td></tr>';
+    if (adjustedTable) adjustedTable.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #999;">等待计算...</td></tr>';
 }
 
 async function loadData() {
@@ -167,17 +170,23 @@ async function fetchAllReturns(config) {
 function displayFundInfo(info) {
     if (!info) return;
 
-    document.getElementById('fundCode').textContent = info.ts_code || '-';
-    document.getElementById('fundName').textContent = info.name || '-';
-    document.getElementById('fundManager').textContent = info.management || '-';
-    document.getElementById('foundDate').textContent = formatDate(info.found_date) || '-';
+    const fundCodeEl = document.getElementById('fundCode');
+    const fundNameEl = document.getElementById('fundName');
+    const fundManagerEl = document.getElementById('fundManager');
+    const foundDateEl = document.getElementById('foundDate');
+    const fundInfoEl = document.getElementById('fundInfo');
 
-    document.getElementById('fundInfo').style.display = 'block';
+    if (fundCodeEl) fundCodeEl.textContent = info.ts_code || '-';
+    if (fundNameEl) fundNameEl.textContent = info.name || '-';
+    if (fundManagerEl) fundManagerEl.textContent = info.management || '-';
+    if (foundDateEl) foundDateEl.textContent = formatDate(info.found_date) || '-';
+    if (fundInfoEl) fundInfoEl.style.display = 'block';
 }
 
 function setupConfigPanel() {
     // 显示配置面板
-    document.getElementById('configPanel').style.display = 'block';
+    const configPanelEl = document.getElementById('configPanel');
+    if (configPanelEl) configPanelEl.style.display = 'block';
     
     // 策略类型切换
     document.querySelectorAll('input[name="strategy"]').forEach(radio => {
@@ -567,12 +576,16 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
 
 
 function showLoading(show) {
-    document.getElementById('loading').style.display = show ? 'block' : 'none';
+    const loadingEl = document.getElementById('loading');
+    if (loadingEl) loadingEl.style.display = show ? 'block' : 'none';
 }
 
 function showError(message) {
-    document.getElementById('errorMessage').textContent = message;
-    document.getElementById('error').style.display = 'block';
+    const errorMessageEl = document.getElementById('errorMessage');
+    const errorEl = document.getElementById('error');
+    
+    if (errorMessageEl) errorMessageEl.textContent = message;
+    if (errorEl) errorEl.style.display = 'block';
 }
 
 function formatDate(dateStr) {
