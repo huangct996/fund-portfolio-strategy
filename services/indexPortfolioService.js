@@ -487,7 +487,9 @@ class IndexPortfolioService {
   calculateCumulativeReturns(results) {
     let customCumulative = 1;
     let indexCumulative = 1;
-    let fundCumulative = 1;
+    
+    // 获取基金的起始净值（第一期的startNav）
+    const initialFundNav = results[0]?.fundStartNav || 1;
 
     results.forEach((r, index) => {
       if (index === 0) {
@@ -500,11 +502,15 @@ class IndexPortfolioService {
         // 后续调仓期：累加收益率
         customCumulative *= (1 + r.customReturn);
         indexCumulative *= (1 + r.indexReturn);
-        fundCumulative *= (1 + r.fundReturn);
+        
+        // 基金净值：使用当前净值相对于初始净值的涨幅
+        // 不累乘，因为净值本身就反映了累计收益
+        const currentFundNav = r.fundEndNav || initialFundNav;
+        const fundCumulativeReturn = (currentFundNav - initialFundNav) / initialFundNav;
         
         r.customCumulativeReturn = customCumulative - 1;
         r.indexCumulativeReturn = indexCumulative - 1;
-        r.fundCumulativeReturn = fundCumulative - 1;
+        r.fundCumulativeReturn = fundCumulativeReturn;
         r.trackingError = r.customCumulativeReturn - r.indexCumulativeReturn;
       }
 
