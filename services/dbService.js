@@ -106,6 +106,29 @@ class DatabaseService {
           KEY idx_trade_date (trade_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表'
       `);
+      
+      // 确保name字段存在（兼容旧版本表结构）
+      try {
+        // 检查name字段是否存在
+        const [columns] = await connection.execute(`
+          SELECT COLUMN_NAME 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'stock_basic_info' 
+          AND COLUMN_NAME = 'name'
+        `);
+        
+        // 如果字段不存在，则添加
+        if (columns.length === 0) {
+          await connection.execute(`
+            ALTER TABLE stock_basic_info 
+            ADD COLUMN name VARCHAR(50) COMMENT '股票名称' AFTER ts_code
+          `);
+          console.log('✅ 已添加name字段到stock_basic_info表');
+        }
+      } catch (error) {
+        console.warn('检查或添加name字段时出现警告:', error.message);
+      }
 
       // 5. 基金净值表
       await connection.execute(`
