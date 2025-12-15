@@ -24,6 +24,15 @@ async function initializePage() {
     showLoading(true);
 
     try {
+        // 设置默认日期
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        
+        if (startDateInput) startDateInput.value = '2018-11-30';
+        if (endDateInput) endDateInput.value = todayStr;
+        
         // 获取基金信息
         const fundInfo = await fetchFundInfo();
         displayFundInfo(fundInfo);
@@ -680,7 +689,10 @@ function updatePeriodInfo(period) {
     if (periodReturnEl) periodReturnEl.innerHTML = `自定义策略: <strong>${customReturn}</strong> | 指数: <strong>${indexReturn}</strong>`;
     
     const totalWeightEl = document.getElementById('totalWeight');
-    if (totalWeightEl) totalWeightEl.textContent = `${totalWeight.toFixed(2)}%`;
+    if (totalWeightEl) {
+        const weight = parseFloat(totalWeight) || 0;
+        totalWeightEl.textContent = `${weight.toFixed(2)}%`;
+    }
     
     // 跟踪误差
     const trackingError = period.trackingError ? formatPercent(period.trackingError) : '-';

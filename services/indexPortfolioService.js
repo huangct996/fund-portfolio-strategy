@@ -295,7 +295,7 @@ class IndexPortfolioService {
     const totalQuality = stocks.reduce((sum, s) => sum + s.qualityFactor, 0);
     
     // 计算综合得分
-    return stocks.map(s => {
+    const stocksWithScore = stocks.map(s => {
       const mvScore = totalMv > 0 ? s.marketValue / totalMv : 0;
       const dvScore = totalDv > 0 ? s.dvRatio / totalDv : 0;
       const qualityScore = totalQuality > 0 ? s.qualityFactor / totalQuality : 0;
@@ -308,9 +308,12 @@ class IndexPortfolioService {
         adjustedWeight: 0,
         isLimited: false
       };
-    }).map(s => {
-      // 根据综合得分分配权重
-      const totalScore = stocks.reduce((sum, stock) => sum + stock.compositeScore, 0);
+    });
+    
+    // 根据综合得分分配权重
+    const totalScore = stocksWithScore.reduce((sum, stock) => sum + stock.compositeScore, 0);
+    
+    return stocksWithScore.map(s => {
       s.adjustedWeight = totalScore > 0 ? s.compositeScore / totalScore : 0;
       return s;
     });
