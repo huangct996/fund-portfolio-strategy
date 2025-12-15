@@ -64,6 +64,8 @@ router.get('/rebalance-dates', async (req, res) => {
 router.get('/index-returns', async (req, res) => {
   try {
     const {
+      startDate,
+      endDate,
       useCompositeScore,
       mvWeight,
       dvWeight,
@@ -79,6 +81,8 @@ router.get('/index-returns', async (req, res) => {
     indexPortfolioService.maxWeight = effectiveMaxWeight;
     
     const config = {
+      startDate: startDate || '',
+      endDate: endDate || '',
       useCompositeScore: useCompositeScore === 'true',
       scoreWeights: {
         mvWeight: parseFloat(mvWeight) || 0.5,

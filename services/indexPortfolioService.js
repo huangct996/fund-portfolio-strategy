@@ -17,6 +17,8 @@ class IndexPortfolioService {
    */
   async calculateIndexBasedReturns(indexCode, fundCode, config = {}) {
     const {
+      startDate = '',
+      endDate = '',
       useCompositeScore = false,
       scoreWeights = { mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2 },
       qualityFactorType = 'pe_pb'
@@ -26,13 +28,27 @@ class IndexPortfolioService {
     console.log(`开始计算基于指数成分股的回测收益率`);
     console.log(`指数代码: ${indexCode}`);
     console.log(`基金代码: ${fundCode} (用于净值对比)`);
+    if (startDate) console.log(`开始日期: ${startDate}`);
+    if (endDate) console.log(`结束日期: ${endDate}`);
     console.log('='.repeat(60) + '\n');
 
     // 1. 获取指数的所有调仓日期
-    const rebalanceDates = await tushareService.getIndexWeightDates(indexCode);
+    let rebalanceDates = await tushareService.getIndexWeightDates(indexCode);
     
     if (!rebalanceDates || rebalanceDates.length === 0) {
       throw new Error(`未找到指数 ${indexCode} 的调仓日期数据`);
+    }
+
+    // 2. 根据日期范围过滤调仓日期
+    if (startDate) {
+      rebalanceDates = rebalanceDates.filter(date => date >= startDate);
+    }
+    if (endDate) {
+      rebalanceDates = rebalanceDates.filter(date => date <= endDate);
+    }
+
+    if (rebalanceDates.length === 0) {
+      throw new Error(`在指定日期范围内未找到调仓日期`);
     }
 
     console.log(`✅ 获取到 ${rebalanceDates.length} 个调仓日期`);

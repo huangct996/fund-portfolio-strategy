@@ -1,9 +1,9 @@
 const API_BASE = '/api';
 let allReturnsData = [];
-let availablePeriods = [];
 let chartInstance = null;  // 保存图表实例，用于销毁和重建
 let currentConfig = {
-    reportPeriods: [],
+    startDate: '',  // 开始日期，留空则使用指数最早的调仓日
+    endDate: '',    // 结束日期，留空则使用指数最新的调仓日
     useCompositeScore: false,
     mvWeight: 0.5,
     dvWeight: 0.3,
@@ -28,12 +28,7 @@ async function initializePage() {
         const fundInfo = await fetchFundInfo();
         displayFundInfo(fundInfo);
 
-        // 获取所有报告期
-        const periodsResult = await fetchReportPeriods();
-        availablePeriods = periodsResult.periods || periodsResult;
-        window.periodData = periodsResult;  // 保存完整数据供后续使用
-        console.log('可用报告期:', availablePeriods);
-        console.log('第一次完整披露:', periodsResult.firstValidPeriod);
+        // 设置配置面板
         setupConfigPanel();
         
         // 不自动加载数据，等待用户点击"应用配置并计算"
@@ -135,8 +130,12 @@ async function fetchReportPeriods() {
 async function fetchAllReturns(config) {
     const params = new URLSearchParams();
     
-    if (config.reportPeriods && config.reportPeriods.length > 0) {
-        params.append('reportPeriods', config.reportPeriods.join(','));
+    // 添加日期范围参数
+    if (config.startDate) {
+        params.append('startDate', config.startDate);
+    }
+    if (config.endDate) {
+        params.append('endDate', config.endDate);
     }
     
     params.append('useCompositeScore', config.useCompositeScore);
@@ -170,46 +169,6 @@ function displayFundInfo(info) {
 function setupConfigPanel() {
     // 显示配置面板
     document.getElementById('configPanel').style.display = 'block';
-    
-    // 填充报告期选择框
-    const periodCheckboxes = document.getElementById('periodCheckboxes');
-    periodCheckboxes.innerHTML = '';
-    
-    const periodData = window.periodData || {};
-    const periodInfo = periodData.periodInfo || [];
-    const firstValidPeriod = periodData.firstValidPeriod;
-    
-    availablePeriods.forEach(period => {
-        const label = document.createElement('label');
-        const info = periodInfo.find(p => p.date === period);
-        
-        let displayText = formatDate(period);
-        let className = '';
-        let title = '';
-        
-        if (info) {
-            if (info.isPartial) {
-                displayText += ` ⚠️ (仅${info.holdingCount}只)`;
-                className = 'partial-period';
-                title = `只公布前${info.holdingCount}大持仓，无法独立计算`;
-            }
-            if (info.isFirstValid) {
-                displayText += ` 🎯`;
-                title = '第一次完整披露，回测从此开始';
-            }
-        }
-        
-        label.className = className;
-        label.title = title;
-        label.innerHTML = `<input type="checkbox" class="period-checkbox" value="${period}"> ${displayText}`;
-        periodCheckboxes.appendChild(label);
-    });
-    
-    // 全选/取消全选
-    document.getElementById('selectAllPeriods').addEventListener('change', (e) => {
-        const checkboxes = document.querySelectorAll('.period-checkbox');
-        checkboxes.forEach(cb => cb.checked = e.target.checked);
-    });
     
     // 策略类型切换
     document.querySelectorAll('input[name="strategy"]').forEach(radio => {
@@ -308,18 +267,14 @@ function updateWeightSum() {
 }
 
 async function applyConfiguration() {
-    // 获取选中的报告期
-    const selectAll = document.getElementById('selectAllPeriods').checked;
-    let selectedPeriods = [];
+    // 获取日期范围
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
     
-    if (!selectAll) {
-        const checkboxes = document.querySelectorAll('.period-checkbox:checked');
-        selectedPeriods = Array.from(checkboxes).map(cb => cb.value);
-        
-        if (selectedPeriods.length === 0) {
-            alert('请至少选择一个报告期');
-            return;
-        }
+    // 验证日期范围
+    if (startDate && endDate && startDate > endDate) {
+        alert('开始日期不能晚于结束日期');
+        return;
     }
     
     // 获取策略类型
@@ -350,7 +305,8 @@ async function applyConfiguration() {
     
     // 保存配置
     currentConfig = {
-        reportPeriods: selectedPeriods,
+        startDate: startDate ? startDate.replace(/-/g, '') : '',  // 转换为YYYYMMDD格式
+        endDate: endDate ? endDate.replace(/-/g, '') : '',
         useCompositeScore,
         mvWeight,
         dvWeight,

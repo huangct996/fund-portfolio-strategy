@@ -45,18 +45,27 @@
             <h2>⚙️ 策略配置</h2>
             
             <div class="config-section">
-                <h3>报告期选择</h3>
+                <h3>回测时间范围</h3>
                 <div class="info-note" style="margin-bottom: 15px;">
                     <strong>📌 说明：</strong>
                     <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li>⚠️ 标记的报告期只公布了前10大持仓，无法独立计算</li>
-                        <li>🎯 标记的是第一次完整披露，回测从此开始</li>
-                        <li>两个策略统一从第一次完整披露开始对比，确保公平性</li>
+                        <li>回测将使用h30269.CSI指数在指定时间范围内的所有调仓日期</li>
+                        <li>如果不选择日期，将使用指数的全部历史数据</li>
+                        <li>开始日期：从该日期之后的第一个调仓日开始回测</li>
+                        <li>结束日期：到该日期之前的最后一个调仓日结束回测</li>
                     </ul>
                 </div>
-                <div id="reportPeriodSelector" class="period-selector">
-                    <label><input type="checkbox" id="selectAllPeriods"> 全部报告期</label>
-                    <div id="periodCheckboxes" class="period-checkboxes"></div>
+                <div class="date-range-selector">
+                    <div class="date-item">
+                        <label for="startDate">开始日期：</label>
+                        <input type="date" id="startDate" class="date-input">
+                        <small style="color: #666; display: block; margin-top: 5px;">留空则从指数最早的调仓日开始</small>
+                    </div>
+                    <div class="date-item">
+                        <label for="endDate">结束日期：</label>
+                        <input type="date" id="endDate" class="date-input">
+                        <small style="color: #666; display: block; margin-top: 5px;">留空则到指数最新的调仓日结束</small>
+                    </div>
                 </div>
             </div>
 

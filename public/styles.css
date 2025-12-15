@@ -809,8 +809,55 @@ tbody tr:hover {
     margin-bottom: 8px;
 }
 
+/* 日期范围选择器样式 */
+.date-range-selector {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.date-item {
+    flex: 1;
+    min-width: 250px;
+}
+
+.date-item label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-color);
+}
+
+.date-input {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(46, 134, 171, 0.1);
+}
+
+.date-input:hover {
+    border-color: #999;
+}
+
 @media (max-width: 768px) {
     .info-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .date-range-selector {
+        flex-direction: column;
+    }
+    
+    .date-item {
+        min-width: 100%;
     }
 }
