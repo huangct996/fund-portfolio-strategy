@@ -208,15 +208,9 @@ class IndexPortfolioService {
   async enrichStockData(indexWeights, tradeDate) {
     const stockCodes = indexWeights.map(w => w.con_code);
     
-    // 获取股票基本信息
-    const stockInfoList = await tushareService.getStockBasicInfo(stockCodes, tradeDate);
+    // 批量获取股票基本信息（使用正确的方法名）
+    const stockInfoMap = await tushareService.batchGetStockBasic(stockCodes, tradeDate);
     
-    // 构建映射
-    const stockInfoMap = {};
-    stockInfoList.forEach(info => {
-      stockInfoMap[info.ts_code] = info;
-    });
-
     // 合并数据
     const enrichedStocks = [];
     for (const weight of indexWeights) {
