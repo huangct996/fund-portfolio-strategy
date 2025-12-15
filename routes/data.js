@@ -36,13 +36,7 @@ router.get('/rebalance-dates', async (req, res) => {
     
     res.json({
       success: true,
-      data: {
-        dates: dates,
-        indexCode: INDEX_CODE,
-        firstDate: dates.length > 0 ? dates[0] : null,
-        lastDate: dates.length > 0 ? dates[dates.length - 1] : null,
-        totalCount: dates.length
-      }
+      data: dates  // 直接返回日期数组
     });
   } catch (error) {
     res.json({

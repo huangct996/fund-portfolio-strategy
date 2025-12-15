@@ -488,6 +488,60 @@ class TushareService {
           adjFactorMap[item.ts_code][item.trade_date] = item.adj_factor;
         });
 
+        // 记录API返回了哪些股票的数据
+        const returnedCodes = new Set(dailyData.map(item => item.ts_code));
+        
+        // 检查哪些股票没有返回数据（可能停牌）
+        const noDataCodes = batch.filter(code => !returnedCodes.has(code));
+        if (noDataCodes.length > 0) {
+          console.warn(`⚠️  以下 ${noDataCodes.length} 只股票在时间段 ${startDate}-${endDate} 无交易数据（可能停牌）:`);
+          noDataCodes.forEach(code => console.warn(`   - ${code}`));
+          
+          // 方案2：为停牌股票查询最后一个交易日的价格
+          for (const code of noDataCodes) {
+            try {
+              // 查询该股票在startDate之前的最后一个交易日数据
+              const lastDailyData = await this.callApi('daily', {
+                ts_code: code,
+                end_date: startDate,
+                limit: 1
+              });
+              
+              const lastAdjFactorData = await this.callApi('adj_factor', {
+                ts_code: code,
+                end_date: startDate,
+                limit: 1
+              });
+              
+              if (lastDailyData.length > 0) {
+                const lastPrice = lastDailyData[0];
+                const lastAdjFactor = lastAdjFactorData.length > 0 ? lastAdjFactorData[0].adj_factor : 1;
+                
+                // 使用最后交易日的价格，假设停牌期间价格不变
+                results[code] = [{
+                  ts_code: code,
+                  trade_date: startDate,
+                  close: lastPrice.close * lastAdjFactor,
+                  open: lastPrice.close * lastAdjFactor,
+                  high: lastPrice.close * lastAdjFactor,
+                  low: lastPrice.close * lastAdjFactor,
+                  adj_factor: lastAdjFactor,
+                  original_close: lastPrice.close,
+                  is_suspended: true  // 标记为停牌
+                }];
+                
+                console.log(`   ✓ ${code} 使用最后交易日 ${lastPrice.trade_date} 的价格`);
+              } else {
+                console.warn(`   ✗ ${code} 无法获取历史价格数据`);
+              }
+              
+              await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (error) {
+              console.warn(`   ✗ ${code} 查询历史价格失败: ${error.message}`);
+            }
+          }
+        }
+        
         // 按股票代码分组，并应用前复权
         dailyData.forEach(item => {
           const code = item.ts_code;
