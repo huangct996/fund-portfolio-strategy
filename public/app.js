@@ -431,14 +431,15 @@ function renderHoldingsForPeriod(period) {
     // 填充指数持仓表格（按指数权重排序）
     const indexBody = document.getElementById('indexHoldingsTable');
     indexBody.innerHTML = '';
-    const sortedByIndex = [...period.holdings].sort((a, b) => b.indexWeight - a.indexWeight);
+    const sortedByIndex = [...period.holdings].sort((a, b) => (parseFloat(b.indexWeight) || 0) - (parseFloat(a.indexWeight) || 0));
     sortedByIndex.forEach((stock, index) => {
         const tr = document.createElement('tr');
+        const indexWeight = parseFloat(stock.indexWeight) || 0;
         tr.innerHTML = `
             <td>${index + 1}</td>
             <td>${stock.symbol}</td>
             <td>${stock.name || stock.symbol}</td>
-            <td>${(stock.indexWeight || 0).toFixed(2)}%</td>
+            <td>${indexWeight.toFixed(2)}%</td>
         `;
         indexBody.appendChild(tr);
     });
@@ -454,15 +455,16 @@ function renderHoldingsForPeriod(period) {
         return;
     }
     
-    const sortedByAdjusted = [...period.holdings].sort((a, b) => b.customWeight - a.customWeight);
+    const sortedByAdjusted = [...period.holdings].sort((a, b) => (parseFloat(b.customWeight) || 0) - (parseFloat(a.customWeight) || 0));
     sortedByAdjusted.forEach((stock, index) => {
         const tr = document.createElement('tr');
+        const customWeight = parseFloat(stock.customWeight) || 0;
         
         let rowHtml = `
             <td>${index + 1}</td>
             <td>${stock.symbol}</td>
             <td>${stock.name || stock.symbol}</td>
-            <td>${(stock.customWeight * 100).toFixed(2)}%</td>
+            <td>${(customWeight * 100).toFixed(2)}%</td>
         `;
         
         if (currentConfig.useCompositeScore) {
