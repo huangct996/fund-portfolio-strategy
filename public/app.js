@@ -345,13 +345,18 @@ function resetConfiguration() {
 function displayHoldingsTable(data) {
     if (data.length === 0) return;
     
-    // 填充报告期选择下拉框
+    // 填充调仓期选择下拉框
     const periodSelect = document.getElementById('holdingsPeriodSelect');
+    if (!periodSelect) {
+        console.error('找不到holdingsPeriodSelect元素');
+        return;
+    }
+    
     periodSelect.innerHTML = '';
     data.forEach((period, index) => {
         const option = document.createElement('option');
         option.value = index;
-        option.textContent = formatDate(period.reportDate);
+        option.textContent = formatDate(period.rebalanceDate || period.reportDate);
         periodSelect.appendChild(option);
     });
     
@@ -368,28 +373,35 @@ function displayHoldingsTable(data) {
 }
 
 function renderHoldingsForPeriod(period) {
-    if (!period || !period.adjustedHoldings) return;
+    if (!period || !period.holdings) return;
     
     // 更新标题
-    const reportDateFormatted = formatDate(period.reportDate);
-    document.getElementById('originalHoldingsTitle').textContent = `基金持仓 (${reportDateFormatted})`;
+    const rebalanceDateFormatted = formatDate(period.rebalanceDate || period.reportDate);
+    const titleElement = document.getElementById('originalHoldingsTitle');
+    if (titleElement) {
+        titleElement.textContent = `h30269.CSI指数持仓 (${rebalanceDateFormatted})`;
+    }
     
-    // 更新报告期详细信息
+    // 更新调仓期详细信息
     updatePeriodInfo(period);
     
     // 更新提示信息
     const holdingsNote = document.getElementById('holdingsNote');
-    if (currentConfig.useCompositeScore) {
-        holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓（综合得分策略，无权重上限）。';
-    } else {
-        holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓（市值加权，单只上限10%）。';
+    if (holdingsNote) {
+        if (currentConfig.useCompositeScore) {
+            holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为指数持仓，右侧为策略持仓（综合得分策略）。';
+        } else {
+            holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为指数持仓，右侧为策略持仓（市值加权，单只上限10%）。';
+        }
     }
     
     const strategyTitle = document.getElementById('strategyTitle');
-    if (currentConfig.useCompositeScore) {
-        strategyTitle.textContent = `策略持仓（综合得分） (${reportDateFormatted})`;
-    } else {
-        strategyTitle.textContent = `策略持仓（市值加权+10%上限） (${reportDateFormatted})`;
+    if (strategyTitle) {
+        if (currentConfig.useCompositeScore) {
+            strategyTitle.textContent = `策略持仓（综合得分） (${rebalanceDateFormatted})`;
+        } else {
+            strategyTitle.textContent = `策略持仓（市值加权+10%上限） (${rebalanceDateFormatted})`;
+        }
     }
     
     // 显示/隐藏综合得分列
@@ -645,26 +657,39 @@ function updatePeriodInfo(period) {
     // 计算指数权重总和
     const totalWeight = period.holdings ? period.holdings.reduce((sum, h) => sum + (h.indexWeight || 0), 0) : 0;
     
-    // 更新各个字段
-    document.getElementById('periodDate').textContent = formatDate(period.rebalanceDate);
-    document.getElementById('disclosureDate').textContent = period.rebalanceDate ? formatDate(period.rebalanceDate) : '-';
-    document.getElementById('startDate').textContent = period.startDate ? formatDate(period.startDate) : '-';
-    document.getElementById('endDate').textContent = period.endDate ? formatDate(period.endDate) : '-';
-    document.getElementById('stockCount').textContent = `${period.stockCount || 0} 只`;
+    // 更新各个字段（添加null检查）
+    const periodDateEl = document.getElementById('periodDate');
+    if (periodDateEl) periodDateEl.textContent = formatDate(period.rebalanceDate);
+    
+    const disclosureDateEl = document.getElementById('disclosureDate');
+    if (disclosureDateEl) disclosureDateEl.textContent = period.rebalanceDate ? formatDate(period.rebalanceDate) : '-';
+    
+    const startDateEl = document.getElementById('startDate');
+    if (startDateEl) startDateEl.textContent = period.startDate ? formatDate(period.startDate) : '-';
+    
+    const endDateEl = document.getElementById('endDate');
+    if (endDateEl) endDateEl.textContent = period.endDate ? formatDate(period.endDate) : '-';
+    
+    const stockCountEl = document.getElementById('stockCount');
+    if (stockCountEl) stockCountEl.textContent = `${period.stockCount || (period.holdings ? period.holdings.length : 0)} 只`;
     
     // 期间收益率（持有起始日到持有结束日的单期收益率）
     const customReturn = formatPercent(period.customReturn);
     const indexReturn = formatPercent(period.indexReturn);
-    document.getElementById('periodReturn').innerHTML = `自定义策略: <strong>${customReturn}</strong> | 指数: <strong>${indexReturn}</strong>`;
+    const periodReturnEl = document.getElementById('periodReturn');
+    if (periodReturnEl) periodReturnEl.innerHTML = `自定义策略: <strong>${customReturn}</strong> | 指数: <strong>${indexReturn}</strong>`;
     
-    document.getElementById('totalWeight').textContent = `${totalWeight.toFixed(2)}%`;
+    const totalWeightEl = document.getElementById('totalWeight');
+    if (totalWeightEl) totalWeightEl.textContent = `${totalWeight.toFixed(2)}%`;
     
     // 跟踪误差
     const trackingError = period.trackingError ? formatPercent(period.trackingError) : '-';
-    document.getElementById('trackingErrorValue').textContent = trackingError;
+    const trackingErrorEl = document.getElementById('trackingErrorValue');
+    if (trackingErrorEl) trackingErrorEl.textContent = trackingError;
     
     // 指数策略按实际调仓日期调仓，无需判断是否调仓
-    document.getElementById('rebalanceStatus').innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（按指数调仓日期）</span>';
+    const rebalanceStatusEl = document.getElementById('rebalanceStatus');
+    if (rebalanceStatusEl) rebalanceStatusEl.innerHTML = '<span style="color: #06D6A0; font-weight: 600;">✅ 是（按指数调仓日期）</span>';
 }
 
 // 加载调仓日期列表
