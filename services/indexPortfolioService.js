@@ -454,29 +454,30 @@ class IndexPortfolioService {
    * 使用基金净值计算收益率
    */
   async calculateReturnsFromNav(fundCode, startDate, endDate) {
-    const navData = await tushareService.getFundNav(fundCode, startDate);
+    const navData = await tushareService.getFundNav(fundCode, startDate, endDate);
     
-    if (!navData || navData.length < 2) {
+    if (!navData || navData.length === 0) {
       return null;
     }
 
-    const startNav = navData.find(n => n.nav_date >= startDate);
-    const endNav = navData.filter(n => n.nav_date <= endDate).pop();
+    // 找到最接近startDate的净值（可能是之前的日期，因为基金可能不是每天都有净值）
+    const startNav = navData.find(n => n.nav_date >= startDate) || navData[0];
+    // 找到最接近endDate的净值
+    const endNav = navData.filter(n => n.nav_date <= endDate).pop() || navData[navData.length - 1];
 
-    if (!startNav || !endNav) {
+    if (!startNav || !endNav || startNav.nav_date === endNav.nav_date) {
       return null;
     }
 
+    // 使用单位净值计算收益率（不使用累计净值，避免重复计算分红）
     const unitNavChange = (endNav.unit_nav - startNav.unit_nav) / startNav.unit_nav;
-    const accumNavChange = (endNav.accum_nav - startNav.accum_nav) / startNav.accum_nav;
-    
-    const hasDividend = Math.abs(unitNavChange - accumNavChange) > 0.1;
     
     return {
-      return: hasDividend ? accumNavChange : unitNavChange,
+      return: unitNavChange,
       startNav: startNav.unit_nav,
       endNav: endNav.unit_nav,
-      hasDividend
+      startDate: startNav.nav_date,
+      endDate: endNav.nav_date
     };
   }
 

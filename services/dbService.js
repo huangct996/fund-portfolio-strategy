@@ -363,12 +363,21 @@ class DatabaseService {
 
   // ==================== 基金净值相关 ====================
   
-  async getFundNav(tsCode, startDate) {
-    const [rows] = await this.pool.execute(`
+  async getFundNav(tsCode, startDate, endDate = null) {
+    let query = `
       SELECT * FROM fund_nav 
       WHERE ts_code = ? AND nav_date >= ?
-      ORDER BY nav_date ASC
-    `, [tsCode, startDate]);
+    `;
+    const params = [tsCode, startDate];
+    
+    if (endDate) {
+      query += ` AND nav_date <= ?`;
+      params.push(endDate);
+    }
+    
+    query += ` ORDER BY nav_date ASC`;
+    
+    const [rows] = await this.pool.execute(query, params);
     return rows;
   }
 

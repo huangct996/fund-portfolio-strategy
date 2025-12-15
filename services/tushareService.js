@@ -101,11 +101,11 @@ class TushareService {
   /**
    * 获取基金净值数据（优先从数据库查询）
    */
-  async getFundNav(fundCode, startDate = '20180101') {
+  async getFundNav(fundCode, startDate = '20180101', endDate = null) {
     await this.ensureDbInitialized();
     
     // 1. 先从数据库查询
-    let data = await dbService.getFundNav(fundCode, startDate);
+    let data = await dbService.getFundNav(fundCode, startDate, endDate);
     
     if (data && data.length > 0) {
       console.log(`✅ 从数据库获取到 ${data.length} 条基金净值记录`);
@@ -114,10 +114,15 @@ class TushareService {
     
     // 2. 数据库没有，调用Tushare API
     console.log(`数据库无净值数据，正在调用Tushare API`);
-    data = await this.callApi('fund_nav', {
+    const apiParams = {
       ts_code: fundCode,
       start_date: startDate
-    });
+    };
+    if (endDate) {
+      apiParams.end_date = endDate;
+    }
+    
+    data = await this.callApi('fund_nav', apiParams);
     
     // 3. 保存到数据库
     if (data.length > 0) {
