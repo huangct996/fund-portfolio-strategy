@@ -9,6 +9,7 @@ const END_DATE = '20251215';
 const WEIGHT_STEP = 0.05;
 const QUALITY_FACTOR_TYPES = ['pe_pb', 'pe', 'pb', 'roe'];
 const MAX_WEIGHTS = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10];  // 5%-10%，步长1%
+const CONCURRENT_LIMIT = 10;  // 并发数量限制
 
 // 生成所有有效的权重组合（总和为1）
 function generateWeightCombinations() {
@@ -189,44 +190,78 @@ function generateMarkdownTable(results) {
   return markdown;
 }
 
+// 并发控制函数
+async function runConcurrent(tasks, limit) {
+  const results = [];
+  const executing = [];
+  
+  for (const [index, task] of tasks.entries()) {
+    const promise = task().then(result => {
+      executing.splice(executing.indexOf(promise), 1);
+      return result;
+    });
+    
+    results.push(promise);
+    executing.push(promise);
+    
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  
+  return Promise.all(results);
+}
+
 // 主函数
 async function main() {
   console.log('开始生成测试用例...');
   const testCases = generateTestCases();
-  console.log(`总共生成 ${testCases.length} 个测试用例\n`);
+  console.log(`总共生成 ${testCases.length} 个测试用例`);
+  console.log(`并发数量: ${CONCURRENT_LIMIT}\n`);
   
   const results = [];
   let completed = 0;
+  const startTime = Date.now();
   
-  console.log('开始执行回测...');
-  for (const testCase of testCases) {
-    console.log(`\n[${completed + 1}/${testCases.length}] 测试参数:`);
-    console.log(`  市值权重: ${testCase.mvWeight}, 股息率权重: ${testCase.dvWeight}, 质量因子权重: ${testCase.qualityWeight}`);
-    console.log(`  质量因子类型: ${testCase.qualityFactorType}, 最大权重: ${(testCase.maxWeight * 100).toFixed(0)}%`);
-    
+  console.log('开始执行回测（并发模式）...\n');
+  
+  // 创建所有测试任务
+  const tasks = testCases.map((testCase, index) => async () => {
     const result = await runBacktest(testCase);
     const metrics = extractMetrics(result, testCase);
-    results.push(metrics);
-    
-    if (metrics.success) {
-      console.log(`  ✅ 成功 - 年化收益率: ${(metrics.customAnnualReturn * 100).toFixed(2)}%, 夏普比率: ${metrics.customSharpe.toFixed(4)}`);
-    } else {
-      console.log(`  ❌ 失败 - ${metrics.error}`);
-    }
     
     completed++;
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+    const avgTime = (elapsed / completed).toFixed(1);
+    const remaining = ((testCases.length - completed) * avgTime / 60).toFixed(1);
     
-    // 每5次测试保存一次结果
-    if (completed % 5 === 0) {
+    console.log(`[${completed}/${testCases.length}] ${testCase.mvWeight}/${testCase.dvWeight}/${testCase.qualityWeight} ${testCase.qualityFactorType} ${(testCase.maxWeight*100).toFixed(0)}% - ${metrics.success ? `✅ ${(metrics.customAnnualReturn*100).toFixed(2)}% SR:${metrics.customSharpe.toFixed(3)}` : '❌'} | 已用${elapsed}s 平均${avgTime}s 剩余${remaining}min`);
+    
+    return { index, metrics };
+  });
+  
+  // 并发执行所有任务
+  const taskResults = await runConcurrent(tasks, CONCURRENT_LIMIT);
+  
+  // 按原始顺序排序结果
+  taskResults.sort((a, b) => a.index - b.index);
+  const orderedResults = taskResults.map(r => r.metrics);
+  
+  // 每5个结果保存一次
+  for (let i = 0; i < orderedResults.length; i++) {
+    results.push(orderedResults[i]);
+    
+    if ((i + 1) % 5 === 0 || i === orderedResults.length - 1) {
       const markdown = generateMarkdownTable(results);
       const outputPath = path.join(__dirname, 'docs', 'strategy_test_results.md');
       fs.writeFileSync(outputPath, markdown, 'utf-8');
       
-      // 同时保存JSON格式
       const jsonPath = path.join(__dirname, 'docs', 'strategy_test_results.json');
       fs.writeFileSync(jsonPath, JSON.stringify(results, null, 2), 'utf-8');
       
-      console.log(`\n✅ 已保存测试结果 (${completed}/${testCases.length})`);
+      if ((i + 1) % 20 === 0 || i === orderedResults.length - 1) {
+        console.log(`\n✅ 已保存测试结果 (${i + 1}/${orderedResults.length})\n`);
+      }
     }
   }
   
