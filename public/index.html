@@ -386,11 +386,11 @@
             </details>
             
             <div class="info-note" id="holdingsNote">
-                <strong>💡 提示：</strong>左侧为基金持仓，右侧为策略持仓。
+                <strong>💡 提示：</strong>左侧为h30269.CSI指数持仓（原始权重），右侧为自定义策略持仓（调整后权重）。
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
-                    <h3 style="color: #A23B72;" id="originalHoldingsTitle">基金持仓</h3>
+                    <h3 style="color: #F18F01;" id="indexHoldingsTitle">h30269.CSI指数持仓</h3>
                     <div class="table-container" style="max-height: 600px; overflow-y: auto;">
                         <table>
                             <thead>
@@ -398,10 +398,10 @@
                                     <th>排名</th>
                                     <th>股票代码</th>
                                     <th>股票名称</th>
-                                    <th>基金权重</th>
+                                    <th>指数权重</th>
                                 </tr>
                             </thead>
-                            <tbody id="originalHoldingsTable"></tbody>
+                            <tbody id="indexHoldingsTable"></tbody>
                         </table>
                     </div>
                 </div>

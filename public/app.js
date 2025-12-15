@@ -436,19 +436,19 @@ function renderHoldingsForPeriod(period) {
         col.style.display = currentConfig.useCompositeScore ? 'table-cell' : 'none';
     });
     
-    // 填充原始持仓表格（按基金权重排序）
-    const originalBody = document.getElementById('originalHoldingsTable');
-    originalBody.innerHTML = '';
-    const sortedByOriginal = [...period.adjustedHoldings].sort((a, b) => b.originalWeight - a.originalWeight);
-    sortedByOriginal.forEach((stock, index) => {
+    // 填充指数持仓表格（按指数权重排序）
+    const indexBody = document.getElementById('indexHoldingsTable');
+    indexBody.innerHTML = '';
+    const sortedByIndex = [...period.holdings].sort((a, b) => b.indexWeight - a.indexWeight);
+    sortedByIndex.forEach((stock, index) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${index + 1}</td>
             <td>${stock.symbol}</td>
             <td>${stock.name || stock.symbol}</td>
-            <td>${(stock.originalWeight * 100).toFixed(2)}%</td>
+            <td>${(stock.indexWeight || 0).toFixed(2)}%</td>
         `;
-        originalBody.appendChild(tr);
+        indexBody.appendChild(tr);
     });
     
     // 填充策略持仓表格（按策略权重排序）
@@ -456,13 +456,13 @@ function renderHoldingsForPeriod(period) {
     adjustedBody.innerHTML = '';
     
     // 检查数据是否存在
-    if (!period.adjustedHoldings || period.adjustedHoldings.length === 0) {
+    if (!period.holdings || period.holdings.length === 0) {
         console.error('策略持仓数据为空:', period);
         adjustedBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #FF6B6B;">⚠️ 策略持仓数据为空，请检查后端返回数据</td></tr>';
         return;
     }
     
-    const sortedByAdjusted = [...period.adjustedHoldings].sort((a, b) => b.adjustedWeight - a.adjustedWeight);
+    const sortedByAdjusted = [...period.holdings].sort((a, b) => b.customWeight - a.customWeight);
     sortedByAdjusted.forEach((stock, index) => {
         const tr = document.createElement('tr');
         
@@ -470,7 +470,7 @@ function renderHoldingsForPeriod(period) {
             <td>${index + 1}</td>
             <td>${stock.symbol}</td>
             <td>${stock.name || stock.symbol}</td>
-            <td>${(stock.adjustedWeight * 100).toFixed(2)}%</td>
+            <td>${(stock.customWeight * 100).toFixed(2)}%</td>
         `;
         
         if (currentConfig.useCompositeScore) {
