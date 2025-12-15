@@ -183,10 +183,10 @@ class IndexPortfolioService {
       // 指数策略
       indexReturn: indexReturns.portfolioReturn,
       indexStockCount: indexReturns.stockCount,
-      // 基金净值
+      // 基金净值（如果返回null，则不设置这些字段，让它们为undefined）
       fundReturn: fundNavReturn?.return || 0,
-      fundStartNav: fundNavReturn?.startNav || 0,
-      fundEndNav: fundNavReturn?.endNav || 0,
+      fundStartNav: fundNavReturn?.startNav,
+      fundEndNav: fundNavReturn?.endNav,
       // 统计信息
       stockCount: stocksWithData.length,
       holdings: customPortfolio.map(p => ({
