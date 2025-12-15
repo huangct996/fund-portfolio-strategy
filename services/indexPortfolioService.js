@@ -341,7 +341,7 @@ class IndexPortfolioService {
     const stockCodes = portfolio.map(p => p.con_code || p.symbol);
     
     // 获取股票价格数据
-    const priceData = await tushareService.getStockPrices(stockCodes, startDate, endDate);
+    const priceData = await tushareService.batchGetStockPrices(stockCodes, startDate, endDate);
     
     const stockReturns = [];
     let validWeightSum = 0;
