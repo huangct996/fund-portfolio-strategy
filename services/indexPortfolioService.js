@@ -457,6 +457,7 @@ class IndexPortfolioService {
     const navData = await tushareService.getFundNav(fundCode, startDate, endDate);
     
     if (!navData || navData.length === 0) {
+      console.warn(`⚠️  基金 ${fundCode} 在 ${startDate}-${endDate} 无净值数据`);
       return null;
     }
 
@@ -466,11 +467,14 @@ class IndexPortfolioService {
     const endNav = navData.filter(n => n.nav_date <= endDate).pop() || navData[navData.length - 1];
 
     if (!startNav || !endNav || startNav.nav_date === endNav.nav_date) {
+      console.warn(`⚠️  基金 ${fundCode} 在 ${startDate}-${endDate} 净值数据不足`);
       return null;
     }
 
     // 使用单位净值计算收益率（不使用累计净值，避免重复计算分红）
     const unitNavChange = (endNav.unit_nav - startNav.unit_nav) / startNav.unit_nav;
+    
+    console.log(`📊 基金净值: ${startNav.nav_date}(${startNav.unit_nav}) → ${endNav.nav_date}(${endNav.unit_nav}), 收益率: ${(unitNavChange * 100).toFixed(2)}%`);
     
     return {
       return: unitNavChange,
