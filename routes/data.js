@@ -3,6 +3,7 @@ const router = express.Router();
 const tushareService = require('../services/tushareService');
 const portfolioService = require('../services/portfolioService');
 const indexPortfolioService = require('../services/indexPortfolioService');
+const dbService = require('../services/dbService');
 
 const FUND_CODE = process.env.FUND_CODE || '512890.SH';
 const INDEX_CODE = process.env.INDEX_CODE || 'h30269.CSI';
@@ -149,20 +150,31 @@ router.get('/index-constituents', async (req, res) => {
     // 计算权重总和
     const totalWeight = constituents.reduce((sum, c) => sum + (c.weight || 0), 0);
     
-    // 获取股票名称
+    // 获取股票名称（从数据库）
     const stockCodes = constituents.map(c => c.con_code);
     const stockNames = {};
     
-    // 批量获取股票名称（从数据库或API）
+    // 批量获取股票名称
     for (const code of stockCodes) {
       try {
-        const stockInfo = await tushareService.getStockBasicInfo([code], date);
-        if (stockInfo && stockInfo.length > 0) {
-          stockNames[code] = stockInfo[0].name || code;
+        // 使用dbService从stock_basic_info表获取股票名称
+        const stockInfo = await dbService.getStockBasicInfo(code, date);
+        if (stockInfo && stockInfo.name) {
+          stockNames[code] = stockInfo.name;
         } else {
-          stockNames[code] = code;
+          // 如果数据库中没有，尝试从Tushare API获取
+          const apiData = await tushareService.callApi('stock_basic', {
+            ts_code: code,
+            fields: 'ts_code,name'
+          });
+          if (apiData && apiData.length > 0 && apiData[0].name) {
+            stockNames[code] = apiData[0].name;
+          } else {
+            stockNames[code] = code;
+          }
         }
       } catch (error) {
+        console.error(`获取股票 ${code} 名称失败:`, error.message);
         stockNames[code] = code;
       }
     }
