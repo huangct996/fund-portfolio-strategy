@@ -144,12 +144,22 @@ async function fetchAllReturns(config) {
         startDate: config.startDate ? config.startDate.replace(/-/g, '') : '',
         endDate: config.endDate ? config.endDate.replace(/-/g, '') : '',
         useCompositeScore: config.useCompositeScore,
+        useRiskParity: config.useRiskParity || false,
         mvWeight: config.mvWeight,
         dvWeight: config.dvWeight,
         qualityWeight: config.qualityWeight,
         qualityFactorType: config.qualityFactorType,
         maxWeight: config.maxWeight
     });
+    
+    // 如果是风险平价策略，添加相关参数
+    if (config.useRiskParity && config.riskParityParams) {
+        params.append('volatilityWindow', config.riskParityParams.volatilityWindow);
+        params.append('ewmaDecay', config.riskParityParams.ewmaDecay);
+        params.append('rebalanceFrequency', config.riskParityParams.rebalanceFrequency);
+        params.append('enableTradingCost', config.riskParityParams.enableTradingCost);
+        params.append('tradingCostRate', config.riskParityParams.tradingCostRate);
+    }
 
     const response = await fetch(`${API_BASE}/index-returns?${params}`);
     const result = await response.json();

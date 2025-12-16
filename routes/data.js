@@ -62,11 +62,17 @@ router.get('/index-returns', async (req, res) => {
       startDate,
       endDate,
       useCompositeScore,
+      useRiskParity,
       mvWeight,
       dvWeight,
       qualityWeight,
       qualityFactorType,
-      maxWeight
+      maxWeight,
+      volatilityWindow,
+      ewmaDecay,
+      rebalanceFrequency,
+      enableTradingCost,
+      tradingCostRate
     } = req.query;
     
     // 使用用户配置的maxWeight，如果没有则使用环境变量的默认值
@@ -79,13 +85,26 @@ router.get('/index-returns', async (req, res) => {
       startDate: startDate || '',
       endDate: endDate || '',
       useCompositeScore: useCompositeScore === 'true',
+      useRiskParity: useRiskParity === 'true',
       scoreWeights: {
         mvWeight: parseFloat(mvWeight) || 0.5,
         dvWeight: parseFloat(dvWeight) || 0.3,
         qualityWeight: parseFloat(qualityWeight) || 0.2
       },
-      qualityFactorType: qualityFactorType || 'pe_pb'
+      qualityFactorType: qualityFactorType || 'pe_pb',
+      maxWeight: effectiveMaxWeight
     };
+    
+    // 如果是风险平价策略，添加相关参数
+    if (config.useRiskParity) {
+      config.riskParityParams = {
+        volatilityWindow: parseInt(volatilityWindow) || 12,
+        ewmaDecay: parseFloat(ewmaDecay) || 0.94,
+        rebalanceFrequency: rebalanceFrequency || 'yearly',
+        enableTradingCost: enableTradingCost === 'true',
+        tradingCostRate: parseFloat(tradingCostRate) || 0
+      };
+    }
     
     const result = await indexPortfolioService.calculateIndexBasedReturns(
       INDEX_CODE,
