@@ -9,7 +9,7 @@ const END_DATE = '20251215';
 const WEIGHT_STEP = 0.05;
 const QUALITY_FACTOR_TYPES = ['pe_pb', 'pe', 'pb', 'roe'];
 const MAX_WEIGHTS = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10];  // 5%-10%，步长1%
-const CONCURRENT_LIMIT = 10;  // 并发数量限制
+const CONCURRENT_LIMIT = 20;  // 并发数量限制（已设置为20）
 
 // 生成所有有效的权重组合（总和为1）
 function generateWeightCombinations() {
@@ -163,28 +163,99 @@ function generateMarkdownTable(results) {
     const bestReturn = successResults.reduce((max, r) => 
       r.customAnnualReturn > max.customAnnualReturn ? r : max
     );
-    markdown += `### 最高年化收益率\n`;
-    markdown += `- 参数: 市值${bestReturn.mvWeight.toFixed(2)}, 股息率${bestReturn.dvWeight.toFixed(2)}, 质量因子${bestReturn.qualityWeight.toFixed(2)}, 类型${bestReturn.qualityFactorType}, 最大权重${(bestReturn.maxWeight * 100).toFixed(0)}%\n`;
-    markdown += `- 年化收益率: ${(bestReturn.customAnnualReturn * 100).toFixed(2)}%\n`;
-    markdown += `- 夏普比率: ${bestReturn.customSharpe.toFixed(4)}\n\n`;
+    markdown += `### 🏆 最高年化收益率\n`;
+    markdown += `- **参数组合**: 市值权重${bestReturn.mvWeight.toFixed(2)}, 股息率权重${bestReturn.dvWeight.toFixed(2)}, 质量因子权重${bestReturn.qualityWeight.toFixed(2)}\n`;
+    markdown += `- **质量因子类型**: ${bestReturn.qualityFactorType}\n`;
+    markdown += `- **单股最大权重**: ${(bestReturn.maxWeight * 100).toFixed(0)}%\n`;
+    markdown += `- **年化收益率**: ${(bestReturn.customAnnualReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **年化波动率**: ${(bestReturn.customVolatility * 100).toFixed(2)}%\n`;
+    markdown += `- **夏普比率**: ${bestReturn.customSharpe.toFixed(4)}\n`;
+    markdown += `- **最大回撤**: ${(bestReturn.customMaxDrawdown * 100).toFixed(2)}%\n`;
+    markdown += `- **超额收益**: ${(bestReturn.excessReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **跟踪误差**: ${(bestReturn.trackingError * 100).toFixed(2)}%\n\n`;
     
     // 最高夏普比率
     const bestSharpe = successResults.reduce((max, r) => 
       r.customSharpe > max.customSharpe ? r : max
     );
-    markdown += `### 最高夏普比率\n`;
-    markdown += `- 参数: 市值${bestSharpe.mvWeight.toFixed(2)}, 股息率${bestSharpe.dvWeight.toFixed(2)}, 质量因子${bestSharpe.qualityWeight.toFixed(2)}, 类型${bestSharpe.qualityFactorType}, 最大权重${(bestSharpe.maxWeight * 100).toFixed(0)}%\n`;
-    markdown += `- 夏普比率: ${bestSharpe.customSharpe.toFixed(4)}\n`;
-    markdown += `- 年化收益率: ${(bestSharpe.customAnnualReturn * 100).toFixed(2)}%\n\n`;
+    markdown += `### 📈 最高夏普比率\n`;
+    markdown += `- **参数组合**: 市值权重${bestSharpe.mvWeight.toFixed(2)}, 股息率权重${bestSharpe.dvWeight.toFixed(2)}, 质量因子权重${bestSharpe.qualityWeight.toFixed(2)}\n`;
+    markdown += `- **质量因子类型**: ${bestSharpe.qualityFactorType}\n`;
+    markdown += `- **单股最大权重**: ${(bestSharpe.maxWeight * 100).toFixed(0)}%\n`;
+    markdown += `- **夏普比率**: ${bestSharpe.customSharpe.toFixed(4)}\n`;
+    markdown += `- **年化收益率**: ${(bestSharpe.customAnnualReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **年化波动率**: ${(bestSharpe.customVolatility * 100).toFixed(2)}%\n`;
+    markdown += `- **最大回撤**: ${(bestSharpe.customMaxDrawdown * 100).toFixed(2)}%\n`;
+    markdown += `- **超额收益**: ${(bestSharpe.excessReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **跟踪误差**: ${(bestSharpe.trackingError * 100).toFixed(2)}%\n\n`;
     
     // 最小回撤
     const bestDrawdown = successResults.reduce((min, r) => 
       r.customMaxDrawdown < min.customMaxDrawdown ? r : min
     );
-    markdown += `### 最小最大回撤\n`;
-    markdown += `- 参数: 市值${bestDrawdown.mvWeight.toFixed(2)}, 股息率${bestDrawdown.dvWeight.toFixed(2)}, 质量因子${bestDrawdown.qualityWeight.toFixed(2)}, 类型${bestDrawdown.qualityFactorType}, 最大权重${(bestDrawdown.maxWeight * 100).toFixed(0)}%\n`;
-    markdown += `- 最大回撤: ${(bestDrawdown.customMaxDrawdown * 100).toFixed(2)}%\n`;
-    markdown += `- 年化收益率: ${(bestDrawdown.customAnnualReturn * 100).toFixed(2)}%\n\n`;
+    markdown += `### 🛡️ 最小最大回撤\n`;
+    markdown += `- **参数组合**: 市值权重${bestDrawdown.mvWeight.toFixed(2)}, 股息率权重${bestDrawdown.dvWeight.toFixed(2)}, 质量因子权重${bestDrawdown.qualityWeight.toFixed(2)}\n`;
+    markdown += `- **质量因子类型**: ${bestDrawdown.qualityFactorType}\n`;
+    markdown += `- **单股最大权重**: ${(bestDrawdown.maxWeight * 100).toFixed(0)}%\n`;
+    markdown += `- **最大回撤**: ${(bestDrawdown.customMaxDrawdown * 100).toFixed(2)}%\n`;
+    markdown += `- **年化收益率**: ${(bestDrawdown.customAnnualReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **年化波动率**: ${(bestDrawdown.customVolatility * 100).toFixed(2)}%\n`;
+    markdown += `- **夏普比率**: ${bestDrawdown.customSharpe.toFixed(4)}\n`;
+    markdown += `- **超额收益**: ${(bestDrawdown.excessReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **跟踪误差**: ${(bestDrawdown.trackingError * 100).toFixed(2)}%\n\n`;
+    
+    // 最高超额收益
+    const bestExcess = successResults.reduce((max, r) => 
+      r.excessReturn > max.excessReturn ? r : max
+    );
+    markdown += `### 💰 最高超额收益\n`;
+    markdown += `- **参数组合**: 市值权重${bestExcess.mvWeight.toFixed(2)}, 股息率权重${bestExcess.dvWeight.toFixed(2)}, 质量因子权重${bestExcess.qualityWeight.toFixed(2)}\n`;
+    markdown += `- **质量因子类型**: ${bestExcess.qualityFactorType}\n`;
+    markdown += `- **单股最大权重**: ${(bestExcess.maxWeight * 100).toFixed(0)}%\n`;
+    markdown += `- **超额收益**: ${(bestExcess.excessReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **年化收益率**: ${(bestExcess.customAnnualReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **夏普比率**: ${bestExcess.customSharpe.toFixed(4)}\n`;
+    markdown += `- **最大回撤**: ${(bestExcess.customMaxDrawdown * 100).toFixed(2)}%\n`;
+    markdown += `- **跟踪误差**: ${(bestExcess.trackingError * 100).toFixed(2)}%\n\n`;
+    
+    // 最低跟踪误差
+    const bestTracking = successResults.reduce((min, r) => 
+      r.trackingError < min.trackingError ? r : min
+    );
+    markdown += `### 🎯 最低跟踪误差\n`;
+    markdown += `- **参数组合**: 市值权重${bestTracking.mvWeight.toFixed(2)}, 股息率权重${bestTracking.dvWeight.toFixed(2)}, 质量因子权重${bestTracking.qualityWeight.toFixed(2)}\n`;
+    markdown += `- **质量因子类型**: ${bestTracking.qualityFactorType}\n`;
+    markdown += `- **单股最大权重**: ${(bestTracking.maxWeight * 100).toFixed(0)}%\n`;
+    markdown += `- **跟踪误差**: ${(bestTracking.trackingError * 100).toFixed(2)}%\n`;
+    markdown += `- **年化收益率**: ${(bestTracking.customAnnualReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **夏普比率**: ${bestTracking.customSharpe.toFixed(4)}\n`;
+    markdown += `- **最大回撤**: ${(bestTracking.customMaxDrawdown * 100).toFixed(2)}%\n`;
+    markdown += `- **超额收益**: ${(bestTracking.excessReturn * 100).toFixed(2)}%\n\n`;
+    
+    // 最低波动率
+    const bestVolatility = successResults.reduce((min, r) => 
+      r.customVolatility < min.customVolatility ? r : min
+    );
+    markdown += `### 📊 最低波动率\n`;
+    markdown += `- **参数组合**: 市值权重${bestVolatility.mvWeight.toFixed(2)}, 股息率权重${bestVolatility.dvWeight.toFixed(2)}, 质量因子权重${bestVolatility.qualityWeight.toFixed(2)}\n`;
+    markdown += `- **质量因子类型**: ${bestVolatility.qualityFactorType}\n`;
+    markdown += `- **单股最大权重**: ${(bestVolatility.maxWeight * 100).toFixed(0)}%\n`;
+    markdown += `- **年化波动率**: ${(bestVolatility.customVolatility * 100).toFixed(2)}%\n`;
+    markdown += `- **年化收益率**: ${(bestVolatility.customAnnualReturn * 100).toFixed(2)}%\n`;
+    markdown += `- **夏普比率**: ${bestVolatility.customSharpe.toFixed(4)}\n`;
+    markdown += `- **最大回撤**: ${(bestVolatility.customMaxDrawdown * 100).toFixed(2)}%\n`;
+    markdown += `- **超额收益**: ${(bestVolatility.excessReturn * 100).toFixed(2)}%\n\n`;
+    
+    // 统计摘要
+    markdown += `## 📋 统计摘要\n\n`;
+    markdown += `- **测试用例总数**: ${results.length}\n`;
+    markdown += `- **成功用例数**: ${successResults.length}\n`;
+    markdown += `- **失败用例数**: ${results.length - successResults.length}\n`;
+    markdown += `- **平均年化收益率**: ${(successResults.reduce((sum, r) => sum + r.customAnnualReturn, 0) / successResults.length * 100).toFixed(2)}%\n`;
+    markdown += `- **平均夏普比率**: ${(successResults.reduce((sum, r) => sum + r.customSharpe, 0) / successResults.length).toFixed(4)}\n`;
+    markdown += `- **平均最大回撤**: ${(successResults.reduce((sum, r) => sum + r.customMaxDrawdown, 0) / successResults.length * 100).toFixed(2)}%\n`;
+    markdown += `- **平均超额收益**: ${(successResults.reduce((sum, r) => sum + r.excessReturn, 0) / successResults.length * 100).toFixed(2)}%\n`;
+    markdown += `- **平均跟踪误差**: ${(successResults.reduce((sum, r) => sum + r.trackingError, 0) / successResults.length * 100).toFixed(2)}%\n\n`;
   }
   
   return markdown;

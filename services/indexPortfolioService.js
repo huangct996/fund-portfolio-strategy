@@ -572,9 +572,16 @@ class IndexPortfolioService {
     const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
     const volatility = Math.sqrt(variance);
     
-    // 年化收益率和波动率（假设每期约3个月）
-    const periodsPerYear = 4;
-    const annualizedReturn = Math.pow(1 + avgReturn, periodsPerYear) - 1;
+    // 年化收益率和波动率（实际调仓频率约为每年1次）
+    const periodsPerYear = 1;
+    
+    // 使用几何平均收益率进行年化（复利计算）
+    const geometricMean = Math.pow(
+      returns.reduce((prod, r) => prod * (1 + r), 1),
+      1 / returns.length
+    ) - 1;
+    const annualizedReturn = Math.pow(1 + geometricMean, periodsPerYear) - 1;
+    
     const annualizedVolatility = volatility * Math.sqrt(periodsPerYear);
     
     // 夏普比率（假设无风险利率3%）
