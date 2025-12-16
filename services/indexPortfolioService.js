@@ -818,7 +818,10 @@ class IndexPortfolioService {
       // 该方法会先从数据库查询，没有则从 Tushare 同步
       const dailyData = await tushareService.getStockDailyWithCache(tsCode, startDate, endDate);
       
-      if (!dailyData || dailyData.length < 2) return [];
+      if (!dailyData || dailyData.length < 2) {
+        console.log(`  ⚠️ ${tsCode}: 数据不足，获取到${dailyData ? dailyData.length : 0}条记录`);
+        return [];
+      }
       
       // 按日期升序排序
       dailyData.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
