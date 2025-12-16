@@ -432,6 +432,40 @@ class DatabaseService {
   }
 
   async getIndexWeightDates(indexCode) {
+    const allDates = await this.getAllIndexWeightDates(indexCode);
+    if (allDates.length === 0) return [];
+
+    const rebalanceDates = [];
+    let prevStocks = null;
+
+    for (let i = 0; i < allDates.length; i++) {
+      const date = allDates[i];
+      const [rows] = await this.pool.execute(`
+        SELECT con_code FROM index_weight 
+        WHERE index_code = ? AND trade_date = ?
+        ORDER BY con_code
+      `, [indexCode, date]);
+      
+      const currentStocks = new Set(rows.map(r => r.con_code));
+
+      if (i === 0) {
+        rebalanceDates.push(date);
+      } else if (prevStocks) {
+        const added = [...currentStocks].filter(code => !prevStocks.has(code));
+        const removed = [...prevStocks].filter(code => !currentStocks.has(code));
+        
+        if (added.length > 0 || removed.length > 0) {
+          rebalanceDates.push(date);
+        }
+      }
+
+      prevStocks = currentStocks;
+    }
+
+    return rebalanceDates;
+  }
+
+  async getAllIndexWeightDates(indexCode) {
     const [rows] = await this.pool.execute(`
       SELECT DISTINCT trade_date 
       FROM index_weight 
@@ -439,6 +473,62 @@ class DatabaseService {
       ORDER BY trade_date ASC
     `, [indexCode]);
     return rows.map(r => r.trade_date);
+  }
+
+  async getRebalanceChanges(indexCode) {
+    const allDates = await this.getAllIndexWeightDates(indexCode);
+    if (allDates.length === 0) return [];
+
+    const changes = [];
+    let prevStocks = null;
+    let prevDate = null;
+
+    for (let i = 0; i < allDates.length; i++) {
+      const date = allDates[i];
+      const [rows] = await this.pool.execute(`
+        SELECT con_code FROM index_weight 
+        WHERE index_code = ? AND trade_date = ?
+        ORDER BY con_code
+      `, [indexCode, date]);
+      
+      const currentStocks = new Set(rows.map(r => r.con_code));
+
+      if (i === 0) {
+        changes.push({
+          date,
+          prevDate: null,
+          totalStocks: currentStocks.size,
+          prevTotalStocks: 0,
+          added: [...currentStocks].sort(),
+          removed: [],
+          addedCount: currentStocks.size,
+          removedCount: 0,
+          isInitial: true
+        });
+      } else if (prevStocks) {
+        const added = [...currentStocks].filter(code => !prevStocks.has(code)).sort();
+        const removed = [...prevStocks].filter(code => !currentStocks.has(code)).sort();
+        
+        if (added.length > 0 || removed.length > 0) {
+          changes.push({
+            date,
+            prevDate,
+            totalStocks: currentStocks.size,
+            prevTotalStocks: prevStocks.size,
+            added,
+            removed,
+            addedCount: added.length,
+            removedCount: removed.length,
+            isInitial: false
+          });
+        }
+      }
+
+      prevStocks = currentStocks;
+      prevDate = date;
+    }
+
+    return changes;
   }
 
   async saveIndexWeight(data) {

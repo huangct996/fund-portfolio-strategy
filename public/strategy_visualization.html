@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>策略回测结果可视化</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #c33;
+        }
+
+        .best-strategies {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .strategy-card {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .strategy-title {
+            font-size: 1.2em;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .strategy-detail {
+            margin: 8px 0;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .strategy-detail strong {
+            color: #333;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .filter-group select {
+            padding: 8px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .filter-group select:hover {
+            border-color: #667eea;
+        }
+
+        .filter-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 策略回测结果可视化分析</h1>
+        <div class="subtitle" id="subtitle">加载中...</div>
+
+        <div id="loading" class="loading">正在加载数据...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="content" style="display: none;">
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label>质量因子类型</label>
+                    <select id="qualityFactorFilter">
+                        <option value="all">全部</option>
+                        <option value="pe_pb">PE_PB</option>
+                        <option value="pe">PE</option>
+                        <option value="pb">PB</option>
+                        <option value="roe">ROE</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>最大权重</label>
+                    <select id="maxWeightFilter">
+                        <option value="all">全部</option>
+                        <option value="0.05">5%</option>
+                        <option value="0.06">6%</option>
+                        <option value="0.07">7%</option>
+                        <option value="0.08">8%</option>
+                        <option value="0.09">9%</option>
+                        <option value="0.10">10%</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📈 年化收益率分布</div>
+                <div class="chart-wrapper">
+                    <canvas id="returnChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">💹 夏普比率分布</div>
+                <div class="chart-wrapper">
+                    <canvas id="sharpeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📉 最大回撤分布</div>
+                <div class="chart-wrapper">
+                    <canvas id="drawdownChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">🎯 收益率 vs 夏普比率散点图</div>
+                <div class="chart-wrapper">
+                    <canvas id="scatterChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 风险收益分析（收益率 vs 波动率）</div>
+                <div class="chart-wrapper">
+                    <canvas id="riskReturnChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">🔍 参数权重影响分析</div>
+                <div class="chart-wrapper">
+                    <canvas id="weightImpactChart"></canvas>
+                </div>
+            </div>
+
+            <div class="best-strategies" id="bestStrategies"></div>
+        </div>
+    </div>
+
+    <script>
+        let allResults = [];
+        let charts = {};
+
+        async function loadData() {
+            try {
+                const response = await fetch('/docs/strategy_test_results.json');
+                if (!response.ok) {
+                    throw new Error('无法加载数据文件，请确保回测已完成并生成了结果文件');
+                }
+                allResults = await response.json();
+                
+                const successResults = allResults.filter(r => r.success);
+                
+                if (successResults.length === 0) {
+                    throw new Error('没有成功的测试结果');
+                }
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                
+                updateSubtitle(successResults);
+                renderStats(successResults);
+                renderCharts(successResults);
+                renderBestStrategies(successResults);
+
+                document.getElementById('qualityFactorFilter').addEventListener('change', filterData);
+                document.getElementById('maxWeightFilter').addEventListener('change', filterData);
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = '错误: ' + error.message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function updateSubtitle(results) {
+            const subtitle = document.getElementById('subtitle');
+            subtitle.textContent = `共 ${allResults.length} 个测试用例，${results.length} 个成功`;
+        }
+
+        function renderStats(results) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            const avgReturn = (results.reduce((sum, r) => sum + r.customAnnualReturn, 0) / results.length * 100).toFixed(2);
+            const avgSharpe = (results.reduce((sum, r) => sum + r.customSharpe, 0) / results.length).toFixed(4);
+            const avgDrawdown = (results.reduce((sum, r) => sum + r.customMaxDrawdown, 0) / results.length * 100).toFixed(2);
+            const avgExcess = (results.reduce((sum, r) => sum + r.excessReturn, 0) / results.length * 100).toFixed(2);
+            const maxReturn = (Math.max(...results.map(r => r.customAnnualReturn)) * 100).toFixed(2);
+            const maxSharpe = Math.max(...results.map(r => r.customSharpe)).toFixed(4);
+
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">平均年化收益率</div>
+                    <div class="stat-value">${avgReturn}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">平均夏普比率</div>
+                    <div class="stat-value">${avgSharpe}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">平均最大回撤</div>
+                    <div class="stat-value">${avgDrawdown}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">平均超额收益</div>
+                    <div class="stat-value">${avgExcess}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">最高年化收益率</div>
+                    <div class="stat-value">${maxReturn}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">最高夏普比率</div>
+                    <div class="stat-value">${maxSharpe}</div>
+                </div>
+            `;
+        }
+
+        function renderCharts(results) {
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            charts.return = renderHistogram('returnChart', results, 'customAnnualReturn', '年化收益率', '%', 100);
+            charts.sharpe = renderHistogram('sharpeChart', results, 'customSharpe', '夏普比率', '', 1);
+            charts.drawdown = renderHistogram('drawdownChart', results, 'customMaxDrawdown', '最大回撤', '%', 100);
+            charts.scatter = renderScatter(results);
+            charts.riskReturn = renderRiskReturn(results);
+            charts.weightImpact = renderWeightImpact(results);
+        }
+
+        function renderHistogram(canvasId, results, field, label, unit, multiplier) {
+            const values = results.map(r => r[field] * multiplier);
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const binCount = 20;
+            const binSize = (max - min) / binCount;
+            
+            const bins = Array(binCount).fill(0);
+            values.forEach(v => {
+                const binIndex = Math.min(Math.floor((v - min) / binSize), binCount - 1);
+                bins[binIndex]++;
+            });
+
+            const labels = bins.map((_, i) => {
+                const start = (min + i * binSize).toFixed(2);
+                const end = (min + (i + 1) * binSize).toFixed(2);
+                return `${start}-${end}${unit}`;
+            });
+
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${label}分布`,
+                        data: bins,
+                        backgroundColor: 'rgba(102, 126, 234, 0.7)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `数量: ${context.parsed.y}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: '策略数量' }
+                        },
+                        x: {
+                            title: { display: true, text: label }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderScatter(results) {
+            const data = results.map(r => ({
+                x: r.customAnnualReturn * 100,
+                y: r.customSharpe,
+                label: `${r.qualityFactorType}-${(r.maxWeight*100).toFixed(0)}%`
+            }));
+
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '策略表现',
+                        data: data,
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 1,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const point = context.raw;
+                                    return [
+                                        `${point.label}`,
+                                        `收益率: ${point.x.toFixed(2)}%`,
+                                        `夏普比率: ${point.y.toFixed(4)}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '年化收益率 (%)' }
+                        },
+                        y: {
+                            title: { display: true, text: '夏普比率' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderRiskReturn(results) {
+            const data = results.map(r => ({
+                x: r.customVolatility * 100,
+                y: r.customAnnualReturn * 100,
+                label: `${r.qualityFactorType}-${(r.maxWeight*100).toFixed(0)}%`
+            }));
+
+            const ctx = document.getElementById('riskReturnChart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '风险收益分析',
+                        data: data,
+                        backgroundColor: 'rgba(118, 75, 162, 0.6)',
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        borderWidth: 1,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const point = context.raw;
+                                    return [
+                                        `${point.label}`,
+                                        `波动率: ${point.x.toFixed(2)}%`,
+                                        `收益率: ${point.y.toFixed(2)}%`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '年化波动率 (%)' }
+                        },
+                        y: {
+                            title: { display: true, text: '年化收益率 (%)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderWeightImpact(results) {
+            const mvWeights = [...new Set(results.map(r => r.mvWeight))].sort();
+            const avgReturns = mvWeights.map(mv => {
+                const filtered = results.filter(r => r.mvWeight === mv);
+                return (filtered.reduce((sum, r) => sum + r.customAnnualReturn, 0) / filtered.length * 100);
+            });
+
+            const ctx = document.getElementById('weightImpactChart').getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: mvWeights.map(w => `${(w*100).toFixed(0)}%`),
+                    datasets: [{
+                        label: '平均年化收益率',
+                        data: avgReturns,
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '市值权重' }
+                        },
+                        y: {
+                            title: { display: true, text: '平均年化收益率 (%)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBestStrategies(results) {
+            const bestReturn = results.reduce((max, r) => r.customAnnualReturn > max.customAnnualReturn ? r : max);
+            const bestSharpe = results.reduce((max, r) => r.customSharpe > max.customSharpe ? r : max);
+            const bestDrawdown = results.reduce((min, r) => r.customMaxDrawdown < min.customMaxDrawdown ? r : min);
+            const bestExcess = results.reduce((max, r) => r.excessReturn > max.excessReturn ? r : max);
+
+            const container = document.getElementById('bestStrategies');
+            container.innerHTML = `
+                ${createStrategyCard('🏆 最高年化收益率', bestReturn)}
+                ${createStrategyCard('📈 最高夏普比率', bestSharpe)}
+                ${createStrategyCard('🛡️ 最小最大回撤', bestDrawdown)}
+                ${createStrategyCard('💰 最高超额收益', bestExcess)}
+            `;
+        }
+
+        function createStrategyCard(title, strategy) {
+            return `
+                <div class="strategy-card">
+                    <div class="strategy-title">${title}</div>
+                    <div class="strategy-detail"><strong>市值权重:</strong> ${strategy.mvWeight.toFixed(2)}</div>
+                    <div class="strategy-detail"><strong>股息率权重:</strong> ${strategy.dvWeight.toFixed(2)}</div>
+                    <div class="strategy-detail"><strong>质量因子权重:</strong> ${strategy.qualityWeight.toFixed(2)}</div>
+                    <div class="strategy-detail"><strong>质量因子类型:</strong> ${strategy.qualityFactorType}</div>
+                    <div class="strategy-detail"><strong>最大权重:</strong> ${(strategy.maxWeight * 100).toFixed(0)}%</div>
+                    <div class="strategy-detail"><strong>年化收益率:</strong> ${(strategy.customAnnualReturn * 100).toFixed(2)}%</div>
+                    <div class="strategy-detail"><strong>夏普比率:</strong> ${strategy.customSharpe.toFixed(4)}</div>
+                    <div class="strategy-detail"><strong>最大回撤:</strong> ${(strategy.customMaxDrawdown * 100).toFixed(2)}%</div>
+                    <div class="strategy-detail"><strong>超额收益:</strong> ${(strategy.excessReturn * 100).toFixed(2)}%</div>
+                </div>
+            `;
+        }
+
+        function filterData() {
+            const qualityFactor = document.getElementById('qualityFactorFilter').value;
+            const maxWeight = document.getElementById('maxWeightFilter').value;
+
+            let filtered = allResults.filter(r => r.success);
+
+            if (qualityFactor !== 'all') {
+                filtered = filtered.filter(r => r.qualityFactorType === qualityFactor);
+            }
+
+            if (maxWeight !== 'all') {
+                filtered = filtered.filter(r => Math.abs(r.maxWeight - parseFloat(maxWeight)) < 0.001);
+            }
+
+            updateSubtitle(filtered);
+            renderStats(filtered);
+            renderCharts(filtered);
+            renderBestStrategies(filtered);
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

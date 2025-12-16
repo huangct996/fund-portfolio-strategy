@@ -718,7 +718,12 @@ function renderComparisonTable(customRisk, indexRisk) {
     const comparisonTable = document.getElementById('comparisonTable');
     const comparisonTableBody = document.getElementById('comparisonTableBody');
     
-    if (!comparisonTable || !comparisonTableBody) return;
+    console.log('renderComparisonTable called', { comparisonTable, comparisonTableBody, customRisk, indexRisk });
+    
+    if (!comparisonTable || !comparisonTableBody) {
+        console.error('对比表格元素未找到', { comparisonTable, comparisonTableBody });
+        return;
+    }
     
     // 计算差异
     const returnDiff = customRisk.annualizedReturn - indexRisk.annualizedReturn;

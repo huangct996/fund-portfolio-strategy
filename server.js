@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 3000;
 
 // 静态文件
 app.use(express.static('public'));
+app.use('/docs', express.static('docs'));
 
 // API路由
 app.use('/api', dataRoutes);

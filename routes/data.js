@@ -116,6 +116,27 @@ router.get('/index-returns', async (req, res) => {
 });
 
 /**
+ * 获取所有调仓变化详情
+ */
+router.get('/rebalance-changes', async (req, res) => {
+  try {
+    await dbService.init();
+    const changes = await dbService.getRebalanceChanges(INDEX_CODE);
+    
+    res.json({
+      success: true,
+      data: changes
+    });
+  } catch (error) {
+    console.error('获取调仓变化详情失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * 查询指定日期的指数成分股
  * 查询参数:
  * - date: 调仓日期，格式YYYYMMDD
@@ -141,8 +162,8 @@ router.get('/index-constituents', async (req, res) => {
       });
     }
     
-    // 计算权重总和
-    const totalWeight = constituents.reduce((sum, c) => sum + (c.weight || 0), 0);
+    // 计算权重总和（确保转换为数字）
+    const totalWeight = constituents.reduce((sum, c) => sum + (parseFloat(c.weight) || 0), 0);
     
     // 获取股票名称（从数据库）
     const stockCodes = constituents.map(c => c.con_code);
