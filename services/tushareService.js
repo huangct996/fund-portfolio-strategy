@@ -667,6 +667,73 @@ class TushareService {
       throw error;
     }
   }
+
+  /**
+   * 获取股票日线数据（带缓存，优先从数据库查询）
+   * @param {string} tsCode - 股票代码
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Array} 日线数据，包含后复权价格
+   */
+  async getStockDailyWithCache(tsCode, startDate, endDate) {
+    await this.ensureDbInitialized();
+    
+    try {
+      // 1. 先从数据库查询
+      const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
+      const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
+      
+      // 2. 如果数据库有完整数据，直接返回
+      if (dailyData.length > 0 && adjFactorData.length > 0) {
+        // 创建复权因子映射
+        const adjFactorMap = {};
+        adjFactorData.forEach(item => {
+          adjFactorMap[item.trade_date] = item.adj_factor;
+        });
+        
+        // 计算后复权价格
+        const latestAdjFactor = adjFactorData[adjFactorData.length - 1].adj_factor;
+        return dailyData.map(item => ({
+          ...item,
+          adj_close: item.close * (latestAdjFactor / (adjFactorMap[item.trade_date] || 1))
+        }));
+      }
+      
+      // 3. 数据库没有数据，从 Tushare 获取并保存
+      console.log(`从 Tushare 获取 ${tsCode} 的日线数据: ${startDate} - ${endDate}`);
+      
+      // 获取日线数据
+      const apiDailyData = await this.getStockDaily(tsCode, startDate, endDate);
+      if (apiDailyData.length > 0) {
+        await dbService.saveStockDaily(apiDailyData);
+      }
+      
+      // 获取复权因子
+      const apiAdjFactorData = await this.getAdjFactor(tsCode, startDate, endDate);
+      if (apiAdjFactorData.length > 0) {
+        await dbService.saveAdjFactor(apiAdjFactorData);
+      }
+      
+      // 计算后复权价格
+      if (apiDailyData.length > 0 && apiAdjFactorData.length > 0) {
+        const adjFactorMap = {};
+        apiAdjFactorData.forEach(item => {
+          adjFactorMap[item.trade_date] = item.adj_factor;
+        });
+        
+        const latestAdjFactor = apiAdjFactorData[apiAdjFactorData.length - 1].adj_factor;
+        return apiDailyData.map(item => ({
+          ...item,
+          adj_close: item.close * (latestAdjFactor / (adjFactorMap[item.trade_date] || 1))
+        }));
+      }
+      
+      return apiDailyData;
+    } catch (error) {
+      console.error(`获取股票日线数据失败 (${tsCode}):`, error.message);
+      return [];
+    }
+  }
 }
 
 module.exports = new TushareService();

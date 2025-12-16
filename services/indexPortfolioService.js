@@ -65,7 +65,19 @@ class IndexPortfolioService {
     console.log(`回测起始日期: ${rebalanceDates[0]}`);
     console.log(`回测结束日期: ${rebalanceDates[rebalanceDates.length - 1]}\n`);
 
+    // 如果是风险平价策略且需要更高频率调仓，生成新的调仓日期
+    if (useRiskParity && riskParityParams && riskParityParams.rebalanceFrequency !== 'yearly') {
+      const originalDates = [...rebalanceDates];
+      rebalanceDates = this.generateHighFrequencyRebalanceDates(
+        rebalanceDates, 
+        riskParityParams.rebalanceFrequency
+      );
+      console.log(`🔄 生成高频调仓日期: ${originalDates.length} → ${rebalanceDates.length} 个`);
+      console.log(`调仓频率: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}\n`);
+    }
+
     const results = [];
+    let previousWeights = null; // 用于计算交易成本
     
     // 2. 遍历每个调仓日期，计算收益率
     for (let i = 0; i < rebalanceDates.length; i++) {
@@ -99,7 +111,8 @@ class IndexPortfolioService {
           startDate,
           endDate,
           fundCode,
-          config
+          config,
+          previousWeights
         );
 
         if (periodResult) {
@@ -109,6 +122,11 @@ class IndexPortfolioService {
             endDate,
             ...periodResult
           });
+          
+          // 更新上一期权重（用于下一期计算交易成本）
+          if (periodResult.currentWeights) {
+            previousWeights = periodResult.currentWeights;
+          }
         }
 
       } catch (error) {
@@ -159,8 +177,8 @@ class IndexPortfolioService {
   /**
    * 计算单个调仓期的收益率
    */
-  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config) {
-    const { useCompositeScore, scoreWeights, qualityFactorType } = config;
+  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null) {
+    const { useCompositeScore, useRiskParity, scoreWeights, qualityFactorType, riskParityParams } = config;
 
     // 1. 准备成分股列表
     const stockCodes = indexWeights.map(w => w.con_code);
@@ -174,12 +192,47 @@ class IndexPortfolioService {
     }
 
     // 3. 计算自定义策略权重
-    const customPortfolio = this.calculateCustomWeights(
-      stocksWithData,
-      useCompositeScore,
-      scoreWeights,
-      qualityFactorType
-    );
+    let customPortfolio;
+    let currentWeights = null;
+    let tradingCost = 0;
+    
+    if (useRiskParity && riskParityParams) {
+      // 风险平价策略
+      const riskParityWeights = await this.calculateRiskParityWeights(
+        stocksWithData,
+        startDate,
+        {
+          volatilityWindow: riskParityParams.volatilityWindow,
+          ewmaDecay: riskParityParams.ewmaDecay,
+          maxWeight: config.maxWeight
+        }
+      );
+      
+      customPortfolio = stocksWithData.map(stock => ({
+        ...stock,
+        adjustedWeight: riskParityWeights[stock.con_code] || 0
+      }));
+      
+      currentWeights = riskParityWeights;
+      
+      // 计算交易成本
+      if (riskParityParams.enableTradingCost && riskParityParams.tradingCostRate > 0) {
+        tradingCost = this.calculateTradingCost(
+          previousWeights,
+          currentWeights,
+          riskParityParams.tradingCostRate
+        );
+        console.log(`💰 交易成本: ${(tradingCost * 100).toFixed(3)}%`);
+      }
+    } else {
+      // 原有策略（市值加权或综合得分）
+      customPortfolio = this.calculateCustomWeights(
+        stocksWithData,
+        useCompositeScore,
+        scoreWeights,
+        qualityFactorType
+      );
+    }
 
     // 4. 准备指数策略组合（使用指数原始权重）
     const indexPortfolio = stocksWithData.map(stock => ({
@@ -196,9 +249,14 @@ class IndexPortfolioService {
       return null;
     }
 
+    // 扣除交易成本
+    const netCustomReturn = customReturns.portfolioReturn - tradingCost;
+
     return {
       // 自定义策略
-      customReturn: customReturns.portfolioReturn,
+      customReturn: netCustomReturn,
+      customReturnBeforeCost: customReturns.portfolioReturn,
+      tradingCost: tradingCost,
       customStockCount: customReturns.stockCount,
       // 指数策略
       indexReturn: indexReturns.portfolioReturn,
@@ -209,6 +267,7 @@ class IndexPortfolioService {
       fundEndNav: fundNavReturn?.endNav,
       // 统计信息
       stockCount: stocksWithData.length,
+      currentWeights: currentWeights, // 用于下一期计算交易成本
       holdings: customPortfolio.map(p => ({
         symbol: p.con_code,
         name: p.name,
@@ -714,7 +773,7 @@ class IndexPortfolioService {
   }
 
   /**
-   * 获取股票的历史日收益率数据
+   * 获取股票的历史日收益率数据（使用数据库缓存）
    * @param {string} tsCode - 股票代码
    * @param {string} endDate - 结束日期
    * @param {number} windowMonths - 窗口期（月）
@@ -735,19 +794,20 @@ class IndexPortfolioService {
         String(startDateObj.getMonth() + 1).padStart(2, '0') + 
         String(startDateObj.getDate()).padStart(2, '0');
       
-      // 获取日行情数据
-      const dailyData = await tushareService.getStockDaily(tsCode, startDate, endDate);
+      // 使用 tushareService 的缓存机制获取日行情数据
+      // 该方法会先从数据库查询，没有则从 Tushare 同步
+      const dailyData = await tushareService.getStockDailyWithCache(tsCode, startDate, endDate);
       
       if (!dailyData || dailyData.length < 2) return [];
       
       // 按日期升序排序
       dailyData.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
       
-      // 计算日收益率
+      // 计算日收益率（使用后复权价格）
       const returns = [];
       for (let i = 1; i < dailyData.length; i++) {
-        const prevClose = dailyData[i - 1].close;
-        const currClose = dailyData[i].close;
+        const prevClose = dailyData[i - 1].adj_close || dailyData[i - 1].close;
+        const currClose = dailyData[i].adj_close || dailyData[i].close;
         if (prevClose > 0) {
           returns.push((currClose - prevClose) / prevClose);
         }
