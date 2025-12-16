@@ -143,22 +143,30 @@ async function fetchAllReturns(config) {
     const params = new URLSearchParams({
         startDate: config.startDate ? config.startDate.replace(/-/g, '') : '',
         endDate: config.endDate ? config.endDate.replace(/-/g, '') : '',
-        useCompositeScore: config.useCompositeScore,
-        useRiskParity: config.useRiskParity || false,
-        mvWeight: config.mvWeight,
-        dvWeight: config.dvWeight,
-        qualityWeight: config.qualityWeight,
-        qualityFactorType: config.qualityFactorType,
         maxWeight: config.maxWeight
     });
     
-    // 如果是风险平价策略，添加相关参数
-    if (config.useRiskParity && config.riskParityParams) {
-        params.append('volatilityWindow', config.riskParityParams.volatilityWindow);
-        params.append('ewmaDecay', config.riskParityParams.ewmaDecay);
-        params.append('rebalanceFrequency', config.riskParityParams.rebalanceFrequency);
-        params.append('enableTradingCost', config.riskParityParams.enableTradingCost);
-        params.append('tradingCostRate', config.riskParityParams.tradingCostRate);
+    // 根据策略类型添加不同的参数
+    if (config.useRiskParity) {
+        // 风险平价策略参数
+        params.append('strategyType', 'riskParity');
+        if (config.riskParityParams) {
+            params.append('volatilityWindow', config.riskParityParams.volatilityWindow);
+            params.append('ewmaDecay', config.riskParityParams.ewmaDecay);
+            params.append('rebalanceFrequency', config.riskParityParams.rebalanceFrequency);
+            params.append('enableTradingCost', config.riskParityParams.enableTradingCost);
+            params.append('tradingCostRate', config.riskParityParams.tradingCostRate);
+        }
+    } else if (config.useCompositeScore) {
+        // 综合得分策略参数
+        params.append('strategyType', 'composite');
+        params.append('mvWeight', config.mvWeight);
+        params.append('dvWeight', config.dvWeight);
+        params.append('qualityWeight', config.qualityWeight);
+        params.append('qualityFactorType', config.qualityFactorType);
+    } else {
+        // 市值加权策略参数
+        params.append('strategyType', 'marketValue');
     }
 
     const response = await fetch(`${API_BASE}/index-returns?${params}`);

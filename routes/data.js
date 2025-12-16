@@ -61,13 +61,14 @@ router.get('/index-returns', async (req, res) => {
     const {
       startDate,
       endDate,
-      useCompositeScore,
-      useRiskParity,
+      strategyType,
+      maxWeight,
+      // 综合得分策略参数
       mvWeight,
       dvWeight,
       qualityWeight,
       qualityFactorType,
-      maxWeight,
+      // 风险平价策略参数
       volatilityWindow,
       ewmaDecay,
       rebalanceFrequency,
@@ -81,22 +82,19 @@ router.get('/index-returns', async (req, res) => {
     // 设置indexPortfolioService的maxWeight
     indexPortfolioService.maxWeight = effectiveMaxWeight;
     
+    // 基础配置
     const config = {
       startDate: startDate || '',
       endDate: endDate || '',
-      useCompositeScore: useCompositeScore === 'true',
-      useRiskParity: useRiskParity === 'true',
-      scoreWeights: {
-        mvWeight: parseFloat(mvWeight) || 0.5,
-        dvWeight: parseFloat(dvWeight) || 0.3,
-        qualityWeight: parseFloat(qualityWeight) || 0.2
-      },
-      qualityFactorType: qualityFactorType || 'pe_pb',
-      maxWeight: effectiveMaxWeight
+      maxWeight: effectiveMaxWeight,
+      useCompositeScore: false,
+      useRiskParity: false
     };
     
-    // 如果是风险平价策略，添加相关参数
-    if (config.useRiskParity) {
+    // 根据策略类型添加对应参数
+    if (strategyType === 'riskParity') {
+      // 风险平价策略
+      config.useRiskParity = true;
       config.riskParityParams = {
         volatilityWindow: parseInt(volatilityWindow) || 12,
         ewmaDecay: parseFloat(ewmaDecay) || 0.94,
@@ -104,7 +102,17 @@ router.get('/index-returns', async (req, res) => {
         enableTradingCost: enableTradingCost === 'true',
         tradingCostRate: parseFloat(tradingCostRate) || 0
       };
+    } else if (strategyType === 'composite') {
+      // 综合得分策略
+      config.useCompositeScore = true;
+      config.scoreWeights = {
+        mvWeight: parseFloat(mvWeight) || 0.5,
+        dvWeight: parseFloat(dvWeight) || 0.3,
+        qualityWeight: parseFloat(qualityWeight) || 0.2
+      };
+      config.qualityFactorType = qualityFactorType || 'pe_pb';
     }
+    // strategyType === 'marketValue' 时不需要额外参数
     
     const result = await indexPortfolioService.calculateIndexBasedReturns(
       INDEX_CODE,
