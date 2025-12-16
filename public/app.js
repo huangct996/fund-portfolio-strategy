@@ -670,7 +670,7 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
         </div>
         <div class="risk-item">
             <span class="risk-label">索提诺比率:</span>
-            <span class="risk-value">${customRisk.sortinoRatio.toFixed(2)}</span>
+            <span class="risk-value">${customRisk.sortinoRatio ? customRisk.sortinoRatio.toFixed(2) : '-'}</span>
         </div>
     `;
     
@@ -689,8 +689,14 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
         </div>
         <div class="risk-item">
             <span class="risk-label">夏普比率:</span>
-            <span class="risk-value">${indexRisk.sharpeRatio.toFixed(2)}</span>
+            <span class="risk-value">${indexRisk.sharpeRatio ? indexRisk.sharpeRatio.toFixed(2) : '-'}</span>
         </div>
+        ${indexRisk.sortinoRatio ? `
+        <div class="risk-item">
+            <span class="risk-label">索提诺比率:</span>
+            <span class="risk-value">${indexRisk.sortinoRatio.toFixed(2)}</span>
+        </div>
+        ` : ''}
     `;
     
     // 显示跟踪误差
@@ -727,8 +733,8 @@ function renderComparisonTable(customRisk, indexRisk) {
     
     // 计算差异
     const returnDiff = customRisk.annualizedReturn - indexRisk.annualizedReturn;
-    const sharpeDiff = customRisk.sharpeRatio - indexRisk.sharpeRatio;
-    const sortinoDiff = customRisk.sortinoRatio - indexRisk.sortinoRatio;
+    const sharpeDiff = (customRisk.sharpeRatio || 0) - (indexRisk.sharpeRatio || 0);
+    const sortinoDiff = (customRisk.sortinoRatio || 0) - (indexRisk.sortinoRatio || 0);
     const drawdownDiff = customRisk.maxDrawdown - indexRisk.maxDrawdown;
     
     // 生成对比数据
@@ -741,13 +747,13 @@ function renderComparisonTable(customRisk, indexRisk) {
         },
         {
             metric: '夏普比率',
-            strategy: customRisk.sharpeRatio.toFixed(2),
-            index: indexRisk.sharpeRatio.toFixed(2),
+            strategy: customRisk.sharpeRatio ? customRisk.sharpeRatio.toFixed(2) : '-',
+            index: indexRisk.sharpeRatio ? indexRisk.sharpeRatio.toFixed(2) : '-',
             analysis: generateAnalysis('sharpe', sharpeDiff, customRisk, indexRisk)
         },
         {
             metric: '索提诺比率',
-            strategy: customRisk.sortinoRatio.toFixed(2),
+            strategy: customRisk.sortinoRatio ? customRisk.sortinoRatio.toFixed(2) : '-',
             index: indexRisk.sortinoRatio ? indexRisk.sortinoRatio.toFixed(2) : '-',
             analysis: generateAnalysis('sortino', sortinoDiff, customRisk, indexRisk)
         },
