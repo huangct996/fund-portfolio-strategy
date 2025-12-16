@@ -20,8 +20,10 @@ class IndexPortfolioService {
       startDate = '',
       endDate = '',
       useCompositeScore = false,
+      useRiskParity = false,
       scoreWeights = { mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2 },
-      qualityFactorType = 'pe_pb'
+      qualityFactorType = 'pe_pb',
+      riskParityParams = null
     } = config;
 
     console.log('\n' + '='.repeat(60));
@@ -30,6 +32,14 @@ class IndexPortfolioService {
     console.log(`基金代码: ${fundCode} (用于净值对比)`);
     if (startDate) console.log(`开始日期: ${startDate}`);
     if (endDate) console.log(`结束日期: ${endDate}`);
+    if (useRiskParity) {
+      console.log(`策略类型: 风险平价策略`);
+      console.log(`风险平价参数:`, riskParityParams);
+    } else if (useCompositeScore) {
+      console.log(`策略类型: 综合得分策略`);
+    } else {
+      console.log(`策略类型: 市值加权策略`);
+    }
     console.log('='.repeat(60) + '\n');
 
     // 1. 获取指数的所有调仓日期
@@ -672,6 +682,229 @@ class IndexPortfolioService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}${month}${day}`;
+  }
+
+  /**
+   * 使用EWMA计算股票的历史波动率
+   * @param {Array} returns - 历史收益率数组
+   * @param {number} decay - EWMA衰减系数 (0-1之间，如0.94)
+   * @returns {number} 波动率
+   */
+  calculateEWMAVolatility(returns, decay = 0.94) {
+    if (!returns || returns.length === 0) return 0;
+    
+    // 计算均值
+    const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    
+    // 使用EWMA计算方差
+    let ewmaVariance = 0;
+    let weight = 1;
+    let totalWeight = 0;
+    
+    // 从最近的数据开始，给予更高权重
+    for (let i = returns.length - 1; i >= 0; i--) {
+      const deviation = returns[i] - mean;
+      ewmaVariance += weight * deviation * deviation;
+      totalWeight += weight;
+      weight *= decay;
+    }
+    
+    ewmaVariance /= totalWeight;
+    return Math.sqrt(ewmaVariance);
+  }
+
+  /**
+   * 获取股票的历史日收益率数据
+   * @param {string} tsCode - 股票代码
+   * @param {string} endDate - 结束日期
+   * @param {number} windowMonths - 窗口期（月）
+   * @returns {Array} 日收益率数组
+   */
+  async getStockDailyReturns(tsCode, endDate, windowMonths = 12) {
+    try {
+      // 计算开始日期（向前推windowMonths个月）
+      const endDateObj = new Date(
+        endDate.substring(0, 4),
+        parseInt(endDate.substring(4, 6)) - 1,
+        endDate.substring(6, 8)
+      );
+      const startDateObj = new Date(endDateObj);
+      startDateObj.setMonth(startDateObj.getMonth() - windowMonths);
+      
+      const startDate = startDateObj.getFullYear() + 
+        String(startDateObj.getMonth() + 1).padStart(2, '0') + 
+        String(startDateObj.getDate()).padStart(2, '0');
+      
+      // 获取日行情数据
+      const dailyData = await tushareService.getStockDaily(tsCode, startDate, endDate);
+      
+      if (!dailyData || dailyData.length < 2) return [];
+      
+      // 按日期升序排序
+      dailyData.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+      
+      // 计算日收益率
+      const returns = [];
+      for (let i = 1; i < dailyData.length; i++) {
+        const prevClose = dailyData[i - 1].close;
+        const currClose = dailyData[i].close;
+        if (prevClose > 0) {
+          returns.push((currClose - prevClose) / prevClose);
+        }
+      }
+      
+      return returns;
+    } catch (error) {
+      console.error(`获取股票 ${tsCode} 历史收益率失败:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 计算风险平价权重
+   * @param {Array} stocks - 股票列表，包含tsCode
+   * @param {string} rebalanceDate - 调仓日期
+   * @param {Object} params - 风险平价参数
+   * @returns {Object} 股票代码到权重的映射
+   */
+  async calculateRiskParityWeights(stocks, rebalanceDate, params = {}) {
+    const {
+      volatilityWindow = 12,
+      ewmaDecay = 0.94,
+      maxWeight = 0.15
+    } = params;
+    
+    console.log(`\n计算风险平价权重 - 调仓日期: ${rebalanceDate}`);
+    console.log(`参数: 窗口=${volatilityWindow}月, EWMA衰减=${ewmaDecay}, 最大权重=${maxWeight}`);
+    
+    // 1. 计算每只股票的波动率
+    const stockVolatilities = [];
+    
+    for (const stock of stocks) {
+      const returns = await this.getStockDailyReturns(stock.con_code, rebalanceDate, volatilityWindow);
+      
+      if (returns.length > 0) {
+        const volatility = this.calculateEWMAVolatility(returns, ewmaDecay);
+        stockVolatilities.push({
+          tsCode: stock.con_code,
+          volatility: volatility,
+          returns: returns
+        });
+      } else {
+        // 如果没有数据，使用默认波动率
+        stockVolatilities.push({
+          tsCode: stock.con_code,
+          volatility: 0.02, // 默认2%日波动率
+          returns: []
+        });
+      }
+    }
+    
+    // 2. 计算风险平价权重：权重 ∝ 1/波动率
+    const invVolatilities = stockVolatilities.map(s => ({
+      tsCode: s.tsCode,
+      invVol: s.volatility > 0 ? 1 / s.volatility : 0
+    }));
+    
+    const totalInvVol = invVolatilities.reduce((sum, s) => sum + s.invVol, 0);
+    
+    // 3. 归一化权重
+    const weights = {};
+    invVolatilities.forEach(s => {
+      let weight = totalInvVol > 0 ? s.invVol / totalInvVol : 1 / stocks.length;
+      // 应用最大权重限制
+      weight = Math.min(weight, maxWeight);
+      weights[s.tsCode] = weight;
+    });
+    
+    // 4. 重新归一化（因为应用了最大权重限制）
+    const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+    Object.keys(weights).forEach(tsCode => {
+      weights[tsCode] = weights[tsCode] / totalWeight;
+    });
+    
+    console.log(`风险平价权重计算完成，共 ${Object.keys(weights).length} 只股票`);
+    console.log(`权重范围: ${(Math.min(...Object.values(weights)) * 100).toFixed(2)}% - ${(Math.max(...Object.values(weights)) * 100).toFixed(2)}%`);
+    
+    return weights;
+  }
+
+  /**
+   * 生成更高频率的调仓日期
+   * @param {Array} baseRebalanceDates - 基础调仓日期（年度）
+   * @param {string} frequency - 频率：'quarterly' 或 'monthly'
+   * @returns {Array} 新的调仓日期列表
+   */
+  generateHighFrequencyRebalanceDates(baseRebalanceDates, frequency) {
+    if (frequency === 'yearly') {
+      return baseRebalanceDates;
+    }
+    
+    const newDates = [];
+    
+    for (let i = 0; i < baseRebalanceDates.length - 1; i++) {
+      const startDate = baseRebalanceDates[i];
+      const endDate = baseRebalanceDates[i + 1];
+      
+      newDates.push(startDate);
+      
+      const startDateObj = new Date(
+        startDate.substring(0, 4),
+        parseInt(startDate.substring(4, 6)) - 1,
+        startDate.substring(6, 8)
+      );
+      
+      const endDateObj = new Date(
+        endDate.substring(0, 4),
+        parseInt(endDate.substring(4, 6)) - 1,
+        endDate.substring(6, 8)
+      );
+      
+      const monthsToAdd = frequency === 'quarterly' ? 3 : 1;
+      
+      let currentDate = new Date(startDateObj);
+      currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+      
+      while (currentDate < endDateObj) {
+        const dateStr = currentDate.getFullYear() + 
+          String(currentDate.getMonth() + 1).padStart(2, '0') + 
+          String(currentDate.getDate()).padStart(2, '0');
+        newDates.push(dateStr);
+        currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+      }
+    }
+    
+    // 添加最后一个日期
+    newDates.push(baseRebalanceDates[baseRebalanceDates.length - 1]);
+    
+    return newDates;
+  }
+
+  /**
+   * 计算交易成本
+   * @param {Object} oldWeights - 旧权重
+   * @param {Object} newWeights - 新权重
+   * @param {number} tradingCostRate - 交易成本率
+   * @returns {number} 交易成本
+   */
+  calculateTradingCost(oldWeights, newWeights, tradingCostRate) {
+    if (!oldWeights || Object.keys(oldWeights).length === 0) {
+      // 首次建仓，所有权重都是买入
+      return Object.values(newWeights).reduce((sum, w) => sum + w, 0) * tradingCostRate;
+    }
+    
+    // 计算权重变化的绝对值之和（换手率）
+    const allCodes = new Set([...Object.keys(oldWeights), ...Object.keys(newWeights)]);
+    let turnover = 0;
+    
+    allCodes.forEach(code => {
+      const oldWeight = oldWeights[code] || 0;
+      const newWeight = newWeights[code] || 0;
+      turnover += Math.abs(newWeight - oldWeight);
+    });
+    
+    // 交易成本 = 换手率 × 成本率
+    return turnover * tradingCostRate;
   }
 }
 
