@@ -65,6 +65,9 @@ class IndexPortfolioService {
     console.log(`回测起始日期: ${rebalanceDates[0]}`);
     console.log(`回测结束日期: ${rebalanceDates[rebalanceDates.length - 1]}\n`);
 
+    // 保存原始年度调仓日期（用于指数策略）
+    const yearlyRebalanceDates = [...rebalanceDates];
+    
     // 如果是风险平价策略且需要更高频率调仓，生成新的调仓日期
     if (useRiskParity && riskParityParams && riskParityParams.rebalanceFrequency !== 'yearly') {
       const originalDates = [...rebalanceDates];
@@ -73,7 +76,8 @@ class IndexPortfolioService {
         riskParityParams.rebalanceFrequency
       );
       console.log(`🔄 生成高频调仓日期: ${originalDates.length} → ${rebalanceDates.length} 个`);
-      console.log(`调仓频率: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}\n`);
+      console.log(`   自定义策略: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}调仓`);
+      console.log(`   指数策略: 年度调仓（保持不变）\n`);
     }
 
     const results = [];
@@ -106,13 +110,17 @@ class IndexPortfolioService {
         console.log(`持有时间段: ${startDate} → ${endDate}`);
 
         // 3. 计算三种策略的收益率
+        // 判断当前日期是否是年度调仓日（指数策略只在年度调仓）
+        const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
+        
         const periodResult = await this.calculatePeriodReturns(
           indexWeights,
           startDate,
           endDate,
           fundCode,
           config,
-          previousWeights
+          previousWeights,
+          isYearlyRebalance
         );
 
         if (periodResult) {
@@ -140,7 +148,12 @@ class IndexPortfolioService {
 
     // 5. 计算风险指标
     const customReturns = results.map(r => r.customReturn);
-    const indexReturns = results.map(r => r.indexReturn);
+    
+    // 指数收益率：只使用年度调仓期的数据
+    const indexReturns = results
+      .filter(r => r.isYearlyRebalance)
+      .map(r => r.indexReturn);
+    
     const fundReturns = results.map(r => r.fundReturn);
 
     console.log('\n调试：收益率数据');
@@ -177,7 +190,7 @@ class IndexPortfolioService {
   /**
    * 计算单个调仓期的收益率
    */
-  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null) {
+  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null, calculateIndexReturn = true) {
     const { useCompositeScore, useRiskParity, scoreWeights, qualityFactorType, riskParityParams } = config;
 
     // 1. 准备成分股列表
@@ -242,10 +255,16 @@ class IndexPortfolioService {
 
     // 5. 计算三种策略的收益率
     const customReturns = await this.calculatePortfolioReturns(customPortfolio, startDate, endDate);
-    const indexReturns = await this.calculatePortfolioReturns(indexPortfolio, startDate, endDate);
+    
+    // 指数策略只在年度调仓日计算，其他时间返回0
+    let indexReturns = null;
+    if (calculateIndexReturn) {
+      indexReturns = await this.calculatePortfolioReturns(indexPortfolio, startDate, endDate);
+    }
+    
     const fundNavReturn = await this.calculateReturnsFromNav(fundCode, startDate, endDate);
 
-    if (!customReturns || !indexReturns) {
+    if (!customReturns) {
       return null;
     }
 
@@ -258,9 +277,10 @@ class IndexPortfolioService {
       customReturnBeforeCost: customReturns.portfolioReturn,
       tradingCost: tradingCost,
       customStockCount: customReturns.stockCount,
-      // 指数策略
-      indexReturn: indexReturns.portfolioReturn,
-      indexStockCount: indexReturns.stockCount,
+      // 指数策略（只在年度调仓日计算）
+      indexReturn: indexReturns ? indexReturns.portfolioReturn : 0,
+      indexStockCount: indexReturns ? indexReturns.stockCount : 0,
+      isYearlyRebalance: calculateIndexReturn,
       // 基金净值（如果返回null，则不设置这些字段，让它们为undefined）
       fundReturn: fundNavReturn?.return || 0,
       fundStartNav: fundNavReturn?.startNav,
