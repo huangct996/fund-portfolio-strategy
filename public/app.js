@@ -198,12 +198,20 @@ function setupConfigPanel() {
         radio.addEventListener('change', (e) => {
             const compositeWeights = document.getElementById('compositeWeights');
             const marketValueConfig = document.getElementById('marketValueConfig');
+            const riskParityConfig = document.getElementById('riskParityConfig');
+            
             if (e.target.value === 'composite') {
                 compositeWeights.style.display = 'block';
                 marketValueConfig.style.display = 'none';
+                riskParityConfig.style.display = 'none';
+            } else if (e.target.value === 'riskParity') {
+                compositeWeights.style.display = 'none';
+                marketValueConfig.style.display = 'none';
+                riskParityConfig.style.display = 'block';
             } else {
                 compositeWeights.style.display = 'none';
                 marketValueConfig.style.display = 'block';
+                riskParityConfig.style.display = 'none';
             }
         });
     });
@@ -255,6 +263,51 @@ function setupConfigPanel() {
             updateWeightSum();
         });
     });
+    
+    // 风险平价策略控件
+    const volatilityWindowSlider = document.getElementById('volatilityWindowSlider');
+    const volatilityWindowValue = document.getElementById('volatilityWindowValue');
+    if (volatilityWindowSlider) {
+        volatilityWindowSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            volatilityWindowValue.textContent = value + '个月';
+        });
+    }
+    
+    const ewmaDecaySlider = document.getElementById('ewmaDecaySlider');
+    const ewmaDecayValue = document.getElementById('ewmaDecayValue');
+    if (ewmaDecaySlider) {
+        ewmaDecaySlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value) / 100;
+            ewmaDecayValue.textContent = value.toFixed(2);
+        });
+    }
+    
+    const enableTradingCost = document.getElementById('enableTradingCost');
+    const tradingCostConfig = document.getElementById('tradingCostConfig');
+    if (enableTradingCost) {
+        enableTradingCost.addEventListener('change', (e) => {
+            tradingCostConfig.style.display = e.target.checked ? 'block' : 'none';
+        });
+    }
+    
+    const tradingCostSlider = document.getElementById('tradingCostSlider');
+    const tradingCostValue = document.getElementById('tradingCostValue');
+    if (tradingCostSlider) {
+        tradingCostSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value) / 100;
+            tradingCostValue.textContent = value.toFixed(2) + '%';
+        });
+    }
+    
+    const rpMaxWeightSlider = document.getElementById('rpMaxWeightSlider');
+    const rpMaxWeightValue = document.getElementById('rpMaxWeightValue');
+    if (rpMaxWeightSlider) {
+        rpMaxWeightSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            rpMaxWeightValue.textContent = value + '%';
+        });
+    }
     
     // 应用配置按钮
     document.getElementById('applyConfig').addEventListener('click', applyConfiguration);
@@ -309,6 +362,7 @@ async function applyConfiguration() {
     // 获取策略类型
     const strategy = document.querySelector('input[name="strategy"]:checked').value;
     const useCompositeScore = strategy === 'composite';
+    const useRiskParity = strategy === 'riskParity';
     
     // 获取质量因子类型
     const qualityFactorType = document.querySelector('input[name="qualityFactor"]:checked')?.value || 'pe_pb';
@@ -322,8 +376,24 @@ async function applyConfiguration() {
     let maxWeight;
     if (useCompositeScore) {
         maxWeight = parseInt(document.getElementById('maxWeightSlider').value) / 100;
+    } else if (useRiskParity) {
+        maxWeight = parseInt(document.getElementById('rpMaxWeightSlider').value) / 100;
     } else {
         maxWeight = parseInt(document.getElementById('mvMaxWeightSlider').value) / 100;
+    }
+    
+    // 风险平价策略参数
+    let riskParityParams = null;
+    if (useRiskParity) {
+        riskParityParams = {
+            volatilityWindow: parseInt(document.getElementById('volatilityWindowSlider').value),
+            ewmaDecay: parseInt(document.getElementById('ewmaDecaySlider').value) / 100,
+            rebalanceFrequency: document.getElementById('rebalanceFrequency').value,
+            enableTradingCost: document.getElementById('enableTradingCost').checked,
+            tradingCostRate: document.getElementById('enableTradingCost').checked 
+                ? parseInt(document.getElementById('tradingCostSlider').value) / 10000 
+                : 0
+        };
     }
     
     // 验证权重和
@@ -337,11 +407,13 @@ async function applyConfiguration() {
         startDate: startDate ? startDate.replace(/-/g, '') : '',  // 转换为YYYYMMDD格式
         endDate: endDate ? endDate.replace(/-/g, '') : '',
         useCompositeScore,
+        useRiskParity,
         mvWeight,
         dvWeight,
         qualityWeight,
         qualityFactorType,
-        maxWeight
+        maxWeight,
+        riskParityParams
     };
     
     // 重新加载数据

@@ -83,6 +83,10 @@
                         <input type="radio" name="strategy" value="composite">
                         综合得分策略
                     </label>
+                    <label>
+                        <input type="radio" name="strategy" value="riskParity">
+                        风险平价策略 ⭐
+                    </label>
                 </div>
             </div>
 
@@ -151,6 +155,62 @@
                         <label>单只股票最大权重: <span id="maxWeightValue">10%</span></label>
                         <input type="range" id="maxWeightSlider" min="5" max="30" step="1" value="10">
                         <small style="color: #666;">限制单只股票的最大持仓比例，防止过度集中</small>
+                    </div>
+                </div>
+            </div>
+
+            <div id="riskParityConfig" class="config-section" style="display: none;">
+                <h3>风险平价策略配置</h3>
+                
+                <div class="info-note" style="margin-bottom: 15px;">
+                    <strong>📌 策略说明：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>使用EWMA（指数加权移动平均）计算股票波动率</li>
+                        <li>权重与波动率成反比，使每只股票的风险贡献相等</li>
+                        <li>目标：降低组合波动率，提高夏普比率</li>
+                    </ul>
+                </div>
+                
+                <div class="weight-config">
+                    <div class="weight-item">
+                        <label>波动率计算窗口: <span id="volatilityWindowValue">12个月</span></label>
+                        <input type="range" id="volatilityWindowSlider" min="6" max="24" step="1" value="12">
+                        <small style="color: #666;">用于计算历史波动率的时间窗口（月）</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>EWMA衰减系数: <span id="ewmaDecayValue">0.94</span></label>
+                        <input type="range" id="ewmaDecaySlider" min="85" max="98" step="1" value="94">
+                        <small style="color: #666;">控制近期数据权重，值越大越重视历史数据</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>调仓频率:</label>
+                        <select id="rebalanceFrequency" class="select-input">
+                            <option value="yearly">每年（跟随指数）</option>
+                            <option value="quarterly">每季度</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                        <small style="color: #666;">更高频率可能提升夏普比率，但增加交易成本</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>
+                            <input type="checkbox" id="enableTradingCost">
+                            考虑交易成本
+                        </label>
+                    </div>
+                    
+                    <div class="weight-item" id="tradingCostConfig" style="display: none; margin-left: 20px;">
+                        <label>交易成本比例: <span id="tradingCostValue">0.30%</span></label>
+                        <input type="range" id="tradingCostSlider" min="10" max="100" step="5" value="30">
+                        <small style="color: #666;">每次调仓的单边交易成本（买入+卖出）</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>单只股票最大权重: <span id="rpMaxWeightValue">15%</span></label>
+                        <input type="range" id="rpMaxWeightSlider" min="5" max="30" step="1" value="15">
+                        <small style="color: #666;">防止极端情况下权重过度集中</small>
                     </div>
                 </div>
             </div>
