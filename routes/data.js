@@ -82,6 +82,10 @@ router.get('/index-returns', async (req, res) => {
     // 设置indexPortfolioService的maxWeight
     indexPortfolioService.maxWeight = effectiveMaxWeight;
     
+    // 调试日志
+    console.log('收到的策略类型:', strategyType);
+    console.log('风险平价参数:', { volatilityWindow, ewmaDecay, rebalanceFrequency, enableTradingCost, tradingCostRate });
+    
     // 基础配置
     const config = {
       startDate: startDate || '',

@@ -384,6 +384,18 @@ class TushareService {
   }
 
   /**
+   * 获取复权因子
+   */
+  async getAdjFactor(tsCode, startDate, endDate) {
+    const data = await this.callApi('adj_factor', {
+      ts_code: tsCode,
+      start_date: startDate,
+      end_date: endDate
+    });
+    return data.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+  }
+
+  /**
    * 批量获取股票价格（使用前复权价格，优先从数据库查询）
    * 前复权：将历史价格按照分红、配股等因素调整，使价格连续可比
    */

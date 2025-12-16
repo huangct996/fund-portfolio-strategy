@@ -839,6 +839,8 @@ class IndexPortfolioService {
     
     // 1. 计算每只股票的波动率
     const stockVolatilities = [];
+    let successCount = 0;
+    let failCount = 0;
     
     for (const stock of stocks) {
       const returns = await this.getStockDailyReturns(stock.con_code, rebalanceDate, volatilityWindow);
@@ -850,6 +852,12 @@ class IndexPortfolioService {
           volatility: volatility,
           returns: returns
         });
+        successCount++;
+        
+        // 调试：输出前3只股票的详细信息
+        if (successCount <= 3) {
+          console.log(`  ${stock.con_code}: ${returns.length}个交易日, 波动率=${(volatility * 100).toFixed(3)}%`);
+        }
       } else {
         // 如果没有数据，使用默认波动率
         stockVolatilities.push({
@@ -857,7 +865,16 @@ class IndexPortfolioService {
           volatility: 0.02, // 默认2%日波动率
           returns: []
         });
+        failCount++;
       }
+    }
+    
+    console.log(`波动率计算完成: 成功${successCount}只, 失败${failCount}只`);
+    
+    // 输出波动率统计
+    const vols = stockVolatilities.map(s => s.volatility).filter(v => v > 0);
+    if (vols.length > 0) {
+      console.log(`波动率统计: 最小=${(Math.min(...vols) * 100).toFixed(3)}%, 最大=${(Math.max(...vols) * 100).toFixed(3)}%, 平均=${(vols.reduce((a, b) => a + b, 0) / vols.length * 100).toFixed(3)}%`);
     }
     
     // 2. 计算风险平价权重：权重 ∝ 1/波动率
