@@ -115,9 +115,19 @@ class IndexPortfolioService {
     const indexReturns = results.map(r => r.indexReturn);
     const fundReturns = results.map(r => r.fundReturn);
 
+    console.log('\n调试：收益率数据');
+    console.log('自定义策略收益率:', customReturns.map(r => (r * 100).toFixed(2) + '%'));
+    console.log('指数收益率:', indexReturns.map(r => (r * 100).toFixed(2) + '%'));
+    console.log('有负收益的期数 - 自定义:', customReturns.filter(r => r < 0).length);
+    console.log('有负收益的期数 - 指数:', indexReturns.filter(r => r < 0).length);
+
     const customRisk = this.calculateRiskMetrics(customReturns, results.length);
     const indexRisk = this.calculateRiskMetrics(indexReturns, results.length);
     const fundRisk = this.calculateRiskMetrics(fundReturns, results.length);
+    
+    console.log('\n风险指标计算结果:');
+    console.log('自定义策略 - 最大回撤:', (customRisk.maxDrawdown * 100).toFixed(2) + '%');
+    console.log('指数策略 - 最大回撤:', (indexRisk.maxDrawdown * 100).toFixed(2) + '%');
 
     // 6. 计算跟踪误差
     const trackingError = this.calculateTrackingError(customReturns, indexReturns);
@@ -572,6 +582,9 @@ class IndexPortfolioService {
     const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
     const volatility = Math.sqrt(variance);
     
+    // 计算累计收益率
+    const totalReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
+    
     // 年化收益率和波动率（实际调仓频率约为每年1次）
     const periodsPerYear = 1;
     
@@ -590,6 +603,15 @@ class IndexPortfolioService {
       ? (annualizedReturn - riskFreeRate) / annualizedVolatility 
       : 0;
     
+    // 索提诺比率（只考虑下行波动）
+    const downReturns = returns.filter(r => r < 0);
+    let sortinoRatio = 0;
+    if (downReturns.length > 0) {
+      const downVariance = downReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / returns.length;
+      const downVolatility = Math.sqrt(downVariance) * Math.sqrt(periodsPerYear);
+      sortinoRatio = downVolatility > 0 ? (annualizedReturn - riskFreeRate) / downVolatility : 0;
+    }
+    
     // 最大回撤
     let maxDrawdown = 0;
     let peak = 1;
@@ -607,9 +629,11 @@ class IndexPortfolioService {
     });
 
     return {
+      totalReturn,
       annualizedReturn,
       volatility: annualizedVolatility,
       sharpeRatio,
+      sortinoRatio,
       maxDrawdown,
       periods
     };
