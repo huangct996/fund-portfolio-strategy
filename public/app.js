@@ -140,30 +140,35 @@ async function fetchReportPeriods() {
 }
 
 async function fetchAllReturns(config) {
-    const params = new URLSearchParams();
-    
-    // 添加日期范围参数
-    if (config.startDate) {
-        params.append('startDate', config.startDate);
-    }
-    if (config.endDate) {
-        params.append('endDate', config.endDate);
-    }
-    
-    params.append('useCompositeScore', config.useCompositeScore);
-    params.append('mvWeight', config.mvWeight);
-    params.append('dvWeight', config.dvWeight);
-    params.append('qualityWeight', config.qualityWeight);
-    params.append('qualityFactorType', config.qualityFactorType);
-    params.append('maxWeight', config.maxWeight || 0.10);
-    
+    const params = new URLSearchParams({
+        startDate: config.startDate ? config.startDate.replace(/-/g, '') : '',
+        endDate: config.endDate ? config.endDate.replace(/-/g, '') : '',
+        useCompositeScore: config.useCompositeScore,
+        mvWeight: config.mvWeight,
+        dvWeight: config.dvWeight,
+        qualityWeight: config.qualityWeight,
+        qualityFactorType: config.qualityFactorType,
+        maxWeight: config.maxWeight
+    });
+
     const response = await fetch(`${API_BASE}/index-returns?${params}`);
     const result = await response.json();
-    
+
     if (!result.success) {
         throw new Error(result.error || '获取收益率数据失败');
     }
-    
+
+    return result.data;
+}
+
+async function fetchRebalanceChanges() {
+    const response = await fetch(`${API_BASE}/rebalance-changes`);
+    const result = await response.json();
+
+    if (!result.success) {
+        throw new Error(result.error || '获取调仓变化数据失败');
+    }
+
     return result.data;
 }
 
@@ -360,8 +365,23 @@ function resetConfiguration() {
 /**
  * 显示持仓明细表格
  */
-function displayHoldingsTable(data) {
+async function displayHoldingsTable(data) {
     if (data.length === 0) return;
+    
+    // 获取调仓变化数据
+    let rebalanceChanges = [];
+    try {
+        rebalanceChanges = await fetchRebalanceChanges();
+        console.log('调仓变化数据:', rebalanceChanges);
+    } catch (error) {
+        console.error('获取调仓变化数据失败:', error);
+    }
+    
+    // 创建日期到变化的映射
+    const changesMap = {};
+    rebalanceChanges.forEach(change => {
+        changesMap[change.date] = change;
+    });
     
     // 填充调仓期选择下拉框
     const periodSelect = document.getElementById('holdingsPeriodSelect');
@@ -374,23 +394,43 @@ function displayHoldingsTable(data) {
     data.forEach((period, index) => {
         const option = document.createElement('option');
         option.value = index;
-        option.textContent = formatDate(period.rebalanceDate || period.reportDate);
+        const date = period.rebalanceDate || period.reportDate;
+        const dateFormatted = formatDate(date);
+        
+        // 查找该日期的调仓变化
+        const change = changesMap[date];
+        if (change) {
+            if (change.isInitial) {
+                option.textContent = `${dateFormatted} [初始调仓: ${change.totalStocks}只]`;
+            } else {
+                const changeInfo = [];
+                if (change.addedCount > 0) changeInfo.push(`+${change.addedCount}`);
+                if (change.removedCount > 0) changeInfo.push(`-${change.removedCount}`);
+                option.textContent = `${dateFormatted} [${changeInfo.join(' ')}只]`;
+            }
+        } else {
+            option.textContent = dateFormatted;
+        }
+        
         periodSelect.appendChild(option);
     });
     
     // 监听报告期切换
     periodSelect.onchange = (e) => {
         const selectedIndex = parseInt(e.target.value);
-        renderHoldingsForPeriod(data[selectedIndex]);
+        const selectedPeriod = data[selectedIndex];
+        const change = changesMap[selectedPeriod.rebalanceDate || selectedPeriod.reportDate];
+        renderHoldingsForPeriod(selectedPeriod, change);
     };
     
     // 默认显示第一个报告期
-    renderHoldingsForPeriod(data[0]);
+    const firstChange = changesMap[data[0].rebalanceDate || data[0].reportDate];
+    renderHoldingsForPeriod(data[0], firstChange);
     
     document.getElementById('holdingsTable').style.display = 'block';
 }
 
-function renderHoldingsForPeriod(period) {
+function renderHoldingsForPeriod(period, rebalanceChange) {
     if (!period || !period.holdings) return;
     
     // 更新标题
@@ -669,6 +709,125 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
             `;
         }
     }
+    
+    // 渲染风险收益指标对比表格
+    renderComparisonTable(customRisk, indexRisk);
+}
+
+function renderComparisonTable(customRisk, indexRisk) {
+    const comparisonTable = document.getElementById('comparisonTable');
+    const comparisonTableBody = document.getElementById('comparisonTableBody');
+    
+    if (!comparisonTable || !comparisonTableBody) return;
+    
+    // 计算差异
+    const returnDiff = customRisk.annualizedReturn - indexRisk.annualizedReturn;
+    const sharpeDiff = customRisk.sharpeRatio - indexRisk.sharpeRatio;
+    const sortinoDiff = customRisk.sortinoRatio - indexRisk.sortinoRatio;
+    const drawdownDiff = customRisk.maxDrawdown - indexRisk.maxDrawdown;
+    
+    // 生成对比数据
+    const comparisons = [
+        {
+            metric: '年化收益率',
+            strategy: `${(customRisk.annualizedReturn * 100).toFixed(1)}%`,
+            index: `${(indexRisk.annualizedReturn * 100).toFixed(1)}%`,
+            analysis: generateAnalysis('return', returnDiff, customRisk, indexRisk)
+        },
+        {
+            metric: '夏普比率',
+            strategy: customRisk.sharpeRatio.toFixed(2),
+            index: indexRisk.sharpeRatio.toFixed(2),
+            analysis: generateAnalysis('sharpe', sharpeDiff, customRisk, indexRisk)
+        },
+        {
+            metric: '索提诺比率',
+            strategy: customRisk.sortinoRatio.toFixed(2),
+            index: indexRisk.sortinoRatio ? indexRisk.sortinoRatio.toFixed(2) : '-',
+            analysis: generateAnalysis('sortino', sortinoDiff, customRisk, indexRisk)
+        },
+        {
+            metric: '卡玛比率',
+            strategy: customRisk.maxDrawdown > 0 ? (customRisk.annualizedReturn / customRisk.maxDrawdown).toFixed(2) : '-',
+            index: indexRisk.maxDrawdown > 0 ? (indexRisk.annualizedReturn / indexRisk.maxDrawdown).toFixed(2) : '-',
+            analysis: '衡量回撤修复能力，数值越高表示单位回撤获得的收益越高'
+        },
+        {
+            metric: '最大回撤',
+            strategy: `${(customRisk.maxDrawdown * 100).toFixed(0)}%`,
+            index: `${(indexRisk.maxDrawdown * 100).toFixed(0)}%`,
+            analysis: generateAnalysis('drawdown', drawdownDiff, customRisk, indexRisk)
+        },
+        {
+            metric: '波动率',
+            strategy: `${(customRisk.volatility * 100).toFixed(1)}%`,
+            index: `${(indexRisk.volatility * 100).toFixed(1)}%`,
+            analysis: customRisk.volatility < indexRisk.volatility 
+                ? '策略波动更小，风险控制更好' 
+                : '策略波动较大，但可能带来更高收益'
+        }
+    ];
+    
+    // 生成表格HTML
+    comparisonTableBody.innerHTML = comparisons.map(row => `
+        <tr>
+            <td class="metric-name">${row.metric}</td>
+            <td class="strategy-col">${row.strategy}</td>
+            <td class="index-col">${row.index}</td>
+            <td class="analysis-col">${row.analysis}</td>
+        </tr>
+    `).join('');
+    
+    // 显示表格
+    comparisonTable.style.display = 'block';
+}
+
+function generateAnalysis(type, diff, customRisk, indexRisk) {
+    switch(type) {
+        case 'return':
+            if (Math.abs(diff) < 0.01) {
+                return '两者收益率基本持平';
+            } else if (diff > 0) {
+                const pct = ((diff / indexRisk.annualizedReturn) * 100).toFixed(1);
+                return `策略表现更优，超额收益 <span class="highlight-better">${(diff * 100).toFixed(2)}%</span>（相对提升${pct}%）`;
+            } else {
+                const pct = ((Math.abs(diff) / indexRisk.annualizedReturn) * 100).toFixed(1);
+                return `指数表现更优，策略落后 <span class="highlight-worse">${(Math.abs(diff) * 100).toFixed(2)}%</span>（相对下降${pct}%）`;
+            }
+            
+        case 'sharpe':
+            if (Math.abs(diff) < 0.1) {
+                return '风险调整后收益相当';
+            } else if (diff > 0) {
+                return `策略的单位风险收益更高，<span class="highlight-better">风险收益比更优</span>`;
+            } else {
+                return `指数的单位风险收益更高，<span class="highlight-worse">策略风险收益比较低</span>`;
+            }
+            
+        case 'sortino':
+            if (!indexRisk.sortinoRatio) {
+                return '索提诺比率衡量下行风险控制能力';
+            }
+            if (Math.abs(diff) < 0.1) {
+                return '下行风险控制能力相当';
+            } else if (diff > 0) {
+                return `策略在控制下行风险方面表现更好，<span class="highlight-better">更擅长控制下跌</span>`;
+            } else {
+                return `指数在控制下行风险方面表现更好`;
+            }
+            
+        case 'drawdown':
+            if (Math.abs(diff) < 0.02) {
+                return '两者回撤控制能力相当';
+            } else if (diff < 0) {
+                return `策略的最大回撤更小，<span class="highlight-better">熊市中防御性更强</span>`;
+            } else {
+                return `指数的最大回撤更小，<span class="highlight-worse">策略在熊市中回撤较大</span>`;
+            }
+            
+        default:
+            return '';
+    }
 }
 
 function formatPercent(value) {
@@ -769,12 +928,15 @@ async function queryIndexConstituents() {
     const loadingEl = document.getElementById('constituentsLoading');
     const resultEl = document.getElementById('constituentsResult');
     const errorEl = document.getElementById('constituentsError');
+    const changeEl = document.getElementById('constituentsRebalanceChange');
     
     if (loadingEl) loadingEl.style.display = 'block';
     if (resultEl) resultEl.style.display = 'none';
     if (errorEl) errorEl.style.display = 'none';
+    if (changeEl) changeEl.style.display = 'none';
     
     try {
+        // 获取成分股数据
         const response = await fetch(`${API_BASE}/index-constituents?date=${queryDate}`);
         const result = await response.json();
         
@@ -782,8 +944,21 @@ async function queryIndexConstituents() {
             throw new Error(result.error || '查询失败');
         }
         
+        // 获取调仓变化数据
+        let rebalanceChange = null;
+        try {
+            const changesResponse = await fetch(`${API_BASE}/rebalance-changes`);
+            const changesResult = await changesResponse.json();
+            if (changesResult.success) {
+                rebalanceChange = changesResult.data.find(c => c.date === queryDate);
+            }
+        } catch (error) {
+            console.error('获取调仓变化数据失败:', error);
+        }
+        
         // 显示结果
         displayConstituents(result.data);
+        displayConstituentsRebalanceChange(rebalanceChange);
         
     } catch (error) {
         const loadingEl = document.getElementById('constituentsLoading');
@@ -794,6 +969,115 @@ async function queryIndexConstituents() {
         if (errorEl) errorEl.style.display = 'block';
         if (errorMsg) errorMsg.textContent = error.message;
     }
+}
+
+function displayConstituentsRebalanceChange(change) {
+    const changeContainer = document.getElementById('constituentsRebalanceChange');
+    if (!changeContainer) return;
+    
+    if (!change) {
+        changeContainer.style.display = 'none';
+        return;
+    }
+    
+    changeContainer.style.display = 'block';
+    
+    let html = '<div class="rebalance-change-box">';
+    
+    if (change.isInitial) {
+        html += `<h4>📊 初始调仓</h4>`;
+        html += `<div class="change-summary">`;
+        html += `<div class="summary-item">`;
+        html += `<span class="summary-label">调仓日期</span>`;
+        html += `<span class="summary-value">${formatDate(change.date)}</span>`;
+        html += `</div>`;
+        html += `<div class="summary-item">`;
+        html += `<span class="summary-label">成分股数量</span>`;
+        html += `<span class="summary-value"><strong>${change.totalStocks}只</strong></span>`;
+        html += `</div>`;
+        html += `</div>`;
+    } else {
+        html += `<h4>🔄 调仓变化对比</h4>`;
+        
+        // 添加调仓日期信息
+        html += `<div class="change-summary">`;
+        html += `<div class="summary-item">`;
+        html += `<span class="summary-label">上期调仓日期</span>`;
+        html += `<span class="summary-value">${formatDate(change.prevDate)}</span>`;
+        html += `</div>`;
+        html += `<div class="summary-item">`;
+        html += `<span class="summary-label">本期调仓日期</span>`;
+        html += `<span class="summary-value"><strong>${formatDate(change.date)}</strong></span>`;
+        html += `</div>`;
+        html += `</div>`;
+        
+        // 添加可视化对比图
+        html += `<div class="change-visualization">`;
+        html += `<div class="viz-row">`;
+        html += `<div class="viz-item">`;
+        html += `<div class="viz-label">上期成分股</div>`;
+        html += `<div class="viz-bar prev-bar" style="width: ${Math.min(100, change.prevTotalStocks * 2)}px;">`;
+        html += `<span class="viz-count">${change.prevTotalStocks}只</span>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div class="viz-item">`;
+        html += `<div class="viz-label">本期成分股</div>`;
+        html += `<div class="viz-bar current-bar" style="width: ${Math.min(100, change.totalStocks * 2)}px;">`;
+        html += `<span class="viz-count">${change.totalStocks}只</span>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        
+        // 添加变化统计
+        html += `<div class="change-stats">`;
+        html += `<div class="stat-item stat-added">`;
+        html += `<div class="stat-icon">➕</div>`;
+        html += `<div class="stat-content">`;
+        html += `<div class="stat-label">新增</div>`;
+        html += `<div class="stat-value">${change.addedCount}只</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div class="stat-item stat-removed">`;
+        html += `<div class="stat-icon">➖</div>`;
+        html += `<div class="stat-content">`;
+        html += `<div class="stat-label">移除</div>`;
+        html += `<div class="stat-value">${change.removedCount}只</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `<div class="stat-item stat-unchanged">`;
+        html += `<div class="stat-icon">✓</div>`;
+        html += `<div class="stat-content">`;
+        html += `<div class="stat-label">保持</div>`;
+        html += `<div class="stat-value">${change.prevTotalStocks - change.removedCount}只</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        html += `</div>`;
+        
+        // 详细变化列表
+        if (change.addedCount > 0) {
+            html += `<div class="change-section">`;
+            html += `<h5 style="color: #28a745;">➕ 新增成分股 (${change.addedCount} 只)</h5>`;
+            html += `<div class="stock-list">`;
+            change.added.forEach(code => {
+                html += `<span class="stock-tag added">${code}</span>`;
+            });
+            html += `</div></div>`;
+        }
+        
+        if (change.removedCount > 0) {
+            html += `<div class="change-section">`;
+            html += `<h5 style="color: #dc3545;">➖ 移除成分股 (${change.removedCount} 只)</h5>`;
+            html += `<div class="stock-list">`;
+            change.removed.forEach(code => {
+                html += `<span class="stock-tag removed">${code}</span>`;
+            });
+            html += `</div></div>`;
+        }
+    }
+    
+    html += '</div>';
+    changeContainer.innerHTML = html;
 }
 
 function displayConstituents(data) {

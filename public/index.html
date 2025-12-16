@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>红利低波ETF(512890) 持仓复制分析系统</title>
+    <title>中证红利低波100指数回测系统</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🎯 红利低波ETF(512890) 持仓复制分析系统 v2.0</h1>
-            <p class="subtitle">支持多报告期分析 | 综合得分策略 | 可配置权重</p>
+            <h1>🎯 中证红利低波100指数回测系统</h1>
+            <p class="subtitle">基于真实调仓日期 | 智能识别成分股变化 | 多策略对比分析</p>
+            <div style="margin-top: 10px;">
+                <a href="about.html" class="btn-secondary" style="display: inline-block;">📖 查看详细说明</a>
+            </div>
         </header>
 
         <div id="loading" class="loading">
@@ -49,10 +52,10 @@
                 <div class="info-note" style="margin-bottom: 15px;">
                     <strong>📌 说明：</strong>
                     <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li>回测将使用h30269.CSI指数在指定时间范围内的所有调仓日期</li>
-                        <li>如果不选择日期，将使用指数的全部历史数据</li>
-                        <li>开始日期：从该日期之后的第一个调仓日开始回测</li>
-                        <li>结束日期：到该日期之前的最后一个调仓日结束回测</li>
+                        <li>系统自动识别真正的调仓日期（成分股发生变化的日期）</li>
+                        <li>从120个交易日中识别出11次真正的调仓（每年12月调整）</li>
+                        <li>留空则使用全部调仓日期进行回测</li>
+                        <li><a href="about.html" style="color: #0066cc;">查看详细说明 →</a></li>
                     </ul>
                 </div>
                 <div class="date-range-selector">
@@ -161,135 +164,9 @@
         <section id="chartsSection" class="card" style="display: none;">
             <h2>收益对比曲线</h2>
             
-            <!-- 业务逻辑说明（可折叠） -->
-            <details class="logic-explanation" open>
-                <summary>📖 回测逻辑说明</summary>
-                <div class="logic-content">
-                    <div class="logic-section">
-                        <h4>📊 数据来源</h4>
-                        <div class="logic-item">
-                            <strong>指数成分股：</strong>使用h30269.CSI（中证红利低波100指数）的成分股和权重数据
-                            <ul>
-                                <li>数据来源：Tushare API的index_weight接口</li>
-                                <li>包含字段：成分股代码（con_code）、权重（weight）、调仓日期（trade_date）</li>
-                            </ul>
-                        </div>
-                        <div class="logic-item">
-                            <strong>调仓时机：</strong>按照指数的实际调仓日期进行调仓
-                            <ul>
-                                <li>调仓日期来自Tushare API返回的trade_date字段</li>
-                                <li>不是固定的季度调仓，而是指数实际调整成分股的日期</li>
-                            </ul>
-                        </div>
-                    </div>
-                    
-                    <div class="logic-section">
-                        <h4>⏱️ 回测时间范围</h4>
-                        <div class="logic-item">
-                            <strong>时间选择：</strong>用户可以自由选择回测的开始和结束日期
-                            <ul>
-                                <li><strong>留空开始日期：</strong>从指数最早的调仓日开始</li>
-                                <li><strong>留空结束日期：</strong>到指数最新的调仓日结束</li>
-                                <li><strong>指定日期范围：</strong>只使用该范围内的调仓日期</li>
-                            </ul>
-                        </div>
-                        <div class="logic-item">
-                            <strong>持有时间段：</strong>
-                            <ul>
-                                <li><strong>持有起始日：</strong>调仓日当天建仓（使用收盘价）</li>
-                                <li><strong>持有结束日：</strong>下一个调仓日（或回测结束日期）</li>
-                            </ul>
-                            <div class="example-box">
-                                <strong>示例：</strong><br>
-                                调仓日 20230630 → 持有起始日 20230630<br>
-                                下一个调仓日 20230930 → 持有结束日 20230930<br>
-                                <span class="highlight">→ 持有时间段：2023-06-30 至 2023-09-30</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="logic-section">
-                        <h4>📊 策略对比方式</h4>
-                        <div class="logic-item">
-                            <strong>成分股来源：</strong>三种策略使用<strong>完全相同的成分股</strong>（都来自h30269.CSI指数）
-                        </div>
-                        <div class="logic-item">
-                            <strong>权重差异：</strong>
-                            <table class="logic-table">
-                                <tr>
-                                    <th>策略类型</th>
-                                    <th>权重来源</th>
-                                    <th>计算方式</th>
-                                </tr>
-                                <tr>
-                                    <td><strong>h30269.CSI指数</strong></td>
-                                    <td>指数原始权重</td>
-                                    <td>使用index_weight接口返回的weight字段<br>完全复制指数配置</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>自定义策略</strong></td>
-                                    <td>用户配置的策略</td>
-                                    <td><strong>市值加权：</strong>按市值比例分配<br><strong>综合得分：</strong>按归一化因子值加权<br>应用单只股票最大权重限制（默认10%）</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>512890.SH基金净值</strong></td>
-                                    <td>基金实际净值</td>
-                                    <td>使用fund_nav接口返回的单位净值<br>包含交易成本和管理费</td>
-                                </tr>
-                            </table>
-                        </div>
-                        <div class="logic-item">
-                            <strong>期间收益率：</strong>持有起始日到持有结束日的单期收益率
-                        </div>
-                        <div class="logic-item">
-                            <strong>累计收益率：</strong>从第一个调仓期开始，使用复利公式累加
-                            <div class="formula-box">
-                                第一个调仓期累计收益率 = 0%（建仓基点）<br>
-                                后续调仓期累计收益率 = (1 + 上期累计收益率) × (1 + 本期期间收益率) - 1<br>
-                                跟踪误差 = 自定义策略累计收益率 - 指数累计收益率
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="logic-section">
-                        <h4>🔍 数据过滤</h4>
-                        <div class="logic-item">
-                            <strong>自动过滤：</strong>
-                            <ul>
-                                <li>过滤无市值数据的股票（通常是新股，上市时间晚于调仓日）</li>
-                                <li>过滤后的股票权重会重新归一化到100%</li>
-                            </ul>
-                        </div>
-                    </div>
-                    
-                    <div class="logic-section">
-                        <h4>💰 交易成本</h4>
-                        <div class="logic-item">
-                            当前回测<strong>不考虑</strong>交易成本和印花税，实际收益会略低于回测结果。
-                        </div>
-                    </div>
-                    
-                    <div class="logic-section">
-                        <h4>💡 其他说明</h4>
-                        <div class="logic-item">
-                            <ul>
-                                <li><strong>前复权价格：</strong>股票收益率采用前复权价格计算，自动处理分红、配股等因素</li>
-                                <li><strong>横轴说明：</strong>横坐标为每个报告期的持有结束日期（即下一期披露日）</li>
-                                <li><strong>纵轴说明：</strong>纵坐标为从第一个报告期开始的累计收益率</li>
-                                <li><strong>基金净值：</strong>仅作参考对比，不影响策略收益率计算</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </details>
-            
-            <div class="info-note" style="margin-top: 15px;">
-                <strong>🔄 调仓时点：</strong>按照h30269.CSI指数的实际调仓日期进行调仓，使用调仓日收盘价买入/卖出。<br>
-                <strong>📈 指数策略：</strong>使用h30269.CSI指数的<strong>成分股和原始权重</strong>，完全复制指数配置。<br>
-                <strong>🎯 自定义策略：</strong>使用h30269.CSI指数的<strong>成分股</strong>，但按用户配置的策略（市值加权/综合得分）<strong>重新计算权重</strong>。<br>
-                <strong>📊 512890.SH基金净值：</strong>作为参考基准，反映红利低波ETF的实际表现（包含交易成本和管理费）。<br>
-                <strong>🔍 数据过滤：</strong>自动过滤无市值数据的股票（通常是新股），过滤后的股票权重会重新归一化到100%。<br>
-                <strong>💰 交易成本：</strong>当前回测<strong>不考虑</strong>交易成本和印花税，实际收益会略低于回测结果。
+            <div class="info-note">
+                <strong>💡 提示：</strong>图表展示三种策略的累计收益率对比。
+                <a href="about.html" style="color: #0066cc; margin-left: 10px;">📖 查看详细回测逻辑说明 →</a>
             </div>
 
             <div class="chart-container">
@@ -318,6 +195,26 @@
                 <div>
                     <h3 style="color: #06D6A0;">跟踪误差</h3>
                     <div id="trackingErrorMetrics" class="risk-metrics-container"></div>
+                </div>
+            </div>
+            
+            <!-- 风险收益指标对比表格 -->
+            <div id="comparisonTable" style="margin-top: 30px; display: none;">
+                <h3 style="margin-bottom: 20px;">二、风险收益指标对比（2015-2025）</h3>
+                <div class="comparison-table-container">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th class="metric-name">指标</th>
+                                <th class="strategy-col">自定义策略</th>
+                                <th class="index-col">h30269.CSI</th>
+                                <th class="analysis-col">差异解析</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonTableBody">
+                            <!-- 动态生成 -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -389,6 +286,7 @@
             <div class="info-note" id="holdingsNote">
                 <strong>💡 提示：</strong>左侧为h30269.CSI指数持仓（原始权重），右侧为自定义策略持仓（调整后权重）。
             </div>
+            
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
                     <h3 style="color: #F18F01;" id="indexHoldingsTitle">h30269.CSI指数持仓</h3>
@@ -452,6 +350,9 @@
                         </div>
                         <button id="queryConstituents" class="btn-primary" style="margin-left: 10px;">查询成分股</button>
                     </div>
+                    
+                    <!-- 调仓变化对比信息 -->
+                    <div id="constituentsRebalanceChange" style="display: none; margin-top: 20px;"></div>
                     
                     <div id="constituentsResult" style="display: none; margin-top: 20px;">
                         <h3 style="color: #2E86AB;">成分股列表</h3>
