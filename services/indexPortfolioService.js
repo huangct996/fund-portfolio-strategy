@@ -672,15 +672,12 @@ class IndexPortfolioService {
     const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
     const volatility = Math.sqrt(variance);
     
-    // 计算累计收益率
-    const totalReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
-    
-    // 根据实际调仓期数计算每年调仓频率
-    // periods是调仓期数组，计算总天数和调仓次数来推算年化频率
-    let periodsPerYear = 1; // 默认年度调仓
+    // 计算实际时间跨度（年数）
+    let actualYears = 1; // 默认1年
+    let periodsPerYear = 1; // 默认年度调仓（用于波动率年化）
     
     if (periods && periods.length > 1) {
-      // 计算平均调仓间隔（天数）
+      // 计算实际时间跨度
       const firstDate = new Date(
         periods[0].rebalanceDate.substring(0, 4),
         parseInt(periods[0].rebalanceDate.substring(4, 6)) - 1,
@@ -692,24 +689,21 @@ class IndexPortfolioService {
         periods[periods.length - 1].rebalanceDate.substring(6, 8)
       );
       const totalDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+      actualYears = totalDays / 365;
+      
+      // 计算平均调仓频率（用于波动率年化）
       const avgDaysPerPeriod = totalDays / (periods.length - 1);
-      
-      // 根据平均间隔推算年化频率
       periodsPerYear = Math.round(365 / avgDaysPerPeriod);
-      
-      // 限制在合理范围内（1-12次/年）
       periodsPerYear = Math.max(1, Math.min(12, periodsPerYear));
       
-      console.log(`  📊 年化频率计算: ${periods.length}个调仓期, 平均间隔${avgDaysPerPeriod.toFixed(0)}天, 年化频率=${periodsPerYear}次/年`);
+      console.log(`  📊 时间跨度: ${periods.length}个调仓期, 实际${actualYears.toFixed(2)}年, 平均间隔${avgDaysPerPeriod.toFixed(0)}天, 年化频率=${periodsPerYear}次/年`);
     }
     
-    // 使用几何平均收益率进行年化（复利计算）
-    const geometricMean = Math.pow(
-      returns.reduce((prod, r) => prod * (1 + r), 1),
-      1 / returns.length
-    ) - 1;
-    const annualizedReturn = Math.pow(1 + geometricMean, periodsPerYear) - 1;
+    // 计算累计收益率和年化收益率
+    const totalReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
+    const annualizedReturn = Math.pow(1 + totalReturn, 1 / actualYears) - 1;
     
+    // 波动率年化使用调仓频率
     const annualizedVolatility = volatility * Math.sqrt(periodsPerYear);
     
     // 夏普比率（假设无风险利率3%）
@@ -721,8 +715,8 @@ class IndexPortfolioService {
     console.log(`  📈 风险指标详情:`);
     console.log(`     期间平均收益率: ${(avgReturn * 100).toFixed(2)}%`);
     console.log(`     期间波动率: ${(volatility * 100).toFixed(2)}%`);
-    console.log(`     几何平均收益率: ${(geometricMean * 100).toFixed(2)}%`);
-    console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}%`);
+    console.log(`     累计收益率: ${(totalReturn * 100).toFixed(2)}%`);
+    console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}% (基于${actualYears.toFixed(2)}年)`);
     console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}%`);
     console.log(`     夏普比率: ${sharpeRatio.toFixed(2)}`);
     
