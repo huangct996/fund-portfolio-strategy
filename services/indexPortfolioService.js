@@ -835,12 +835,23 @@ class IndexPortfolioService {
       
       // 计算日收益率（使用后复权价格）
       const returns = [];
+      let validCount = 0;
+      let invalidCount = 0;
+      
       for (let i = 1; i < dailyData.length; i++) {
-        const prevClose = dailyData[i - 1].adj_close || dailyData[i - 1].close;
-        const currClose = dailyData[i].adj_close || dailyData[i].close;
-        if (prevClose > 0) {
+        const prevClose = dailyData[i - 1].adj_close || dailyData[i - 1].close_price || dailyData[i - 1].close;
+        const currClose = dailyData[i].adj_close || dailyData[i].close_price || dailyData[i].close;
+        
+        if (prevClose > 0 && currClose > 0) {
           returns.push((currClose - prevClose) / prevClose);
+          validCount++;
+        } else {
+          invalidCount++;
         }
+      }
+      
+      if (invalidCount > 0) {
+        console.log(`  ⚠️ ${tsCode}: ${invalidCount}条无效数据（价格<=0），有效数据${validCount}条`);
       }
       
       return returns;
