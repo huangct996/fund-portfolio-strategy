@@ -328,14 +328,7 @@ function setupConfigPanel() {
         });
     }
     
-    const riskFreeRateSlider = document.getElementById('riskFreeRateSlider');
-    const riskFreeRateValue = document.getElementById('riskFreeRateValue');
-    if (riskFreeRateSlider) {
-        riskFreeRateSlider.addEventListener('input', (e) => {
-            const value = parseInt(e.target.value) / 10;
-            riskFreeRateValue.textContent = value.toFixed(1) + '%';
-        });
-    }
+    // 无风险收益率输入框不需要事件处理，直接读取值即可
     
     // 应用配置按钮
     document.getElementById('applyConfig').addEventListener('click', applyConfiguration);
@@ -421,7 +414,7 @@ async function applyConfiguration() {
             tradingCostRate: document.getElementById('enableTradingCost').checked 
                 ? parseInt(document.getElementById('tradingCostSlider').value) / 10000 
                 : 0,
-            riskFreeRate: parseInt(document.getElementById('riskFreeRateSlider').value) / 1000
+            riskFreeRate: parseFloat(document.getElementById('riskFreeRateInput').value) / 100
         };
     }
     
