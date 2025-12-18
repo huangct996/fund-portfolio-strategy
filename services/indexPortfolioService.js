@@ -162,9 +162,10 @@ class IndexPortfolioService {
     console.log('有负收益的期数 - 自定义:', customReturns.filter(r => r < 0).length);
     console.log('有负收益的期数 - 指数:', indexReturns.filter(r => r < 0).length);
 
-    const customRisk = this.calculateRiskMetrics(customReturns, results.length);
-    const indexRisk = this.calculateRiskMetrics(indexReturns, results.length);
-    const fundRisk = this.calculateRiskMetrics(fundReturns, results.length);
+    // 传入完整的调仓期数组，用于计算年化频率
+    const customRisk = this.calculateRiskMetrics(customReturns, results);
+    const indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance));
+    const fundRisk = this.calculateRiskMetrics(fundReturns, results);
     
     console.log('\n风险指标计算结果:');
     console.log('自定义策略 - 最大回撤:', (customRisk.maxDrawdown * 100).toFixed(2) + '%');
@@ -698,6 +699,8 @@ class IndexPortfolioService {
       
       // 限制在合理范围内（1-12次/年）
       periodsPerYear = Math.max(1, Math.min(12, periodsPerYear));
+      
+      console.log(`  📊 年化频率计算: ${periods.length}个调仓期, 平均间隔${avgDaysPerPeriod.toFixed(0)}天, 年化频率=${periodsPerYear}次/年`);
     }
     
     // 使用几何平均收益率进行年化（复利计算）

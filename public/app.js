@@ -473,7 +473,7 @@ async function displayHoldingsTable(data) {
         changesMap[change.date] = change;
     });
     
-    // 填充调仓期选择下拉框（只显示有调仓变化的期数，即自定义策略的调仓期）
+    // 填充调仓期选择下拉框（显示策略的所有调仓期）
     const periodSelect = document.getElementById('holdingsPeriodSelect');
     if (!periodSelect) {
         console.error('找不到holdingsPeriodSelect元素');
@@ -482,30 +482,29 @@ async function displayHoldingsTable(data) {
     
     periodSelect.innerHTML = '';
     
-    // 只显示有调仓变化的期数（自定义策略的调仓期）
-    const rebalancePeriods = data.filter((period, index) => {
-        const date = period.rebalanceDate || period.reportDate;
-        return changesMap[date]; // 只保留有调仓变化的期数
-    });
-    
-    rebalancePeriods.forEach((period, displayIndex) => {
+    // 显示所有调仓期（data已经是策略的实际调仓期）
+    data.forEach((period, index) => {
         const option = document.createElement('option');
-        // 使用原始索引作为value，以便正确获取数据
-        const originalIndex = data.indexOf(period);
-        option.value = originalIndex;
+        option.value = index;
         
         const date = period.rebalanceDate || period.reportDate;
         const dateFormatted = formatDate(date);
         
-        // 查找该日期的调仓变化
+        // 查找该日期的调仓变化（如果有）
         const change = changesMap[date];
-        if (change.isInitial) {
-            option.textContent = `${dateFormatted} [初始调仓: ${change.totalStocks}只]`;
+        if (change) {
+            if (change.isInitial) {
+                option.textContent = `${dateFormatted} [初始调仓: ${change.totalStocks}只]`;
+            } else {
+                const changeInfo = [];
+                if (change.addedCount > 0) changeInfo.push(`+${change.addedCount}`);
+                if (change.removedCount > 0) changeInfo.push(`-${change.removedCount}`);
+                option.textContent = `${dateFormatted} [${changeInfo.join(' ')}只]`;
+            }
         } else {
-            const changeInfo = [];
-            if (change.addedCount > 0) changeInfo.push(`+${change.addedCount}`);
-            if (change.removedCount > 0) changeInfo.push(`-${change.removedCount}`);
-            option.textContent = `${dateFormatted} [${changeInfo.join(' ')}只]`;
+            // 没有调仓变化数据时，只显示日期和持仓数
+            const stockCount = period.holdings ? period.holdings.length : 0;
+            option.textContent = `${dateFormatted} [${stockCount}只]`;
         }
         
         periodSelect.appendChild(option);
