@@ -818,7 +818,12 @@ class IndexPortfolioService {
       // 该方法会先从数据库查询，没有则从 Tushare 同步
       // 传入期望的最小数据量：每月约20个交易日，乘以窗口月数，再打8折作为阈值
       const expectedMinRecords = Math.floor(windowMonths * 20 * 0.8);
+      
+      console.log(`  🔍 获取 ${tsCode} 历史数据: ${startDate}-${endDate}, 窗口=${windowMonths}月, 期望≥${expectedMinRecords}条`);
+      
       const dailyData = await tushareService.getStockDailyWithCache(tsCode, startDate, endDate, expectedMinRecords);
+      
+      console.log(`  📊 ${tsCode} 实际获取: ${dailyData ? dailyData.length : 0}条记录`);
       
       if (!dailyData || dailyData.length < 2) {
         console.log(`  ⚠️ ${tsCode}: 数据不足，获取到${dailyData ? dailyData.length : 0}条记录`);
