@@ -77,7 +77,8 @@ class IndexPortfolioService {
       );
       console.log(`🔄 生成高频调仓日期: ${originalDates.length} → ${rebalanceDates.length} 个`);
       console.log(`   自定义策略: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}调仓`);
-      console.log(`   指数策略: 年度调仓（保持不变）\n`);
+      console.log(`   指数策略: 年度调仓（保持不变）`);
+      console.log(`   年度调仓日期: ${yearlyRebalanceDates.join(', ')}\n`);
     }
 
     const results = [];
@@ -125,6 +126,7 @@ class IndexPortfolioService {
         // 3. 计算三种策略的收益率
         // 判断当前日期是否是年度调仓日（指数策略只在年度调仓）
         const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
+        console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
         
         const periodResult = await this.calculatePeriodReturns(
           indexWeights,
@@ -1132,32 +1134,41 @@ class IndexPortfolioService {
     const newDates = [];
     const monthsToAdd = frequency === 'quarterly' ? 3 : 1;
     
-    // 获取起始和结束日期
-    const firstDate = baseRebalanceDates[0];
-    const lastDate = baseRebalanceDates[baseRebalanceDates.length - 1];
-    
-    const startDateObj = new Date(
-      firstDate.substring(0, 4),
-      parseInt(firstDate.substring(4, 6)) - 1,
-      firstDate.substring(6, 8)
-    );
-    
-    const endDateObj = new Date(
-      lastDate.substring(0, 4),
-      parseInt(lastDate.substring(4, 6)) - 1,
-      lastDate.substring(6, 8)
-    );
-    
-    // 从起始日期开始，每隔指定月份生成一个调仓日期
-    let currentDate = new Date(startDateObj);
-    
-    while (currentDate <= endDateObj) {
-      const dateStr = currentDate.getFullYear() + 
-        String(currentDate.getMonth() + 1).padStart(2, '0') + 
-        String(currentDate.getDate()).padStart(2, '0');
-      newDates.push(dateStr);
+    // 遍历每两个年度调仓日期之间，插入高频调仓日期
+    for (let i = 0; i < baseRebalanceDates.length - 1; i++) {
+      const startDate = baseRebalanceDates[i];
+      const endDate = baseRebalanceDates[i + 1];
+      
+      // 添加起始年度调仓日期
+      newDates.push(startDate);
+      
+      const startDateObj = new Date(
+        startDate.substring(0, 4),
+        parseInt(startDate.substring(4, 6)) - 1,
+        startDate.substring(6, 8)
+      );
+      
+      const endDateObj = new Date(
+        endDate.substring(0, 4),
+        parseInt(endDate.substring(4, 6)) - 1,
+        endDate.substring(6, 8)
+      );
+      
+      // 在两个年度调仓日期之间插入高频调仓日期
+      let currentDate = new Date(startDateObj);
       currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+      
+      while (currentDate < endDateObj) {
+        const dateStr = currentDate.getFullYear() + 
+          String(currentDate.getMonth() + 1).padStart(2, '0') + 
+          String(currentDate.getDate()).padStart(2, '0');
+        newDates.push(dateStr);
+        currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+      }
     }
+    
+    // 添加最后一个年度调仓日期
+    newDates.push(baseRebalanceDates[baseRebalanceDates.length - 1]);
     
     console.log(`   生成调仓日期详情: ${newDates.join(', ')}`);
     
