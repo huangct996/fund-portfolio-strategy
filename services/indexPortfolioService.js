@@ -718,6 +718,14 @@ class IndexPortfolioService {
       ? (annualizedReturn - riskFreeRate) / annualizedVolatility 
       : 0;
     
+    console.log(`  📈 风险指标详情:`);
+    console.log(`     期间平均收益率: ${(avgReturn * 100).toFixed(2)}%`);
+    console.log(`     期间波动率: ${(volatility * 100).toFixed(2)}%`);
+    console.log(`     几何平均收益率: ${(geometricMean * 100).toFixed(2)}%`);
+    console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}%`);
+    console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}%`);
+    console.log(`     夏普比率: ${sharpeRatio.toFixed(2)}`);
+    
     // 索提诺比率（只考虑下行波动）
     const downReturns = returns.filter(r => r < 0);
     let sortinoRatio = 0;
