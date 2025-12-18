@@ -1108,42 +1108,41 @@ class IndexPortfolioService {
       return baseRebalanceDates;
     }
     
-    const newDates = [];
-    
-    for (let i = 0; i < baseRebalanceDates.length - 1; i++) {
-      const startDate = baseRebalanceDates[i];
-      const endDate = baseRebalanceDates[i + 1];
-      
-      newDates.push(startDate);
-      
-      const startDateObj = new Date(
-        startDate.substring(0, 4),
-        parseInt(startDate.substring(4, 6)) - 1,
-        startDate.substring(6, 8)
-      );
-      
-      const endDateObj = new Date(
-        endDate.substring(0, 4),
-        parseInt(endDate.substring(4, 6)) - 1,
-        endDate.substring(6, 8)
-      );
-      
-      const monthsToAdd = frequency === 'quarterly' ? 3 : 1;
-      
-      let currentDate = new Date(startDateObj);
-      currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
-      
-      while (currentDate < endDateObj) {
-        const dateStr = currentDate.getFullYear() + 
-          String(currentDate.getMonth() + 1).padStart(2, '0') + 
-          String(currentDate.getDate()).padStart(2, '0');
-        newDates.push(dateStr);
-        currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
-      }
+    if (baseRebalanceDates.length === 0) {
+      return [];
     }
     
-    // 添加最后一个日期
-    newDates.push(baseRebalanceDates[baseRebalanceDates.length - 1]);
+    const newDates = [];
+    const monthsToAdd = frequency === 'quarterly' ? 3 : 1;
+    
+    // 获取起始和结束日期
+    const firstDate = baseRebalanceDates[0];
+    const lastDate = baseRebalanceDates[baseRebalanceDates.length - 1];
+    
+    const startDateObj = new Date(
+      firstDate.substring(0, 4),
+      parseInt(firstDate.substring(4, 6)) - 1,
+      firstDate.substring(6, 8)
+    );
+    
+    const endDateObj = new Date(
+      lastDate.substring(0, 4),
+      parseInt(lastDate.substring(4, 6)) - 1,
+      lastDate.substring(6, 8)
+    );
+    
+    // 从起始日期开始，每隔指定月份生成一个调仓日期
+    let currentDate = new Date(startDateObj);
+    
+    while (currentDate <= endDateObj) {
+      const dateStr = currentDate.getFullYear() + 
+        String(currentDate.getMonth() + 1).padStart(2, '0') + 
+        String(currentDate.getDate()).padStart(2, '0');
+      newDates.push(dateStr);
+      currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+    }
+    
+    console.log(`   生成调仓日期详情: ${newDates.join(', ')}`);
     
     return newDates;
   }
