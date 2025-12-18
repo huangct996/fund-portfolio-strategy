@@ -325,7 +325,13 @@ class IndexPortfolioService {
     console.log('指数策略 - 最大回撤:', (indexRisk.maxDrawdown * 100).toFixed(2) + '%');
 
     // 6. 计算跟踪误差
+    console.log(`\n计算跟踪误差 - 自定义策略收益率数量: ${customReturns.length}, 指数收益率数量: ${indexReturns.length}`);
     const trackingError = this.calculateTrackingError(customReturns, indexReturns);
+    if (trackingError) {
+      console.log(`✅ 跟踪误差: ${(trackingError.trackingError * 100).toFixed(2)}%, 平均偏离: ${(trackingError.avgDifference * 100).toFixed(2)}%`);
+    } else {
+      console.warn('⚠️ 跟踪误差计算失败（数组长度不匹配或数据不足）');
+    }
 
     console.log(`\n${'='.repeat(60)}`);
     console.log(`回测完成`);
