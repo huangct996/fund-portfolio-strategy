@@ -844,6 +844,10 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
     
     indexMetrics.innerHTML = `
         <div class="risk-item">
+            <span class="risk-label">累计收益率:</span>
+            <span class="risk-value">${(indexRisk.totalReturn * 100).toFixed(2)}%</span>
+        </div>
+        <div class="risk-item">
             <span class="risk-label">年化收益率:</span>
             <span class="risk-value">${(indexRisk.annualizedReturn * 100).toFixed(2)}%</span>
         </div>
@@ -859,12 +863,10 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
             <span class="risk-label">夏普比率:</span>
             <span class="risk-value">${indexRisk.sharpeRatio ? indexRisk.sharpeRatio.toFixed(2) : '-'}</span>
         </div>
-        ${indexRisk.sortinoRatio ? `
         <div class="risk-item">
             <span class="risk-label">索提诺比率:</span>
-            <span class="risk-value">${indexRisk.sortinoRatio.toFixed(2)}</span>
+            <span class="risk-value">${indexRisk.sortinoRatio ? indexRisk.sortinoRatio.toFixed(2) : '-'}</span>
         </div>
-        ` : ''}
     `;
     
     // 显示跟踪误差
