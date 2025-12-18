@@ -156,6 +156,7 @@ async function fetchAllReturns(config) {
             params.append('rebalanceFrequency', config.riskParityParams.rebalanceFrequency);
             params.append('enableTradingCost', config.riskParityParams.enableTradingCost);
             params.append('tradingCostRate', config.riskParityParams.tradingCostRate);
+            params.append('riskFreeRate', config.riskParityParams.riskFreeRate || 0.02);
         }
     } else if (config.useCompositeScore) {
         // 综合得分策略参数
@@ -327,6 +328,15 @@ function setupConfigPanel() {
         });
     }
     
+    const riskFreeRateSlider = document.getElementById('riskFreeRateSlider');
+    const riskFreeRateValue = document.getElementById('riskFreeRateValue');
+    if (riskFreeRateSlider) {
+        riskFreeRateSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value) / 10;
+            riskFreeRateValue.textContent = value.toFixed(1) + '%';
+        });
+    }
+    
     // 应用配置按钮
     document.getElementById('applyConfig').addEventListener('click', applyConfiguration);
     
@@ -410,7 +420,8 @@ async function applyConfiguration() {
             enableTradingCost: document.getElementById('enableTradingCost').checked,
             tradingCostRate: document.getElementById('enableTradingCost').checked 
                 ? parseInt(document.getElementById('tradingCostSlider').value) / 10000 
-                : 0
+                : 0,
+            riskFreeRate: parseInt(document.getElementById('riskFreeRateSlider').value) / 1000
         };
     }
     

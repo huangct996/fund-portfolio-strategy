@@ -163,9 +163,14 @@ class IndexPortfolioService {
     console.log('有负收益的期数 - 指数:', indexReturns.filter(r => r < 0).length);
 
     // 传入完整的调仓期数组，用于计算年化频率
-    const customRisk = this.calculateRiskMetrics(customReturns, results);
-    const indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance));
-    const fundRisk = this.calculateRiskMetrics(fundReturns, results);
+    // 从配置中获取无风险收益率，默认2%
+    const riskFreeRate = (useRiskParity && riskParityParams && riskParityParams.riskFreeRate) 
+      ? riskParityParams.riskFreeRate 
+      : 0.02;
+    
+    const customRisk = this.calculateRiskMetrics(customReturns, results, riskFreeRate);
+    const indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
+    const fundRisk = this.calculateRiskMetrics(fundReturns, results, riskFreeRate);
     
     console.log('\n风险指标计算结果:');
     console.log('自定义策略 - 最大回撤:', (customRisk.maxDrawdown * 100).toFixed(2) + '%');
@@ -665,7 +670,7 @@ class IndexPortfolioService {
   /**
    * 计算风险指标
    */
-  calculateRiskMetrics(returns, periods) {
+  calculateRiskMetrics(returns, periods, riskFreeRate = 0.02) {
     if (!returns || returns.length === 0) return null;
 
     const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
@@ -706,8 +711,7 @@ class IndexPortfolioService {
     // 波动率年化使用调仓频率
     const annualizedVolatility = volatility * Math.sqrt(periodsPerYear);
     
-    // 夏普比率（假设无风险利率3%）
-    const riskFreeRate = 0.03;
+    // 夏普比率（使用可配置的无风险利率）
     const sharpeRatio = annualizedVolatility > 0 
       ? (annualizedReturn - riskFreeRate) / annualizedVolatility 
       : 0;
@@ -718,6 +722,7 @@ class IndexPortfolioService {
     console.log(`     累计收益率: ${(totalReturn * 100).toFixed(2)}%`);
     console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}% (基于${actualYears.toFixed(2)}年)`);
     console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}%`);
+    console.log(`     无风险收益率: ${(riskFreeRate * 100).toFixed(2)}%`);
     console.log(`     夏普比率: ${sharpeRatio.toFixed(2)}`);
     
     // 索提诺比率（只考虑下行波动）

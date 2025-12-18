@@ -73,7 +73,8 @@ router.get('/index-returns', async (req, res) => {
       ewmaDecay,
       rebalanceFrequency,
       enableTradingCost,
-      tradingCostRate
+      tradingCostRate,
+      riskFreeRate
     } = req.query;
     
     // 使用用户配置的maxWeight，如果没有则使用环境变量的默认值
@@ -104,7 +105,8 @@ router.get('/index-returns', async (req, res) => {
         ewmaDecay: parseFloat(ewmaDecay) || 0.94,
         rebalanceFrequency: rebalanceFrequency || 'yearly',
         enableTradingCost: enableTradingCost === 'true',
-        tradingCostRate: parseFloat(tradingCostRate) || 0
+        tradingCostRate: parseFloat(tradingCostRate) || 0,
+        riskFreeRate: parseFloat(riskFreeRate) || 0.02
       };
     } else if (strategyType === 'composite') {
       // 综合得分策略
