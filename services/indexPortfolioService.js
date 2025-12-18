@@ -90,34 +90,45 @@ class IndexPortfolioService {
       console.log(`在用户选择的开始日期建仓: ${startDate}`);
       console.log(`${'='.repeat(60)}`);
       
-      // 使用第一个调仓日期的成分股数据
-      const firstRebalanceDate = rebalanceDates[0];
-      const indexWeights = await tushareService.getIndexWeightByDate(indexCode, firstRebalanceDate);
+      // 查找最近的历史年度调仓日期（在开始日期之前）
+      const allYearlyDates = await tushareService.getIndexWeightDates(indexCode);
+      const historicalYearlyDate = allYearlyDates
+        .filter(d => d < startDate)
+        .sort((a, b) => b.localeCompare(a))[0];
       
-      if (indexWeights && indexWeights.length > 0) {
-        const periodResult = await this.calculatePeriodReturns(
-          indexWeights,
-          startDate,
-          firstRebalanceDate,
-          fundCode,
-          config,
-          null,
-          true  // 视为年度调仓
-        );
+      if (historicalYearlyDate) {
+        console.log(`   使用最近的历史年度调仓日期: ${historicalYearlyDate}`);
+        const indexWeights = await tushareService.getIndexWeightByDate(indexCode, historicalYearlyDate);
         
-        if (periodResult) {
-          results.push({
-            rebalanceDate: startDate,
-            startDate: startDate,
-            endDate: firstRebalanceDate,
-            isStartDate: true,  // 标记为开始日期
-            ...periodResult
-          });
+        if (indexWeights && indexWeights.length > 0) {
+          const firstRebalanceDate = rebalanceDates[0];
+          const periodResult = await this.calculatePeriodReturns(
+            indexWeights,
+            startDate,
+            firstRebalanceDate,
+            fundCode,
+            config,
+            null,
+            true  // 视为年度调仓
+          );
           
-          if (periodResult.currentWeights) {
-            previousWeights = periodResult.currentWeights;
+          if (periodResult) {
+            results.push({
+              rebalanceDate: startDate,
+              startDate: startDate,
+              endDate: firstRebalanceDate,
+              isStartDate: true,  // 标记为开始日期
+              historicalRebalanceDate: historicalYearlyDate,  // 记录使用的历史调仓日期
+              ...periodResult
+            });
+            
+            if (periodResult.currentWeights) {
+              previousWeights = periodResult.currentWeights;
+            }
           }
         }
+      } else {
+        console.warn(`⚠️  未找到开始日期 ${startDate} 之前的历史年度调仓日期`);
       }
     }
     
