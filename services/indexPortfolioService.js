@@ -674,8 +674,31 @@ class IndexPortfolioService {
     // 计算累计收益率
     const totalReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
     
-    // 年化收益率和波动率（实际调仓频率约为每年1次）
-    const periodsPerYear = 1;
+    // 根据实际调仓期数计算每年调仓频率
+    // periods是调仓期数组，计算总天数和调仓次数来推算年化频率
+    let periodsPerYear = 1; // 默认年度调仓
+    
+    if (periods && periods.length > 1) {
+      // 计算平均调仓间隔（天数）
+      const firstDate = new Date(
+        periods[0].rebalanceDate.substring(0, 4),
+        parseInt(periods[0].rebalanceDate.substring(4, 6)) - 1,
+        periods[0].rebalanceDate.substring(6, 8)
+      );
+      const lastDate = new Date(
+        periods[periods.length - 1].rebalanceDate.substring(0, 4),
+        parseInt(periods[periods.length - 1].rebalanceDate.substring(4, 6)) - 1,
+        periods[periods.length - 1].rebalanceDate.substring(6, 8)
+      );
+      const totalDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+      const avgDaysPerPeriod = totalDays / (periods.length - 1);
+      
+      // 根据平均间隔推算年化频率
+      periodsPerYear = Math.round(365 / avgDaysPerPeriod);
+      
+      // 限制在合理范围内（1-12次/年）
+      periodsPerYear = Math.max(1, Math.min(12, periodsPerYear));
+    }
     
     // 使用几何平均收益率进行年化（复利计算）
     const geometricMean = Math.pow(
