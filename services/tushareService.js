@@ -692,12 +692,12 @@ class TushareService {
     await this.ensureDbInitialized();
     
     try {
-      // 1. 检查是否已完整同步过这个日期范围
-      const dailySyncLog = await dbService.checkSyncStatus(tsCode, 'daily', startDate, endDate);
-      const adjSyncLog = await dbService.checkSyncStatus(tsCode, 'adj_factor', startDate, endDate);
+      // 1. 检查同步状态（支持智能范围合并）
+      const dailySyncStatus = await dbService.checkSyncStatus(tsCode, 'daily', startDate, endDate);
+      const adjSyncStatus = await dbService.checkSyncStatus(tsCode, 'adj_factor', startDate, endDate);
       
-      // 如果已完整同步，直接从数据库读取
-      if (dailySyncLog && adjSyncLog) {
+      // 如果已完整同步（没有缺失范围），直接从数据库读取
+      if (dailySyncStatus.isSynced && adjSyncStatus.isSynced) {
         const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
         const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
         

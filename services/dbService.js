@@ -587,9 +587,11 @@ class DatabaseService {
   
   /**
    * 检查数据是否已完整同步
+   * 返回：{ isSynced: boolean, missingRanges: [{start, end}] }
    */
   async checkSyncStatus(tsCode, dataType, startDate, endDate) {
-    const [rows] = await this.pool.execute(`
+    // 1. 查找是否有单条记录完全覆盖请求范围
+    const [fullCoverRows] = await this.pool.execute(`
       SELECT * FROM data_sync_log 
       WHERE ts_code = ? 
         AND data_type = ? 
@@ -600,7 +602,71 @@ class DatabaseService {
       LIMIT 1
     `, [tsCode, dataType, startDate, endDate]);
     
-    return rows.length > 0 ? rows[0] : null;
+    if (fullCoverRows.length > 0) {
+      return { isSynced: true, missingRanges: [], fullCoverRecord: fullCoverRows[0] };
+    }
+    
+    // 2. 查找所有与请求范围有交集的同步记录
+    const [overlapRows] = await this.pool.execute(`
+      SELECT * FROM data_sync_log 
+      WHERE ts_code = ? 
+        AND data_type = ? 
+        AND sync_status = 'completed'
+        AND (
+          (start_date <= ? AND end_date >= ?) OR  -- 覆盖起始日期
+          (start_date <= ? AND end_date >= ?) OR  -- 覆盖结束日期
+          (start_date >= ? AND end_date <= ?)     -- 完全包含在内
+        )
+      ORDER BY start_date ASC
+    `, [tsCode, dataType, startDate, startDate, endDate, endDate, startDate, endDate]);
+    
+    if (overlapRows.length === 0) {
+      // 没有任何同步记录，整个范围都需要同步
+      return { isSynced: false, missingRanges: [{ start: startDate, end: endDate }] };
+    }
+    
+    // 3. 计算缺失的日期范围
+    const missingRanges = this.calculateMissingRanges(startDate, endDate, overlapRows);
+    
+    return { 
+      isSynced: missingRanges.length === 0, 
+      missingRanges,
+      existingRecords: overlapRows
+    };
+  }
+  
+  /**
+   * 计算缺失的日期范围
+   */
+  calculateMissingRanges(requestStart, requestEnd, syncedRecords) {
+    if (syncedRecords.length === 0) {
+      return [{ start: requestStart, end: requestEnd }];
+    }
+    
+    // 按起始日期排序
+    const sorted = syncedRecords.sort((a, b) => a.start_date.localeCompare(b.start_date));
+    const missing = [];
+    
+    let currentPos = requestStart;
+    
+    for (const record of sorted) {
+      // 如果当前位置在记录开始之前，说明有缺失
+      if (currentPos < record.start_date) {
+        missing.push({ start: currentPos, end: record.start_date });
+      }
+      
+      // 更新当前位置到记录结束位置（如果更大）
+      if (record.end_date > currentPos) {
+        currentPos = record.end_date;
+      }
+    }
+    
+    // 检查最后是否还有缺失
+    if (currentPos < requestEnd) {
+      missing.push({ start: currentPos, end: requestEnd });
+    }
+    
+    return missing;
   }
   
   /**
