@@ -279,10 +279,9 @@ class IndexPortfolioService {
     // 5. 计算风险指标
     const customReturns = results.map(r => r.customReturn);
     
-    // 指数收益率：只使用年度调仓期的数据
-    const indexReturns = results
-      .filter(r => r.isYearlyRebalance)
-      .map(r => r.indexReturn);
+    // 指数收益率：使用所有调仓期的数据（包括季度/月度）
+    // 注意：指数策略在所有调仓期都计算了收益率，只是持仓只在年度调仓期更新
+    const indexReturns = results.map(r => r.indexReturn);
     
     const fundReturns = results.map(r => r.fundReturn);
 
