@@ -163,6 +163,26 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数成分股权重表'
       `);
 
+      // 7. 数据同步记录表（记录已完整同步的数据范围）
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS data_sync_log (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ts_code VARCHAR(20) NOT NULL COMMENT '股票代码',
+          data_type VARCHAR(20) NOT NULL COMMENT '数据类型：daily/adj_factor',
+          start_date VARCHAR(8) NOT NULL COMMENT '同步起始日期',
+          end_date VARCHAR(8) NOT NULL COMMENT '同步结束日期',
+          record_count INT NOT NULL COMMENT '实际记录数',
+          sync_status VARCHAR(20) DEFAULT 'completed' COMMENT '同步状态：completed/partial/failed',
+          sync_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '同步时间',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_sync_log (ts_code, data_type, start_date, end_date),
+          KEY idx_ts_code (ts_code),
+          KEY idx_data_type (data_type),
+          KEY idx_sync_status (sync_status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据同步记录表'
+      `);
+
       console.log('✅ 数据库表创建/检查完成');
     } finally {
       connection.release();
@@ -561,6 +581,42 @@ class DatabaseService {
     } finally {
       connection.release();
     }
+  }
+
+  // ==================== 数据同步记录相关 ====================
+  
+  /**
+   * 检查数据是否已完整同步
+   */
+  async checkSyncStatus(tsCode, dataType, startDate, endDate) {
+    const [rows] = await this.pool.execute(`
+      SELECT * FROM data_sync_log 
+      WHERE ts_code = ? 
+        AND data_type = ? 
+        AND start_date <= ? 
+        AND end_date >= ?
+        AND sync_status = 'completed'
+      ORDER BY sync_time DESC
+      LIMIT 1
+    `, [tsCode, dataType, startDate, endDate]);
+    
+    return rows.length > 0 ? rows[0] : null;
+  }
+  
+  /**
+   * 记录数据同步状态
+   */
+  async recordSyncStatus(tsCode, dataType, startDate, endDate, recordCount, syncStatus = 'completed') {
+    await this.pool.execute(`
+      INSERT INTO data_sync_log 
+      (ts_code, data_type, start_date, end_date, record_count, sync_status)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        record_count = VALUES(record_count),
+        sync_status = VALUES(sync_status),
+        sync_time = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    `, [tsCode, dataType, startDate, endDate, recordCount, syncStatus]);
   }
 
   async close() {

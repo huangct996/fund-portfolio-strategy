@@ -692,11 +692,36 @@ class TushareService {
     await this.ensureDbInitialized();
     
     try {
-      // 1. 先从数据库查询
+      // 1. 检查是否已完整同步过这个日期范围
+      const dailySyncLog = await dbService.checkSyncStatus(tsCode, 'daily', startDate, endDate);
+      const adjSyncLog = await dbService.checkSyncStatus(tsCode, 'adj_factor', startDate, endDate);
+      
+      // 如果已完整同步，直接从数据库读取
+      if (dailySyncLog && adjSyncLog) {
+        const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
+        const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
+        
+        if (dailyData.length > 0 && adjFactorData.length > 0) {
+          // 创建复权因子映射
+          const adjFactorMap = {};
+          adjFactorData.forEach(item => {
+            adjFactorMap[item.trade_date] = item.adj_factor;
+          });
+          
+          // 计算后复权价格
+          const latestAdjFactor = adjFactorData[adjFactorData.length - 1].adj_factor;
+          return dailyData.map(item => ({
+            ...item,
+            adj_close: item.close * (latestAdjFactor / (adjFactorMap[item.trade_date] || 1))
+          }));
+        }
+      }
+      
+      // 2. 未同步或数据不完整，从数据库查询现有数据
       const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
       const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
       
-      // 2. 检查数据完整性
+      // 3. 检查数据完整性
       // 如果未指定最小记录数，根据日期范围动态计算（每月约20个交易日，打8折）
       let requiredMinRecords = minRecords;
       if (requiredMinRecords === null) {
@@ -709,6 +734,10 @@ class TushareService {
       const hasEnoughData = dailyData.length >= requiredMinRecords && adjFactorData.length >= requiredMinRecords;
       
       if (hasEnoughData) {
+        // 数据充足，记录同步状态
+        await dbService.recordSyncStatus(tsCode, 'daily', startDate, endDate, dailyData.length, 'completed');
+        await dbService.recordSyncStatus(tsCode, 'adj_factor', startDate, endDate, adjFactorData.length, 'completed');
+        
         // 创建复权因子映射
         const adjFactorMap = {};
         adjFactorData.forEach(item => {
@@ -728,19 +757,27 @@ class TushareService {
         console.log(`  ⚠️ ${tsCode} 数据库数据不足(${dailyData.length}/${requiredMinRecords}条)，从Tushare重新获取`);
       }
       
-      // 3. 数据库没有数据，从 Tushare 获取并保存
+      // 4. 数据库没有数据或数据不足，从 Tushare 获取并保存
       console.log(`从 Tushare 获取 ${tsCode} 的日线数据: ${startDate} - ${endDate}`);
       
       // 获取日线数据
       const apiDailyData = await this.getStockDaily(tsCode, startDate, endDate);
       if (apiDailyData.length > 0) {
         await dbService.saveStockDaily(apiDailyData);
+        // 记录同步状态（即使数据可能不完整，也记录实际获取的数量）
+        await dbService.recordSyncStatus(tsCode, 'daily', startDate, endDate, apiDailyData.length, 'completed');
+      } else {
+        // 没有数据，可能是停牌或非交易日，记录为已完成避免重复查询
+        await dbService.recordSyncStatus(tsCode, 'daily', startDate, endDate, 0, 'completed');
       }
       
       // 获取复权因子
       const apiAdjFactorData = await this.getAdjFactor(tsCode, startDate, endDate);
       if (apiAdjFactorData.length > 0) {
         await dbService.saveAdjFactor(apiAdjFactorData);
+        await dbService.recordSyncStatus(tsCode, 'adj_factor', startDate, endDate, apiAdjFactorData.length, 'completed');
+      } else {
+        await dbService.recordSyncStatus(tsCode, 'adj_factor', startDate, endDate, 0, 'completed');
       }
       
       // 计算后复权价格
