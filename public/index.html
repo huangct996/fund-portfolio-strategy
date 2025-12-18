@@ -174,14 +174,14 @@
                 
                 <div class="weight-config">
                     <div class="weight-item">
-                        <label>波动率计算窗口: <span id="volatilityWindowValue">12个月</span></label>
-                        <input type="range" id="volatilityWindowSlider" min="6" max="24" step="1" value="12">
+                        <label>波动率计算窗口: <span id="volatilityWindowValue">6个月</span></label>
+                        <input type="range" id="volatilityWindowSlider" min="6" max="24" step="1" value="6">
                         <small style="color: #666;">用于计算历史波动率的时间窗口（月）</small>
                     </div>
                     
                     <div class="weight-item">
-                        <label>EWMA衰减系数: <span id="ewmaDecayValue">0.94</span></label>
-                        <input type="range" id="ewmaDecaySlider" min="85" max="98" step="1" value="94">
+                        <label>EWMA衰减系数: <span id="ewmaDecayValue">0.91</span></label>
+                        <input type="range" id="ewmaDecaySlider" min="85" max="98" step="1" value="91">
                         <small style="color: #666;">控制近期数据权重，值越大越重视历史数据</small>
                     </div>
                     
@@ -209,8 +209,8 @@
                     </div>
                     
                     <div class="weight-item">
-                        <label>单只股票最大权重: <span id="rpMaxWeightValue">15%</span></label>
-                        <input type="range" id="rpMaxWeightSlider" min="5" max="30" step="1" value="15">
+                        <label>单只股票最大权重: <span id="rpMaxWeightValue">13%</span></label>
+                        <input type="range" id="rpMaxWeightSlider" min="5" max="30" step="1" value="13">
                         <small style="color: #666;">防止极端情况下权重过度集中</small>
                     </div>
                     
