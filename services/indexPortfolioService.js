@@ -94,11 +94,24 @@ class IndexPortfolioService {
 
       try {
         // 获取当前日期的指数成分股权重
-        const indexWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
+        // 对于季度/月度调仓，如果当前日期没有成分股数据，则使用最近的历史年度调仓日期的数据
+        let indexWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
         
         if (!indexWeights || indexWeights.length === 0) {
-          console.warn(`⚠️  调仓日期 ${currentDate} 无成分股数据，跳过`);
-          continue;
+          // 查找最近的历史年度调仓日期
+          const nearestYearlyDate = yearlyRebalanceDates
+            .filter(d => d <= currentDate)
+            .sort((a, b) => b.localeCompare(a))[0];
+          
+          if (nearestYearlyDate && nearestYearlyDate !== currentDate) {
+            console.log(`   ℹ️  当前日期 ${currentDate} 无成分股数据，使用最近的年度调仓日期 ${nearestYearlyDate} 的数据`);
+            indexWeights = await tushareService.getIndexWeightByDate(indexCode, nearestYearlyDate);
+          }
+          
+          if (!indexWeights || indexWeights.length === 0) {
+            console.warn(`⚠️  调仓日期 ${currentDate} 及其最近的年度调仓日期均无成分股数据，跳过`);
+            continue;
+          }
         }
 
         console.log(`成分股数量: ${indexWeights.length} 只`);
