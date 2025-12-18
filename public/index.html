@@ -76,7 +76,7 @@
                 <h3>策略类型</h3>
                 <div class="strategy-selector">
                     <label>
-                        <input type="radio" name="strategy" value="marketValue" checked>
+                        <input type="radio" name="strategy" value="marketValue">
                         市值加权策略
                     </label>
                     <label>
@@ -84,7 +84,7 @@
                         综合得分策略
                     </label>
                     <label>
-                        <input type="radio" name="strategy" value="riskParity">
+                        <input type="radio" name="strategy" value="riskParity" checked>
                         风险平价策略 ⭐
                     </label>
                 </div>
@@ -188,7 +188,7 @@
                         <label>调仓频率:</label>
                         <select id="rebalanceFrequency" class="select-input">
                             <option value="yearly">每年（跟随指数）</option>
-                            <option value="quarterly">每季度</option>
+                            <option value="quarterly" selected>每季度</option>
                             <option value="monthly">每月</option>
                         </select>
                         <small style="color: #666;">更高频率可能提升夏普比率，但增加交易成本</small>

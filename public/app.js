@@ -25,13 +25,11 @@ async function initializePage() {
 
     try {
         // 设置默认日期
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
         
-        if (startDateInput) startDateInput.value = '2018-11-30';
-        if (endDateInput) endDateInput.value = todayStr;
+        if (startDateInput) startDateInput.value = '2020-07-10';
+        if (endDateInput) endDateInput.value = '2025-07-10';
         
         // 获取基金信息
         const fundInfo = await fetchFundInfo();
