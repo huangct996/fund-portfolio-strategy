@@ -84,7 +84,44 @@ class IndexPortfolioService {
     const results = [];
     let previousWeights = null; // 用于计算交易成本
     
-    // 2. 遍历每个调仓日期，计算收益率
+    // 2. 如果用户选择的开始日期早于第一个调仓日期，在开始日期建仓
+    if (startDate && startDate < rebalanceDates[0]) {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`在用户选择的开始日期建仓: ${startDate}`);
+      console.log(`${'='.repeat(60)}`);
+      
+      // 使用第一个调仓日期的成分股数据
+      const firstRebalanceDate = rebalanceDates[0];
+      const indexWeights = await tushareService.getIndexWeightByDate(indexCode, firstRebalanceDate);
+      
+      if (indexWeights && indexWeights.length > 0) {
+        const periodResult = await this.calculatePeriodReturns(
+          indexWeights,
+          startDate,
+          firstRebalanceDate,
+          fundCode,
+          config,
+          null,
+          true  // 视为年度调仓
+        );
+        
+        if (periodResult) {
+          results.push({
+            rebalanceDate: startDate,
+            startDate: startDate,
+            endDate: firstRebalanceDate,
+            isStartDate: true,  // 标记为开始日期
+            ...periodResult
+          });
+          
+          if (periodResult.currentWeights) {
+            previousWeights = periodResult.currentWeights;
+          }
+        }
+      }
+    }
+    
+    // 3. 遍历每个调仓日期，计算收益率
     for (let i = 0; i < rebalanceDates.length; i++) {
       const currentDate = rebalanceDates[i];
       const nextDate = i < rebalanceDates.length - 1 ? rebalanceDates[i + 1] : null;
@@ -157,8 +194,47 @@ class IndexPortfolioService {
         continue;
       }
     }
+    
+    // 4. 如果用户选择的结束日期晚于最后一个调仓日期，持仓到结束日期
+    if (endDate && results.length > 0) {
+      const lastResult = results[results.length - 1];
+      const lastRebalanceDate = lastResult.rebalanceDate;
+      
+      if (endDate > lastRebalanceDate) {
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`持仓到用户选择的结束日期: ${endDate}`);
+        console.log(`${'='.repeat(60)}`);
+        
+        // 使用最后一个调仓期的持仓，计算到结束日期的收益率
+        const indexWeights = await tushareService.getIndexWeightByDate(indexCode, lastRebalanceDate);
+        
+        if (indexWeights && indexWeights.length > 0) {
+          const isYearlyRebalance = yearlyRebalanceDates.includes(lastRebalanceDate);
+          
+          const periodResult = await this.calculatePeriodReturns(
+            indexWeights,
+            lastRebalanceDate,
+            endDate,
+            fundCode,
+            config,
+            previousWeights,
+            isYearlyRebalance
+          );
+          
+          if (periodResult) {
+            results.push({
+              rebalanceDate: endDate,
+              startDate: lastRebalanceDate,
+              endDate: endDate,
+              isEndDate: true,  // 标记为结束日期
+              ...periodResult
+            });
+          }
+        }
+      }
+    }
 
-    // 4. 计算累计收益率
+    // 5. 计算累计收益率
     this.calculateCumulativeReturns(results);
 
     // 5. 计算风险指标

@@ -670,11 +670,21 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
     }
     
     // 添加所有调仓期数据
+    const pointRadiusCustom = [];
+    const pointRadiusIndex = [];
+    const pointRadiusFund = [];
+    
     data.forEach(d => {
         labels.push(formatDate(d.rebalanceDate));
         customData.push((d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
         indexData.push((d.indexCumulativeReturn !== undefined ? d.indexCumulativeReturn : d.indexReturn) * 100);
         fundData.push((d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+        
+        // 只在调仓日期显示圆点（不包括开始日期和结束日期）
+        const isRebalanceDate = !d.isStartDate && !d.isEndDate;
+        pointRadiusCustom.push(isRebalanceDate ? 4 : 0);
+        pointRadiusIndex.push(isRebalanceDate && d.isYearlyRebalance ? 4 : 0);  // 指数只在年度调仓显示圆点
+        pointRadiusFund.push(isRebalanceDate ? 4 : 0);
     });
     
     // 添加终点（用户选择的结束时间）
@@ -688,6 +698,23 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
             customData.push(customData[customData.length - 1]);
             indexData.push(indexData[indexData.length - 1]);
             fundData.push(fundData[fundData.length - 1]);
+            // 终点不显示圆点
+            pointRadiusCustom.push(0);
+            pointRadiusIndex.push(0);
+            pointRadiusFund.push(0);
+        }
+    }
+    
+    // 如果添加了起点，也需要为起点添加圆点半径
+    if (data.length > 0 && currentConfig.startDate) {
+        const startDate = formatDate(currentConfig.startDate);
+        const firstRebalanceDate = formatDate(data[0].rebalanceDate);
+        
+        if (startDate !== firstRebalanceDate) {
+            // 起点不显示圆点
+            pointRadiusCustom.unshift(0);
+            pointRadiusIndex.unshift(0);
+            pointRadiusFund.unshift(0);
         }
     }
     
@@ -703,7 +730,9 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
                     backgroundColor: 'rgba(46, 134, 171, 0.1)',
                     borderWidth: 3,
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: pointRadiusCustom,
+                    pointHoverRadius: 6
                 },
                 {
                     label: 'h30269.CSI指数',
@@ -712,7 +741,9 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
                     backgroundColor: 'rgba(241, 143, 1, 0.1)',
                     borderWidth: 3,
                     fill: false,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: pointRadiusIndex,
+                    pointHoverRadius: 6
                 },
                 {
                     label: '512890.SH基金净值',
@@ -722,7 +753,9 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
                     borderWidth: 2,
                     fill: false,
                     tension: 0.4,
-                    borderDash: [5, 5]
+                    borderDash: [5, 5],
+                    pointRadius: pointRadiusFund,
+                    pointHoverRadius: 6
                 }
             ]
         },
