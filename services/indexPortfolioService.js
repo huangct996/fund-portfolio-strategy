@@ -73,7 +73,8 @@ class IndexPortfolioService {
       const originalDates = [...rebalanceDates];
       rebalanceDates = this.generateHighFrequencyRebalanceDates(
         rebalanceDates, 
-        riskParityParams.rebalanceFrequency
+        riskParityParams.rebalanceFrequency,
+        endDate  // 传入结束日期，以便生成到结束日期为止的所有调仓日期
       );
       console.log(`🔄 生成高频调仓日期: ${originalDates.length} → ${rebalanceDates.length} 个`);
       console.log(`   自定义策略: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}调仓`);
@@ -1232,9 +1233,10 @@ class IndexPortfolioService {
    * 生成更高频率的调仓日期
    * @param {Array} baseRebalanceDates - 基础调仓日期（年度）
    * @param {string} frequency - 频率：'quarterly' 或 'monthly'
+   * @param {string} userEndDate - 用户选择的结束日期（可选）
    * @returns {Array} 新的调仓日期列表
    */
-  generateHighFrequencyRebalanceDates(baseRebalanceDates, frequency) {
+  generateHighFrequencyRebalanceDates(baseRebalanceDates, frequency, userEndDate = null) {
     if (frequency === 'yearly') {
       return baseRebalanceDates;
     }
@@ -1280,7 +1282,36 @@ class IndexPortfolioService {
     }
     
     // 添加最后一个年度调仓日期
-    newDates.push(baseRebalanceDates[baseRebalanceDates.length - 1]);
+    const lastYearlyDate = baseRebalanceDates[baseRebalanceDates.length - 1];
+    newDates.push(lastYearlyDate);
+    
+    // 如果提供了用户结束日期，继续生成到结束日期为止的调仓日期
+    if (userEndDate && userEndDate > lastYearlyDate) {
+      const lastDateObj = new Date(
+        lastYearlyDate.substring(0, 4),
+        parseInt(lastYearlyDate.substring(4, 6)) - 1,
+        lastYearlyDate.substring(6, 8)
+      );
+      
+      const userEndDateObj = new Date(
+        userEndDate.substring(0, 4),
+        parseInt(userEndDate.substring(4, 6)) - 1,
+        userEndDate.substring(6, 8)
+      );
+      
+      let currentDate = new Date(lastDateObj);
+      currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+      
+      while (currentDate < userEndDateObj) {
+        const dateStr = currentDate.getFullYear() + 
+          String(currentDate.getMonth() + 1).padStart(2, '0') + 
+          String(currentDate.getDate()).padStart(2, '0');
+        newDates.push(dateStr);
+        currentDate.setMonth(currentDate.getMonth() + monthsToAdd);
+      }
+      
+      console.log(`   📅 从最后年度调仓日期 ${lastYearlyDate} 继续生成到用户结束日期 ${userEndDate}`);
+    }
     
     console.log(`   生成调仓日期详情: ${newDates.join(', ')}`);
     
