@@ -649,8 +649,8 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
     }
     
     // 显示累计收益率：自定义策略 vs 原策略
-    // 横轴使用披露日期（每个报告期公布持仓的日期）
-    // 直接使用每个报告期的披露日期和累计收益率，不添加起始点
+    // 横轴使用自定义策略的调仓期日期（每个调仓期的日期）
+    // 直接使用每个调仓期的日期和累计收益率，不添加起始点
     const labels = data.map(d => formatDate(d.rebalanceDate));
     // 注意：不能使用 || 运算符，因为0是falsy值，会导致第一个点显示错误
     const customData = data.map(d => (d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
