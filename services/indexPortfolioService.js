@@ -676,7 +676,11 @@ class IndexPortfolioService {
       } else {
         // 后续调仓期：累加收益率
         customCumulative *= (1 + r.customReturn);
-        indexCumulative *= (1 + r.indexReturn);
+        
+        // 指数收益率：只在年度调仓期更新，非年度调仓期保持不变
+        if (r.indexReturn !== null && r.indexReturn !== undefined) {
+          indexCumulative *= (1 + r.indexReturn);
+        }
         
         // 基金净值：使用当前净值相对于初始净值的涨幅
         // 如果当前期有有效净值，使用当前净值；否则使用上一期的净值

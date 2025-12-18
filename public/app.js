@@ -650,12 +650,46 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
     
     // 显示累计收益率：自定义策略 vs 原策略
     // 横轴使用自定义策略的调仓期日期（每个调仓期的日期）
-    // 直接使用每个调仓期的日期和累计收益率，不添加起始点
-    const labels = data.map(d => formatDate(d.rebalanceDate));
-    // 注意：不能使用 || 运算符，因为0是falsy值，会导致第一个点显示错误
-    const customData = data.map(d => (d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
-    const indexData = data.map(d => (d.indexCumulativeReturn !== undefined ? d.indexCumulativeReturn : d.indexReturn) * 100);
-    const fundData = data.map(d => (d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+    // 添加起点和终点以用户选择的时间为准
+    const labels = [];
+    const customData = [];
+    const indexData = [];
+    const fundData = [];
+    
+    // 添加起点（用户选择的开始时间）
+    if (data.length > 0 && currentConfig.startDate) {
+        const startDate = formatDate(currentConfig.startDate);
+        const firstRebalanceDate = formatDate(data[0].rebalanceDate);
+        
+        if (startDate !== firstRebalanceDate) {
+            labels.push(startDate);
+            customData.push(0);
+            indexData.push(0);
+            fundData.push(0);
+        }
+    }
+    
+    // 添加所有调仓期数据
+    data.forEach(d => {
+        labels.push(formatDate(d.rebalanceDate));
+        customData.push((d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
+        indexData.push((d.indexCumulativeReturn !== undefined ? d.indexCumulativeReturn : d.indexReturn) * 100);
+        fundData.push((d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+    });
+    
+    // 添加终点（用户选择的结束时间）
+    if (data.length > 0 && currentConfig.endDate) {
+        const endDate = formatDate(currentConfig.endDate);
+        const lastRebalanceDate = formatDate(data[data.length - 1].rebalanceDate);
+        
+        if (endDate !== lastRebalanceDate) {
+            labels.push(endDate);
+            // 终点使用最后一个调仓期的累计收益率
+            customData.push(customData[customData.length - 1]);
+            indexData.push(indexData[indexData.length - 1]);
+            fundData.push(fundData[fundData.length - 1]);
+        }
+    }
     
     chartInstance = new Chart(ctx, {
         type: 'line',
