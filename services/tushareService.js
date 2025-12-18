@@ -695,10 +695,11 @@ class TushareService {
       const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
       const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
       
-      // 2. 检查数据完整性：需要足够的数据量（至少30条，约1个月交易日）
-      const hasEnoughData = dailyData.length >= 30 && adjFactorData.length >= 30;
+      // 2. 检查数据完整性：需要足够的数据量（至少10条）
+      const hasEnoughData = dailyData.length >= 10 && adjFactorData.length >= 10;
       
       if (hasEnoughData) {
+        console.log(`  ✓ 从数据库获取 ${tsCode}: ${dailyData.length}条日线数据`);
         // 创建复权因子映射
         const adjFactorMap = {};
         adjFactorData.forEach(item => {

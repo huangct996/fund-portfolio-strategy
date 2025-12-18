@@ -536,19 +536,23 @@ function renderHoldingsForPeriod(period, rebalanceChange) {
     // 更新提示信息
     const holdingsNote = document.getElementById('holdingsNote');
     if (holdingsNote) {
-        if (currentConfig.useCompositeScore) {
+        if (currentConfig.useRiskParity) {
+            holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为指数持仓，右侧为策略持仓（风险平价策略）。';
+        } else if (currentConfig.useCompositeScore) {
             holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为指数持仓，右侧为策略持仓（综合得分策略）。';
         } else {
-            holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为指数持仓，右侧为策略持仓（市值加权，单只上限10%）。';
+            holdingsNote.innerHTML = '<strong>💡 提示：</strong>左侧为指数持仓，右侧为策略持仓（市值加权策略）。';
         }
     }
     
     const strategyTitle = document.getElementById('strategyTitle');
     if (strategyTitle) {
-        if (currentConfig.useCompositeScore) {
-            strategyTitle.textContent = `策略持仓（综合得分） (${rebalanceDateFormatted})`;
+        if (currentConfig.useRiskParity) {
+            strategyTitle.textContent = `策略持仓 (${rebalanceDateFormatted})`;
+        } else if (currentConfig.useCompositeScore) {
+            strategyTitle.textContent = `策略持仓 (${rebalanceDateFormatted})`;
         } else {
-            strategyTitle.textContent = `策略持仓（市值加权+10%上限） (${rebalanceDateFormatted})`;
+            strategyTitle.textContent = `策略持仓 (${rebalanceDateFormatted})`;
         }
     }
     
