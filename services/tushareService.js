@@ -599,6 +599,28 @@ class TushareService {
   }
 
   /**
+   * 获取指数日线数据
+   */
+  async getIndexDaily(indexCode, startDate, endDate) {
+    try {
+      // 转换指数代码格式：h30269.CSI -> 930269.CSI
+      const tsCode = indexCode.replace(/^h/, '9');
+      
+      const data = await this.callApi('index_daily', {
+        ts_code: tsCode,
+        start_date: startDate,
+        end_date: endDate
+      });
+      
+      console.log(`✅ 获取指数 ${indexCode} 日线数据 ${data.length} 条`);
+      return data;
+    } catch (error) {
+      console.error(`获取指数日线数据失败 (${indexCode}):`, error.message);
+      return [];
+    }
+  }
+
+  /**
    * 获取指数成分股权重数据（优先从数据库查询）
    */
   async getIndexWeight(indexCode) {

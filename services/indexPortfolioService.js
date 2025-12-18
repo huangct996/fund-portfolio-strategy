@@ -169,7 +169,25 @@ class IndexPortfolioService {
       : 0.02;
     
     const customRisk = this.calculateRiskMetrics(customReturns, results, riskFreeRate);
-    const indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
+    
+    // 指数风险指标：使用日线数据计算更准确的夏普比率和最大回撤
+    let indexRisk;
+    try {
+      const firstDate = results.find(r => r.isYearlyRebalance)?.rebalanceDate;
+      const lastDate = results[results.length - 1]?.rebalanceDate;
+      
+      if (firstDate && lastDate) {
+        console.log(`\n获取指数日线数据用于计算准确的风险指标...`);
+        indexRisk = await this.calculateIndexRiskMetricsFromDaily(indexCode, firstDate, lastDate, riskFreeRate);
+      } else {
+        // 降级方案：使用调仓期数据
+        indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
+      }
+    } catch (error) {
+      console.warn('获取指数日线数据失败，使用调仓期数据:', error.message);
+      indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
+    }
+    
     const fundRisk = this.calculateRiskMetrics(fundReturns, results, riskFreeRate);
     
     console.log('\n风险指标计算结果:');
@@ -665,6 +683,102 @@ class IndexPortfolioService {
 
       console.log(`调仓期${index + 1} ${r.rebalanceDate}: 自定义${(r.customCumulativeReturn * 100).toFixed(2)}%, 指数${(r.indexCumulativeReturn * 100).toFixed(2)}%, 基金${(r.fundCumulativeReturn * 100).toFixed(2)}%, 跟踪误差${(r.trackingError * 100).toFixed(2)}%`);
     });
+  }
+
+  /**
+   * 基于日线数据计算指数风险指标
+   */
+  async calculateIndexRiskMetricsFromDaily(indexCode, startDate, endDate, riskFreeRate = 0.02) {
+    try {
+      // 获取指数日线数据
+      const dailyData = await tushareService.getIndexDaily(indexCode, startDate, endDate);
+      
+      if (!dailyData || dailyData.length < 2) {
+        throw new Error('日线数据不足');
+      }
+      
+      // 计算日收益率
+      const dailyReturns = [];
+      for (let i = 1; i < dailyData.length; i++) {
+        const prevClose = dailyData[i - 1].close;
+        const currClose = dailyData[i].close;
+        if (prevClose > 0 && currClose > 0) {
+          dailyReturns.push((currClose - prevClose) / prevClose);
+        }
+      }
+      
+      if (dailyReturns.length === 0) {
+        throw new Error('无有效日收益率数据');
+      }
+      
+      // 计算累计收益率
+      const totalReturn = dailyReturns.reduce((prod, r) => prod * (1 + r), 1) - 1;
+      
+      // 计算实际年数
+      const firstDate = new Date(
+        dailyData[0].trade_date.substring(0, 4),
+        parseInt(dailyData[0].trade_date.substring(4, 6)) - 1,
+        dailyData[0].trade_date.substring(6, 8)
+      );
+      const lastDate = new Date(
+        dailyData[dailyData.length - 1].trade_date.substring(0, 4),
+        parseInt(dailyData[dailyData.length - 1].trade_date.substring(4, 6)) - 1,
+        dailyData[dailyData.length - 1].trade_date.substring(6, 8)
+      );
+      const totalDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+      const actualYears = totalDays / 365;
+      
+      // 年化收益率
+      const annualizedReturn = Math.pow(1 + totalReturn, 1 / actualYears) - 1;
+      
+      // 计算波动率（日收益率的标准差）
+      const avgReturn = dailyReturns.reduce((sum, r) => sum + r, 0) / dailyReturns.length;
+      const variance = dailyReturns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / dailyReturns.length;
+      const dailyVolatility = Math.sqrt(variance);
+      
+      // 年化波动率（假设252个交易日）
+      const annualizedVolatility = dailyVolatility * Math.sqrt(252);
+      
+      // 夏普比率
+      const sharpeRatio = annualizedVolatility > 0 
+        ? (annualizedReturn - riskFreeRate) / annualizedVolatility 
+        : 0;
+      
+      // 最大回撤（基于日线数据）
+      let maxDrawdown = 0;
+      let peak = dailyData[0].close;
+      
+      for (let i = 1; i < dailyData.length; i++) {
+        const close = dailyData[i].close;
+        if (close > peak) {
+          peak = close;
+        }
+        const drawdown = (peak - close) / peak;
+        if (drawdown > maxDrawdown) {
+          maxDrawdown = drawdown;
+        }
+      }
+      
+      console.log(`  📈 指数风险指标（基于${dailyData.length}个交易日）:`);
+      console.log(`     累计收益率: ${(totalReturn * 100).toFixed(2)}%`);
+      console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}% (基于${actualYears.toFixed(2)}年)`);
+      console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}%`);
+      console.log(`     无风险收益率: ${(riskFreeRate * 100).toFixed(2)}%`);
+      console.log(`     夏普比率: ${sharpeRatio.toFixed(2)}`);
+      console.log(`     最大回撤: ${(maxDrawdown * 100).toFixed(2)}%`);
+      
+      return {
+        totalReturn,
+        annualizedReturn,
+        volatility: annualizedVolatility,
+        sharpeRatio,
+        maxDrawdown,
+        periods: dailyData.length
+      };
+    } catch (error) {
+      console.error('计算指数日线风险指标失败:', error.message);
+      throw error;
+    }
   }
 
   /**
