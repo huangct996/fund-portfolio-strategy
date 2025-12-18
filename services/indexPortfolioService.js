@@ -956,18 +956,23 @@ class IndexPortfolioService {
       
       // 计算平均调仓频率（用于波动率年化）
       const avgDaysPerPeriod = totalDays / (periods.length - 1);
-      periodsPerYear = Math.round(365 / avgDaysPerPeriod);
+      const avgPeriodsPerYear = 365 / avgDaysPerPeriod;
+      periodsPerYear = Math.round(avgPeriodsPerYear);
       periodsPerYear = Math.max(1, Math.min(12, periodsPerYear));
       
-      console.log(`  📊 时间跨度: ${periods.length}个调仓期, 实际${actualYears.toFixed(2)}年, 平均间隔${avgDaysPerPeriod.toFixed(0)}天, 年化频率=${periodsPerYear}次/年`);
+      console.log(`  📊 时间跨度: ${periods.length}个调仓期, 实际${actualYears.toFixed(2)}年, 平均间隔${avgDaysPerPeriod.toFixed(0)}天, 年化频率=${avgPeriodsPerYear.toFixed(2)}次/年`);
     }
     
     // 计算累计收益率和年化收益率
     const totalReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
     const annualizedReturn = Math.pow(1 + totalReturn, 1 / actualYears) - 1;
     
-    // 波动率年化使用调仓频率
-    const annualizedVolatility = volatility * Math.sqrt(periodsPerYear);
+    // 波动率年化：使用实际年化频率（不四舍五入）
+    // 这样可以更准确地反映波动率
+    const actualPeriodsPerYear = periods && periods.length > 1 
+      ? (periods.length - 1) / actualYears 
+      : periodsPerYear;
+    const annualizedVolatility = volatility * Math.sqrt(actualPeriodsPerYear);
     
     // 夏普比率（使用可配置的无风险利率）
     const sharpeRatio = annualizedVolatility > 0 
@@ -979,9 +984,10 @@ class IndexPortfolioService {
     console.log(`     期间波动率: ${(volatility * 100).toFixed(2)}%`);
     console.log(`     累计收益率: ${(totalReturn * 100).toFixed(2)}%`);
     console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}% (基于${actualYears.toFixed(2)}年)`);
-    console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}%`);
+    console.log(`     实际年化频率: ${actualPeriodsPerYear.toFixed(2)}次/年 (${returns.length}期 / ${actualYears.toFixed(2)}年)`);
+    console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}% = ${(volatility * 100).toFixed(2)}% × √${actualPeriodsPerYear.toFixed(2)}`);
     console.log(`     无风险收益率: ${(riskFreeRate * 100).toFixed(2)}%`);
-    console.log(`     夏普比率: ${sharpeRatio.toFixed(2)}`);
+    console.log(`     夏普比率: ${sharpeRatio.toFixed(2)} = (${(annualizedReturn * 100).toFixed(2)}% - ${(riskFreeRate * 100).toFixed(2)}%) / ${(annualizedVolatility * 100).toFixed(2)}%`);
     
     // 索提诺比率（只考虑下行波动）
     const downReturns = returns.filter(r => r < 0);
