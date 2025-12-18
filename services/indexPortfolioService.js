@@ -83,6 +83,7 @@ class IndexPortfolioService {
 
     const results = [];
     let previousWeights = null; // 用于计算交易成本
+    let currentIndexWeights = null; // 指数策略当前持仓（只在年度调仓期更新）
     
     // 2. 如果用户选择的开始日期早于第一个调仓日期，在开始日期建仓
     if (startDate && startDate < rebalanceDates[0]) {
@@ -101,6 +102,9 @@ class IndexPortfolioService {
         const indexWeights = await tushareService.getIndexWeightByDate(indexCode, historicalYearlyDate);
         
         if (indexWeights && indexWeights.length > 0) {
+          // 初始化指数策略持仓
+          currentIndexWeights = indexWeights;
+          
           const firstRebalanceDate = rebalanceDates[0];
           const periodResult = await this.calculatePeriodReturns(
             indexWeights,
@@ -142,11 +146,15 @@ class IndexPortfolioService {
       console.log(`${'='.repeat(60)}`);
 
       try {
-        // 获取当前日期的指数成分股权重
-        // 对于季度/月度调仓，如果当前日期没有成分股数据，则使用最近的历史年度调仓日期的数据
-        let indexWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
+        // 判断当前日期是否是年度调仓日（指数策略在年度调仓时更新持仓）
+        const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
+        console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
         
-        if (!indexWeights || indexWeights.length === 0) {
+        // 获取自定义策略的成分股权重
+        // 对于季度/月度调仓，如果当前日期没有成分股数据，则使用最近的历史年度调仓日期的数据
+        let customIndexWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
+        
+        if (!customIndexWeights || customIndexWeights.length === 0) {
           // 查找最近的历史年度调仓日期
           const nearestYearlyDate = yearlyRebalanceDates
             .filter(d => d <= currentDate)
@@ -154,16 +162,28 @@ class IndexPortfolioService {
           
           if (nearestYearlyDate && nearestYearlyDate !== currentDate) {
             console.log(`   ℹ️  当前日期 ${currentDate} 无成分股数据，使用最近的年度调仓日期 ${nearestYearlyDate} 的数据`);
-            indexWeights = await tushareService.getIndexWeightByDate(indexCode, nearestYearlyDate);
+            customIndexWeights = await tushareService.getIndexWeightByDate(indexCode, nearestYearlyDate);
           }
           
-          if (!indexWeights || indexWeights.length === 0) {
+          if (!customIndexWeights || customIndexWeights.length === 0) {
             console.warn(`⚠️  调仓日期 ${currentDate} 及其最近的年度调仓日期均无成分股数据，跳过`);
             continue;
           }
         }
 
-        console.log(`成分股数量: ${indexWeights.length} 只`);
+        console.log(`成分股数量: ${customIndexWeights.length} 只`);
+        
+        // 如果是年度调仓期，更新指数策略持仓
+        if (isYearlyRebalance) {
+          currentIndexWeights = customIndexWeights;
+          console.log(`   📊 指数策略更新持仓（年度调仓）`);
+        } else if (!currentIndexWeights) {
+          // 如果还没有初始化指数持仓，使用当前的成分股数据
+          currentIndexWeights = customIndexWeights;
+          console.log(`   📊 指数策略初始化持仓`);
+        } else {
+          console.log(`   📊 指数策略保持持仓不变（非年度调仓）`);
+        }
         
         // 计算持有时间段
         const startDate = currentDate;  // 在调仓日建仓
@@ -172,18 +192,16 @@ class IndexPortfolioService {
         console.log(`持有时间段: ${startDate} → ${endDate}`);
 
         // 3. 计算三种策略的收益率
-        // 判断当前日期是否是年度调仓日（指数策略只在年度调仓）
-        const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
-        console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
-        
+        // 自定义策略使用customIndexWeights，指数策略使用currentIndexWeights
         const periodResult = await this.calculatePeriodReturns(
-          indexWeights,
+          customIndexWeights,
           startDate,
           endDate,
           fundCode,
           config,
           previousWeights,
-          isYearlyRebalance
+          true,  // 总是计算指数收益率
+          currentIndexWeights  // 传入指数策略的持仓
         );
 
         if (periodResult) {
@@ -316,8 +334,13 @@ class IndexPortfolioService {
   /**
    * 计算单个调仓期的收益率
    */
-  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null, calculateIndexReturn = true) {
+  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null, calculateIndexReturn = true, indexStrategyWeights = null) {
     const { useCompositeScore, useRiskParity, scoreWeights, qualityFactorType, riskParityParams } = config;
+    
+    // 如果没有传入指数策略持仓，使用自定义策略的持仓
+    if (!indexStrategyWeights) {
+      indexStrategyWeights = indexWeights;
+    }
 
     // 1. 准备成分股列表
     const stockCodes = indexWeights.map(w => w.con_code);
@@ -373,8 +396,10 @@ class IndexPortfolioService {
       );
     }
 
-    // 4. 准备指数策略组合（使用指数原始权重）
-    const indexPortfolio = stocksWithData.map(stock => ({
+    // 4. 准备指数策略组合（使用指数策略的持仓权重）
+    // 获取指数策略持仓的股票数据
+    const indexStocksWithData = await this.enrichStockData(indexStrategyWeights, startDate);
+    const indexPortfolio = indexStocksWithData.map(stock => ({
       ...stock,
       adjustedWeight: stock.indexWeight / 100  // 指数权重是百分比，转换为小数
     }));
@@ -382,7 +407,7 @@ class IndexPortfolioService {
     // 5. 计算三种策略的收益率
     const customReturns = await this.calculatePortfolioReturns(customPortfolio, startDate, endDate);
     
-    // 指数策略只在年度调仓日计算，其他时间返回0
+    // 指数策略在所有调仓期都计算收益率（使用当前持仓）
     let indexReturns = null;
     if (calculateIndexReturn) {
       indexReturns = await this.calculatePortfolioReturns(indexPortfolio, startDate, endDate);
