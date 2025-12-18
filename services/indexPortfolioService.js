@@ -114,6 +114,8 @@ class IndexPortfolioService {
             fundCode,
             config,
             null,
+            true,  // 总是计算指数收益率
+            indexWeights,  // 指数策略持仓
             true  // 视为年度调仓
           );
           
@@ -123,6 +125,7 @@ class IndexPortfolioService {
               startDate: startDate,
               endDate: firstRebalanceDate,
               isStartDate: true,  // 标记为开始日期
+              isYearlyRebalance: true,  // 开始日期视为年度调仓
               historicalRebalanceDate: historicalYearlyDate,  // 记录使用的历史调仓日期
               ...periodResult
             });
@@ -202,7 +205,8 @@ class IndexPortfolioService {
           config,
           previousWeights,
           true,  // 总是计算指数收益率
-          currentIndexWeights  // 传入指数策略的持仓
+          currentIndexWeights,  // 传入指数策略的持仓
+          isYearlyRebalance  // 传入是否年度调仓的标记
         );
 
         if (periodResult) {
@@ -210,6 +214,7 @@ class IndexPortfolioService {
             rebalanceDate: currentDate,
             startDate,
             endDate,
+            isYearlyRebalance,  // 添加年度调仓标记
             ...periodResult
           });
           
@@ -239,7 +244,8 @@ class IndexPortfolioService {
         const indexWeights = await tushareService.getIndexWeightByDate(indexCode, lastRebalanceDate);
         
         if (indexWeights && indexWeights.length > 0) {
-          const isYearlyRebalance = yearlyRebalanceDates.includes(lastRebalanceDate);
+          // 结束日期不是年度调仓期
+          const isYearlyRebalance = false;
           
           const periodResult = await this.calculatePeriodReturns(
             indexWeights,
@@ -248,7 +254,9 @@ class IndexPortfolioService {
             fundCode,
             config,
             previousWeights,
-            isYearlyRebalance
+            true,  // 总是计算指数收益率
+            currentIndexWeights,  // 使用当前指数策略持仓
+            isYearlyRebalance  // 结束日期不是年度调仓
           );
           
           if (periodResult) {
@@ -257,6 +265,7 @@ class IndexPortfolioService {
               startDate: lastRebalanceDate,
               endDate: endDate,
               isEndDate: true,  // 标记为结束日期
+              isYearlyRebalance: false,  // 结束日期不是年度调仓
               ...periodResult
             });
           }
@@ -335,7 +344,7 @@ class IndexPortfolioService {
   /**
    * 计算单个调仓期的收益率
    */
-  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null, calculateIndexReturn = true, indexStrategyWeights = null) {
+  async calculatePeriodReturns(indexWeights, startDate, endDate, fundCode, config, previousWeights = null, calculateIndexReturn = true, indexStrategyWeights = null, isYearlyRebalance = false) {
     const { useCompositeScore, useRiskParity, scoreWeights, qualityFactorType, riskParityParams } = config;
     
     // 如果没有传入指数策略持仓，使用自定义策略的持仓
@@ -429,10 +438,10 @@ class IndexPortfolioService {
       customReturnBeforeCost: customReturns.portfolioReturn,
       tradingCost: tradingCost,
       customStockCount: customReturns.stockCount,
-      // 指数策略（只在年度调仓日计算，非年度调仓期返回null）
+      // 指数策略（所有调仓期都计算收益率）
       indexReturn: indexReturns ? indexReturns.portfolioReturn : null,
       indexStockCount: indexReturns ? indexReturns.stockCount : 0,
-      isYearlyRebalance: calculateIndexReturn,
+      // 不在这里设置isYearlyRebalance，由调用方设置
       // 基金净值（如果返回null，则不设置这些字段，让它们为undefined）
       fundReturn: fundNavReturn?.return || 0,
       fundStartNav: fundNavReturn?.startNav,
