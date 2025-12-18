@@ -816,7 +816,9 @@ class IndexPortfolioService {
       
       // 使用 tushareService 的缓存机制获取日行情数据
       // 该方法会先从数据库查询，没有则从 Tushare 同步
-      const dailyData = await tushareService.getStockDailyWithCache(tsCode, startDate, endDate);
+      // 传入期望的最小数据量：每月约20个交易日，乘以窗口月数，再打8折作为阈值
+      const expectedMinRecords = Math.floor(windowMonths * 20 * 0.8);
+      const dailyData = await tushareService.getStockDailyWithCache(tsCode, startDate, endDate, expectedMinRecords);
       
       if (!dailyData || dailyData.length < 2) {
         console.log(`  ⚠️ ${tsCode}: 数据不足，获取到${dailyData ? dailyData.length : 0}条记录`);

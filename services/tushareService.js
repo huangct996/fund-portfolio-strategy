@@ -685,9 +685,10 @@ class TushareService {
    * @param {string} tsCode - 股票代码
    * @param {string} startDate - 开始日期
    * @param {string} endDate - 结束日期
+   * @param {number} minRecords - 最小记录数（默认根据时间范围动态计算）
    * @returns {Array} 日线数据，包含后复权价格
    */
-  async getStockDailyWithCache(tsCode, startDate, endDate) {
+  async getStockDailyWithCache(tsCode, startDate, endDate, minRecords = null) {
     await this.ensureDbInitialized();
     
     try {
@@ -695,9 +696,17 @@ class TushareService {
       const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
       const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
       
-      // 2. 检查数据完整性：需要足够的数据量（至少200条，约1年交易日）
-      // 如果数据不足，强制从Tushare重新获取
-      const hasEnoughData = dailyData.length >= 200 && adjFactorData.length >= 200;
+      // 2. 检查数据完整性
+      // 如果未指定最小记录数，根据日期范围动态计算（每月约20个交易日，打8折）
+      let requiredMinRecords = minRecords;
+      if (requiredMinRecords === null) {
+        const start = new Date(startDate.substring(0, 4), parseInt(startDate.substring(4, 6)) - 1, startDate.substring(6, 8));
+        const end = new Date(endDate.substring(0, 4), parseInt(endDate.substring(4, 6)) - 1, endDate.substring(6, 8));
+        const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        requiredMinRecords = Math.floor(monthsDiff * 20 * 0.8);
+      }
+      
+      const hasEnoughData = dailyData.length >= requiredMinRecords && adjFactorData.length >= requiredMinRecords;
       
       if (hasEnoughData) {
         // 创建复权因子映射
@@ -716,7 +725,7 @@ class TushareService {
       
       // 数据不足，记录日志并从Tushare重新获取
       if (dailyData.length > 0) {
-        console.log(`  ⚠️ ${tsCode} 数据库数据不足(${dailyData.length}条)，从Tushare重新获取`);
+        console.log(`  ⚠️ ${tsCode} 数据库数据不足(${dailyData.length}/${requiredMinRecords}条)，从Tushare重新获取`);
       }
       
       // 3. 数据库没有数据，从 Tushare 获取并保存
