@@ -170,21 +170,21 @@ class IndexPortfolioService {
     
     const customRisk = this.calculateRiskMetrics(customReturns, results, riskFreeRate);
     
-    // 指数风险指标：使用日线数据计算更准确的夏普比率和最大回撤
+    // 指数风险指标：使用基金净值数据作为代理（因为基金跟踪指数）
     let indexRisk;
     try {
       const firstDate = results.find(r => r.isYearlyRebalance)?.rebalanceDate;
       const lastDate = results[results.length - 1]?.rebalanceDate;
       
       if (firstDate && lastDate) {
-        console.log(`\n获取指数日线数据用于计算准确的风险指标...`);
-        indexRisk = await this.calculateIndexRiskMetricsFromDaily(indexCode, firstDate, lastDate, riskFreeRate);
+        console.log(`\n使用基金净值数据计算指数的准确风险指标...`);
+        indexRisk = await this.calculateIndexRiskMetricsFromFundNav(fundCode, firstDate, lastDate, riskFreeRate);
       } else {
         // 降级方案：使用调仓期数据
         indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
       }
     } catch (error) {
-      console.warn('获取指数日线数据失败，使用调仓期数据:', error.message);
+      console.warn('使用基金净值数据计算失败，降级使用调仓期数据:', error.message);
       indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
     }
     
@@ -686,24 +686,27 @@ class IndexPortfolioService {
   }
 
   /**
-   * 基于日线数据计算指数风险指标
+   * 基于基金净值数据计算指数风险指标（使用基金作为指数的代理）
    */
-  async calculateIndexRiskMetricsFromDaily(indexCode, startDate, endDate, riskFreeRate = 0.02) {
+  async calculateIndexRiskMetricsFromFundNav(fundCode, startDate, endDate, riskFreeRate = 0.02) {
     try {
-      // 获取指数日线数据
-      const dailyData = await tushareService.getIndexDaily(indexCode, startDate, endDate);
+      // 获取基金净值数据
+      const navData = await tushareService.getFundNav(fundCode, startDate, endDate);
       
-      if (!dailyData || dailyData.length < 2) {
-        throw new Error('日线数据不足');
+      if (!navData || navData.length < 2) {
+        throw new Error('基金净值数据不足');
       }
+      
+      // 按日期排序
+      navData.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
       
       // 计算日收益率
       const dailyReturns = [];
-      for (let i = 1; i < dailyData.length; i++) {
-        const prevClose = dailyData[i - 1].close;
-        const currClose = dailyData[i].close;
-        if (prevClose > 0 && currClose > 0) {
-          dailyReturns.push((currClose - prevClose) / prevClose);
+      for (let i = 1; i < navData.length; i++) {
+        const prevNav = navData[i - 1].accum_nav || navData[i - 1].unit_nav;
+        const currNav = navData[i].accum_nav || navData[i].unit_nav;
+        if (prevNav > 0 && currNav > 0) {
+          dailyReturns.push((currNav - prevNav) / prevNav);
         }
       }
       
@@ -716,14 +719,14 @@ class IndexPortfolioService {
       
       // 计算实际年数
       const firstDate = new Date(
-        dailyData[0].trade_date.substring(0, 4),
-        parseInt(dailyData[0].trade_date.substring(4, 6)) - 1,
-        dailyData[0].trade_date.substring(6, 8)
+        navData[0].nav_date.substring(0, 4),
+        parseInt(navData[0].nav_date.substring(4, 6)) - 1,
+        navData[0].nav_date.substring(6, 8)
       );
       const lastDate = new Date(
-        dailyData[dailyData.length - 1].trade_date.substring(0, 4),
-        parseInt(dailyData[dailyData.length - 1].trade_date.substring(4, 6)) - 1,
-        dailyData[dailyData.length - 1].trade_date.substring(6, 8)
+        navData[navData.length - 1].nav_date.substring(0, 4),
+        parseInt(navData[navData.length - 1].nav_date.substring(4, 6)) - 1,
+        navData[navData.length - 1].nav_date.substring(6, 8)
       );
       const totalDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
       const actualYears = totalDays / 365;
@@ -744,22 +747,22 @@ class IndexPortfolioService {
         ? (annualizedReturn - riskFreeRate) / annualizedVolatility 
         : 0;
       
-      // 最大回撤（基于日线数据）
+      // 最大回撤（基于净值数据）
       let maxDrawdown = 0;
-      let peak = dailyData[0].close;
+      let peak = navData[0].accum_nav || navData[0].unit_nav;
       
-      for (let i = 1; i < dailyData.length; i++) {
-        const close = dailyData[i].close;
-        if (close > peak) {
-          peak = close;
+      for (let i = 1; i < navData.length; i++) {
+        const nav = navData[i].accum_nav || navData[i].unit_nav;
+        if (nav > peak) {
+          peak = nav;
         }
-        const drawdown = (peak - close) / peak;
+        const drawdown = (peak - nav) / peak;
         if (drawdown > maxDrawdown) {
           maxDrawdown = drawdown;
         }
       }
       
-      console.log(`  📈 指数风险指标（基于${dailyData.length}个交易日）:`);
+      console.log(`  📈 指数风险指标（基于基金${navData.length}个交易日净值）:`);
       console.log(`     累计收益率: ${(totalReturn * 100).toFixed(2)}%`);
       console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}% (基于${actualYears.toFixed(2)}年)`);
       console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}%`);
@@ -773,10 +776,10 @@ class IndexPortfolioService {
         volatility: annualizedVolatility,
         sharpeRatio,
         maxDrawdown,
-        periods: dailyData.length
+        periods: navData.length
       };
     } catch (error) {
-      console.error('计算指数日线风险指标失败:', error.message);
+      console.error('基于基金净值计算指数风险指标失败:', error.message);
       throw error;
     }
   }
