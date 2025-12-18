@@ -314,8 +314,8 @@ class IndexPortfolioService {
       customReturnBeforeCost: customReturns.portfolioReturn,
       tradingCost: tradingCost,
       customStockCount: customReturns.stockCount,
-      // 指数策略（只在年度调仓日计算）
-      indexReturn: indexReturns ? indexReturns.portfolioReturn : 0,
+      // 指数策略（只在年度调仓日计算，非年度调仓期返回null）
+      indexReturn: indexReturns ? indexReturns.portfolioReturn : null,
       indexStockCount: indexReturns ? indexReturns.stockCount : 0,
       isYearlyRebalance: calculateIndexReturn,
       // 基金净值（如果返回null，则不设置这些字段，让它们为undefined）
