@@ -264,17 +264,50 @@
                         </small>
                     </div>
                     
-                    <div class="info-note" style="margin-top: 15px; background: #d4edda; border-left-color: #28a745;">
-                        <strong>🎯 预期综合效果（相对提升）：</strong>
-                        <ul style="margin: 5px 0; padding-left: 20px;">
-                            <li>年化收益率：<strong>+1.3%-2.3%</strong></li>
-                            <li>年化波动率：<strong>-0.1%-0.4%</strong></li>
-                            <li>夏普比率：<strong>+0.17-0.32</strong> (相对提升)</li>
-                            <li>超额收益：<strong>+1.3%-2.5%</strong> (显著改善)</li>
-                        </ul>
-                        <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #666;">
-                            ⚠️ 注：由于数据频率局限，绝对值会被高估，请以相对提升为主要参考
-                        </p>
+                    <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
+                        <strong>🎯 方案四：股票池优化筛选</strong>
+                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合，预期夏普比率+0.08-0.15</p>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>
+                            <input type="checkbox" id="enableStockFilter">
+                            <strong>★ 启用股票池筛选</strong>
+                        </label>
+                        <small style="color: #666; display: block; margin-left: 20px;">
+                            仅针对自定义策略，指数策略保持原有成分股不变
+                        </small>
+                    </div>
+                    
+                    <div id="stockFilterConfig" style="display: none; margin-left: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; margin-top: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">最低ROE (%):</label>
+                                <input type="number" id="minROE" min="0" max="30" step="1" value="5" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除ROE低于此值的股票</small>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">最高负债率 (%):</label>
+                                <input type="number" id="maxDebtRatio" min="0" max="100" step="5" value="70" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除负债率高于此值的股票</small>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">动量期间（月）:</label>
+                                <input type="number" id="momentumMonths" min="1" max="12" step="1" value="6" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">计算过去N个月的收益率</small>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">最低动量收益率 (%):</label>
+                                <input type="number" id="minMomentumReturn" min="-50" max="50" step="5" value="-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除动量收益率低于此值的股票</small>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label>
+                                <input type="checkbox" id="filterByQuality" checked>
+                                <span style="font-size: 0.9em;">剔除质量得分低于中位数的股票（基于PE、PB、股息率）</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>

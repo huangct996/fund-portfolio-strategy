@@ -187,7 +187,9 @@ class TushareService {
           totalMv: parseFloat(dbData.total_mv) || 0,
           dvRatio: parseFloat(dbData.dv_ratio) || 0,
           peTtm: parseFloat(dbData.pe_ttm) || 0,
-          pb: parseFloat(dbData.pb) || 0
+          pb: parseFloat(dbData.pb) || 0,
+          roe: parseFloat(dbData.roe) || 0,
+          debtRatio: parseFloat(dbData.debt_ratio) || 0
         };
         
         // 如果数据库中没有股票名称，标记为需要获取

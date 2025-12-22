@@ -161,6 +161,15 @@ async function fetchAllReturns(config) {
             params.append('useQualityTilt', config.riskParityParams.useQualityTilt);
             params.append('useCovariance', config.riskParityParams.useCovariance);
             params.append('hybridRatio', config.riskParityParams.hybridRatio);
+            // 股票池筛选参数
+            params.append('enableStockFilter', config.riskParityParams.enableStockFilter);
+            if (config.riskParityParams.stockFilterParams) {
+                params.append('minROE', config.riskParityParams.stockFilterParams.minROE);
+                params.append('maxDebtRatio', config.riskParityParams.stockFilterParams.maxDebtRatio);
+                params.append('momentumMonths', config.riskParityParams.stockFilterParams.momentumMonths);
+                params.append('minMomentumReturn', config.riskParityParams.stockFilterParams.minMomentumReturn);
+                params.append('filterByQuality', config.riskParityParams.stockFilterParams.filterByQuality);
+            }
         }
     } else if (config.useCompositeScore) {
         // 综合得分策略参数
@@ -338,6 +347,15 @@ function setupConfigPanel() {
         });
     }
     
+    // 股票池筛选控件
+    const enableStockFilter = document.getElementById('enableStockFilter');
+    const stockFilterConfig = document.getElementById('stockFilterConfig');
+    if (enableStockFilter) {
+        enableStockFilter.addEventListener('change', (e) => {
+            stockFilterConfig.style.display = e.target.checked ? 'block' : 'none';
+        });
+    }
+    
     // 无风险收益率输入框不需要事件处理，直接读取值即可
     
     // 应用配置按钮
@@ -450,7 +468,16 @@ async function applyConfiguration() {
             useCovariance: document.getElementById('enableCovariance')?.checked || false,
             hybridRatio: document.getElementById('enableHybrid')?.checked 
                 ? parseInt(document.getElementById('hybridRatioSlider').value) / 100 
-                : 0
+                : 0,
+            // 股票池筛选参数
+            enableStockFilter: document.getElementById('enableStockFilter')?.checked || false,
+            stockFilterParams: document.getElementById('enableStockFilter')?.checked ? {
+                minROE: parseFloat(document.getElementById('minROE').value) / 100,
+                maxDebtRatio: parseFloat(document.getElementById('maxDebtRatio').value) / 100,
+                momentumMonths: parseInt(document.getElementById('momentumMonths').value),
+                minMomentumReturn: parseFloat(document.getElementById('minMomentumReturn').value) / 100,
+                filterByQuality: document.getElementById('filterByQuality')?.checked || false
+            } : null
         };
     }
     

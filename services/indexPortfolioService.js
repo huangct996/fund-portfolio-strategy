@@ -1,4 +1,5 @@
 const tushareService = require('./tushareService');
+const stockFilterService = require('./stockFilterService');
 
 /**
  * 基于指数成分股的投资组合回测服务
@@ -460,7 +461,10 @@ class IndexPortfolioService {
           // 综合优化参数
           useQualityTilt: riskParityParams.useQualityTilt || false,
           useCovariance: riskParityParams.useCovariance || false,
-          hybridRatio: riskParityParams.hybridRatio || 0
+          hybridRatio: riskParityParams.hybridRatio || 0,
+          // 股票池筛选参数
+          enableStockFilter: riskParityParams.enableStockFilter || false,
+          stockFilterParams: riskParityParams.stockFilterParams || null
         }
       );
       
@@ -574,7 +578,9 @@ class IndexPortfolioService {
           marketValue: info.totalMv,
           dvRatio: info.dvRatio || 0,
           peTtm: info.peTtm || 0,
-          pb: info.pb || 0
+          pb: info.pb || 0,
+          roe: info.roe || 0,
+          debtRatio: info.debtRatio || 0
         });
       }
     }
@@ -1397,12 +1403,29 @@ class IndexPortfolioService {
       maxWeight = 0.15,
       useQualityTilt = false,  // 是否使用质量因子倾斜
       useCovariance = false,   // 是否使用协方差矩阵优化
-      hybridRatio = 0          // 混合策略比例：0=纯风险平价，0.3=70%风险平价+30%市值
+      hybridRatio = 0,         // 混合策略比例：0=纯风险平价，0.3=70%风险平价+30%市值
+      enableStockFilter = false,  // 是否启用股票池筛选
+      stockFilterParams = null    // 股票池筛选参数
     } = params;
     
     console.log(`\n🔧 计算风险平价权重 - 调仓日期: ${rebalanceDate}`);
     console.log(`📊 基础参数: 窗口=${volatilityWindow}月, EWMA=${ewmaDecay}, 最大权重=${maxWeight}`);
     console.log(`🚀 综合优化: 质量因子=${useQualityTilt}, 协方差=${useCovariance}, 混合比例=${hybridRatio}`);
+    
+    // 0. 股票池筛选（仅针对自定义策略）
+    let filteredStocks = stocks;
+    if (enableStockFilter && stockFilterParams) {
+      filteredStocks = await stockFilterService.filterStocks(stocks, stockFilterParams, rebalanceDate);
+      if (filteredStocks.length === 0) {
+        console.warn(`⚠️  股票池筛选后无有效股票，使用原始股票池`);
+        filteredStocks = stocks;
+      }
+    } else {
+      console.log(`📋 未启用股票池筛选，使用全部${stocks.length}只股票`);
+    }
+    
+    // 使用筛选后的股票列表进行后续计算
+    stocks = filteredStocks;
     
     // 1. 批量获取所有股票的历史数据
     const tsCodes = stocks.map(s => s.con_code);

@@ -88,7 +88,7 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='复权因子表'
       `);
 
-      // 4. 股票基本信息表（市值、股息率、PE、PB等）
+      // 4. 股票基本信息表（市值、股息率、PE、PB、ROE、负债率等）
       await connection.execute(`
         CREATE TABLE IF NOT EXISTS stock_basic_info (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -99,6 +99,8 @@ class DatabaseService {
           dv_ratio DECIMAL(10, 4) COMMENT '股息率（%）',
           pe_ttm DECIMAL(10, 4) COMMENT '市盈率TTM',
           pb DECIMAL(10, 4) COMMENT '市净率',
+          roe DECIMAL(10, 4) COMMENT 'ROE净资产收益率（%）',
+          debt_ratio DECIMAL(10, 4) COMMENT '资产负债率（%）',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           UNIQUE KEY uk_basic_info (ts_code, trade_date),
@@ -107,10 +109,10 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表'
       `);
       
-      // 确保name字段存在（兼容旧版本表结构）
+      // 确保name、roe、debt_ratio字段存在（兼容旧版本表结构）
       try {
-        // 检查name字段是否存在
-        const [columns] = await connection.execute(`
+        // 检查并添加name字段
+        const [nameColumns] = await connection.execute(`
           SELECT COLUMN_NAME 
           FROM INFORMATION_SCHEMA.COLUMNS 
           WHERE TABLE_SCHEMA = DATABASE() 
@@ -118,16 +120,49 @@ class DatabaseService {
           AND COLUMN_NAME = 'name'
         `);
         
-        // 如果字段不存在，则添加
-        if (columns.length === 0) {
+        if (nameColumns.length === 0) {
           await connection.execute(`
             ALTER TABLE stock_basic_info 
             ADD COLUMN name VARCHAR(50) COMMENT '股票名称' AFTER ts_code
           `);
           console.log('✅ 已添加name字段到stock_basic_info表');
         }
+        
+        // 检查并添加roe字段
+        const [roeColumns] = await connection.execute(`
+          SELECT COLUMN_NAME 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'stock_basic_info' 
+          AND COLUMN_NAME = 'roe'
+        `);
+        
+        if (roeColumns.length === 0) {
+          await connection.execute(`
+            ALTER TABLE stock_basic_info 
+            ADD COLUMN roe DECIMAL(10, 4) COMMENT 'ROE净资产收益率（%）' AFTER pb
+          `);
+          console.log('✅ 已添加roe字段到stock_basic_info表');
+        }
+        
+        // 检查并添加debt_ratio字段
+        const [debtColumns] = await connection.execute(`
+          SELECT COLUMN_NAME 
+          FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'stock_basic_info' 
+          AND COLUMN_NAME = 'debt_ratio'
+        `);
+        
+        if (debtColumns.length === 0) {
+          await connection.execute(`
+            ALTER TABLE stock_basic_info 
+            ADD COLUMN debt_ratio DECIMAL(10, 4) COMMENT '资产负债率（%）' AFTER roe
+          `);
+          console.log('✅ 已添加debt_ratio字段到stock_basic_info表');
+        }
       } catch (error) {
-        console.warn('检查或添加name字段时出现警告:', error.message);
+        console.warn('检查或添加字段时出现警告:', error.message);
       }
 
       // 5. 基金净值表

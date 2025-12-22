@@ -78,7 +78,14 @@ router.get('/index-returns', async (req, res) => {
       // 综合优化参数
       useQualityTilt,
       useCovariance,
-      hybridRatio
+      hybridRatio,
+      // 股票池筛选参数
+      enableStockFilter,
+      minROE,
+      maxDebtRatio,
+      momentumMonths,
+      minMomentumReturn,
+      filterByQuality
     } = req.query;
     
     // 使用用户配置的maxWeight，如果没有则使用环境变量的默认值
@@ -119,7 +126,16 @@ router.get('/index-returns', async (req, res) => {
         // 综合优化参数
         useQualityTilt: useQualityTilt === 'true',
         useCovariance: useCovariance === 'true',
-        hybridRatio: parseFloat(hybridRatio) || 0
+        hybridRatio: parseFloat(hybridRatio) || 0,
+        // 股票池筛选参数
+        enableStockFilter: enableStockFilter === 'true',
+        stockFilterParams: enableStockFilter === 'true' ? {
+          minROE: parseFloat(minROE) || 0.05,
+          maxDebtRatio: parseFloat(maxDebtRatio) || 0.70,
+          momentumMonths: parseInt(momentumMonths) || 6,
+          minMomentumReturn: parseFloat(minMomentumReturn) || -0.20,
+          filterByQuality: filterByQuality === 'true'
+        } : null
       };
       
       console.log('\n' + '='.repeat(80));
