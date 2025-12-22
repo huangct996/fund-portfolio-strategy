@@ -26,21 +26,21 @@ class IndexPortfolioService {
       riskParityParams = null
     } = config;
 
-    console.log('\n' + '='.repeat(60));
-    console.log(`开始计算基于指数成分股的回测收益率`);
-    console.log(`指数代码: ${indexCode}`);
-    console.log(`基金代码: ${fundCode} (用于净值对比)`);
-    if (startDate) console.log(`开始日期: ${startDate}`);
-    if (endDate) console.log(`结束日期: ${endDate}`);
-    if (useRiskParity) {
-      console.log(`策略类型: 风险平价策略`);
-      console.log(`风险平价参数:`, riskParityParams);
-    } else if (useCompositeScore) {
-      console.log(`策略类型: 综合得分策略`);
-    } else {
-      console.log(`策略类型: 市值加权策略`);
-    }
-    console.log('='.repeat(60) + '\n');
+    // console.log('\n' + '='.repeat(60));
+    // console.log(`开始计算基于指数成分股的回测收益率`);
+    // console.log(`指数代码: ${indexCode}`);
+    // console.log(`基金代码: ${fundCode} (用于净值对比)`);
+    // if (startDate) console.log(`开始日期: ${startDate}`);
+    // if (endDate) console.log(`结束日期: ${endDate}`);
+    // if (useRiskParity) {
+    //   console.log(`策略类型: 风险平价策略`);
+    //   console.log(`风险平价参数:`, riskParityParams);
+    // } else if (useCompositeScore) {
+    //   console.log(`策略类型: 综合得分策略`);
+    // } else {
+    //   console.log(`策略类型: 市值加权策略`);
+    // }
+    // console.log('='.repeat(60) + '\n');
 
     // 1. 获取指数的所有调仓日期
     let rebalanceDates = await tushareService.getIndexWeightDates(indexCode);
@@ -61,9 +61,9 @@ class IndexPortfolioService {
       throw new Error(`在指定日期范围内未找到调仓日期`);
     }
 
-    console.log(`✅ 获取到 ${rebalanceDates.length} 个调仓日期`);
-    console.log(`回测起始日期: ${rebalanceDates[0]}`);
-    console.log(`回测结束日期: ${rebalanceDates[rebalanceDates.length - 1]}\n`);
+    // console.log(`✅ 获取到 ${rebalanceDates.length} 个调仓日期`);
+    // console.log(`回测起始日期: ${rebalanceDates[0]}`);
+    // console.log(`回测结束日期: ${rebalanceDates[rebalanceDates.length - 1]}\n`);
 
     // 保存原始年度调仓日期（用于指数策略）
     const yearlyRebalanceDates = [...rebalanceDates];
@@ -76,10 +76,10 @@ class IndexPortfolioService {
         riskParityParams.rebalanceFrequency,
         endDate  // 传入结束日期，以便生成到结束日期为止的所有调仓日期
       );
-      console.log(`🔄 生成高频调仓日期: ${originalDates.length} → ${rebalanceDates.length} 个`);
-      console.log(`   自定义策略: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}调仓`);
-      console.log(`   指数策略: 年度调仓（保持不变）`);
-      console.log(`   年度调仓日期: ${yearlyRebalanceDates.join(', ')}\n`);
+      // console.log(`🔄 生成高频调仓日期: ${originalDates.length} → ${rebalanceDates.length} 个`);
+      // console.log(`   自定义策略: ${riskParityParams.rebalanceFrequency === 'quarterly' ? '每季度' : '每月'}调仓`);
+      // console.log(`   指数策略: 年度调仓（保持不变）`);
+      // console.log(`   年度调仓日期: ${yearlyRebalanceDates.join(', ')}\n`);
     }
 
     const results = [];
@@ -88,9 +88,9 @@ class IndexPortfolioService {
     
     // 2. 如果用户选择的开始日期早于第一个调仓日期，在开始日期建仓
     if (startDate && startDate < rebalanceDates[0]) {
-      console.log(`\n${'='.repeat(60)}`);
-      console.log(`在用户选择的开始日期建仓: ${startDate}`);
-      console.log(`${'='.repeat(60)}`);
+      // console.log(`\n${'='.repeat(60)}`);
+      // console.log(`在用户选择的开始日期建仓: ${startDate}`);
+      // console.log(`${'='.repeat(60)}`);
       
       // 查找最近的历史年度调仓日期（在开始日期之前）
       const allYearlyDates = await tushareService.getIndexWeightDates(indexCode);
@@ -99,7 +99,7 @@ class IndexPortfolioService {
         .sort((a, b) => b.localeCompare(a))[0];
       
       if (historicalYearlyDate) {
-        console.log(`   使用最近的历史年度调仓日期: ${historicalYearlyDate}`);
+        // console.log(`   使用最近的历史年度调仓日期: ${historicalYearlyDate}`);
         const indexWeights = await tushareService.getIndexWeightByDate(indexCode, historicalYearlyDate);
         
         if (indexWeights && indexWeights.length > 0) {
@@ -145,14 +145,14 @@ class IndexPortfolioService {
       const currentDate = rebalanceDates[i];
       const nextDate = i < rebalanceDates.length - 1 ? rebalanceDates[i + 1] : null;
       
-      console.log(`\n${'='.repeat(60)}`);
-      console.log(`处理调仓日期 ${i + 1}/${rebalanceDates.length}: ${currentDate}`);
-      console.log(`${'='.repeat(60)}`);
+      // console.log(`\n${'='.repeat(60)}`);
+      // console.log(`处理调仓日期 ${i + 1}/${rebalanceDates.length}: ${currentDate}`);
+      // console.log(`${'='.repeat(60)}`);
 
       try {
         // 判断当前日期是否是年度调仓日（指数策略在年度调仓时更新持仓）
         const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
-        console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
+        // console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
         
         // 获取自定义策略的成分股权重
         // 对于季度/月度调仓，如果当前日期没有成分股数据，则使用最近的历史年度调仓日期的数据
@@ -165,7 +165,7 @@ class IndexPortfolioService {
             .sort((a, b) => b.localeCompare(a))[0];
           
           if (nearestYearlyDate && nearestYearlyDate !== currentDate) {
-            console.log(`   ℹ️  当前日期 ${currentDate} 无成分股数据，使用最近的年度调仓日期 ${nearestYearlyDate} 的数据`);
+            // console.log(`   ℹ️  当前日期 ${currentDate} 无成分股数据，使用最近的年度调仓日期 ${nearestYearlyDate} 的数据`);
             customIndexWeights = await tushareService.getIndexWeightByDate(indexCode, nearestYearlyDate);
           }
           
@@ -175,25 +175,25 @@ class IndexPortfolioService {
           }
         }
 
-        console.log(`成分股数量: ${customIndexWeights.length} 只`);
+        // console.log(`成分股数量: ${customIndexWeights.length} 只`);
         
         // 如果是年度调仓期，更新指数策略持仓
         if (isYearlyRebalance) {
           currentIndexWeights = customIndexWeights;
-          console.log(`   📊 指数策略更新持仓（年度调仓）`);
+          // console.log(`   📊 指数策略更新持仓（年度调仓）`);
         } else if (!currentIndexWeights) {
           // 如果还没有初始化指数持仓，使用当前的成分股数据
           currentIndexWeights = customIndexWeights;
-          console.log(`   📊 指数策略初始化持仓`);
+          // console.log(`   📊 指数策略初始化持仓`);
         } else {
-          console.log(`   📊 指数策略保持持仓不变（非年度调仓）`);
+          // console.log(`   📊 指数策略保持持仓不变（非年度调仓）`);
         }
         
         // 计算持有时间段
         const startDate = currentDate;  // 在调仓日建仓
         const endDate = nextDate || this.getTodayDate();  // 持有到下一个调仓日或今天
         
-        console.log(`持有时间段: ${startDate} → ${endDate}`);
+        // console.log(`持有时间段: ${startDate} → ${endDate}`);
 
         // 3. 计算三种策略的收益率
         // 自定义策略使用customIndexWeights，指数策略使用currentIndexWeights
@@ -236,9 +236,9 @@ class IndexPortfolioService {
       const lastRebalanceDate = lastResult.rebalanceDate;
       
       if (endDate > lastRebalanceDate) {
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`持仓到用户选择的结束日期: ${endDate}`);
-        console.log(`${'='.repeat(60)}`);
+        // console.log(`\n${'='.repeat(60)}`);
+        // console.log(`持仓到用户选择的结束日期: ${endDate}`);
+        // console.log(`${'='.repeat(60)}`);
         
         // 使用最后一个调仓期的持仓，计算到结束日期的收益率
         const indexWeights = await tushareService.getIndexWeightByDate(indexCode, lastRebalanceDate);
@@ -285,11 +285,11 @@ class IndexPortfolioService {
     
     const fundReturns = results.map(r => r.fundReturn);
 
-    console.log('\n调试：收益率数据');
-    console.log('自定义策略收益率:', customReturns.map(r => (r * 100).toFixed(2) + '%'));
-    console.log('指数收益率:', indexReturns.map(r => (r * 100).toFixed(2) + '%'));
-    console.log('有负收益的期数 - 自定义:', customReturns.filter(r => r < 0).length);
-    console.log('有负收益的期数 - 指数:', indexReturns.filter(r => r < 0).length);
+    // console.log('\n调试：收益率数据');
+    // console.log('自定义策略收益率:', customReturns.map(r => (r * 100).toFixed(2) + '%'));
+    // console.log('指数收益率:', indexReturns.map(r => (r * 100).toFixed(2) + '%'));
+    // console.log('有负收益的期数 - 自定义:', customReturns.filter(r => r < 0).length);
+    // console.log('有负收益的期数 - 指数:', indexReturns.filter(r => r < 0).length);
 
     // 传入完整的调仓期数组，用于计算年化频率
     // 从配置中获取无风险收益率，默认2%
@@ -306,7 +306,7 @@ class IndexPortfolioService {
       const lastDate = results[results.length - 1]?.rebalanceDate;
       
       if (firstDate && lastDate) {
-        console.log(`\n使用基金净值数据计算指数的准确风险指标...`);
+        // console.log(`\n使用基金净值数据计算指数的准确风险指标...`);
         indexRisk = await this.calculateIndexRiskMetricsFromFundNav(fundCode, firstDate, lastDate, riskFreeRate);
       } else {
         // 降级方案：使用调仓期数据
@@ -319,18 +319,18 @@ class IndexPortfolioService {
     
     const fundRisk = this.calculateRiskMetrics(fundReturns, results, riskFreeRate);
     
-    console.log('\n风险指标计算结果:');
-    console.log('自定义策略 - 最大回撤:', (customRisk.maxDrawdown * 100).toFixed(2) + '%');
-    console.log('指数策略 - 最大回撤:', (indexRisk.maxDrawdown * 100).toFixed(2) + '%');
+    // console.log('\n风险指标计算结果:');
+    // console.log('自定义策略 - 最大回撤:', (customRisk.maxDrawdown * 100).toFixed(2) + '%');
+    // console.log('指数策略 - 最大回撤:', (indexRisk.maxDrawdown * 100).toFixed(2) + '%');
 
     // 6. 计算跟踪误差
-    console.log(`\n计算跟踪误差 - 自定义策略收益率数量: ${customReturns.length}, 指数收益率数量: ${indexReturns.length}`);
+    // console.log(`\n计算跟踪误差 - 自定义策略收益率数量: ${customReturns.length}, 指数收益率数量: ${indexReturns.length}`);
     const trackingError = this.calculateTrackingError(customReturns, indexReturns);
-    if (trackingError) {
-      console.log(`✅ 跟踪误差: ${(trackingError.trackingError * 100).toFixed(2)}%, 平均偏离: ${(trackingError.avgDifference * 100).toFixed(2)}%`);
-    } else {
-      console.warn('⚠️ 跟踪误差计算失败（数组长度不匹配或数据不足）');
-    }
+    // if (trackingError) {
+    //   console.log(`✅ 跟踪误差: ${(trackingError.trackingError * 100).toFixed(2)}%, 平均偏离: ${(trackingError.avgDifference * 100).toFixed(2)}%`);
+    // } else {
+    //   console.warn('⚠️ 跟踪误差计算失败（数组长度不匹配或数据不足）');
+    // }
 
     console.log(`\n${'='.repeat(60)}`);
     console.log(`回测完成`);
@@ -1121,11 +1121,11 @@ class IndexPortfolioService {
       // 传入期望的最小数据量：每月约20个交易日，乘以窗口月数，再打8折作为阈值
       const expectedMinRecords = Math.floor(windowMonths * 20 * 0.8);
       
-      console.log(`  🔍 获取 ${tsCode} 历史数据: ${startDate}-${endDate}, 窗口=${windowMonths}月, 期望≥${expectedMinRecords}条`);
+      // console.log(`  🔍 获取 ${tsCode} 历史数据: ${startDate}-${endDate}, 窗口=${windowMonths}月, 期望≥${expectedMinRecords}条`);
       
       const dailyData = await tushareService.getStockDailyWithCache(tsCode, startDate, endDate, expectedMinRecords);
       
-      console.log(`  📊 ${tsCode} 实际获取: ${dailyData ? dailyData.length : 0}条记录`);
+      // console.log(`  📊 ${tsCode} 实际获取: ${dailyData ? dailyData.length : 0}条记录`);
       
       if (!dailyData || dailyData.length < 2) {
         console.log(`  ⚠️ ${tsCode}: 数据不足，获取到${dailyData ? dailyData.length : 0}条记录`);
@@ -1177,29 +1177,74 @@ class IndexPortfolioService {
       maxWeight = 0.15
     } = params;
     
-    console.log(`\n计算风险平价权重 - 调仓日期: ${rebalanceDate}`);
-    console.log(`参数: 窗口=${volatilityWindow}月, EWMA衰减=${ewmaDecay}, 最大权重=${maxWeight}`);
+    // console.log(`\n计算风险平价权重 - 调仓日期: ${rebalanceDate}`);
+    // console.log(`参数: 窗口=${volatilityWindow}月, EWMA衰减=${ewmaDecay}, 最大权重=${maxWeight}`);
     
-    // 1. 计算每只股票的波动率
+    // 1. 批量获取所有股票的历史数据
+    const tsCodes = stocks.map(s => s.con_code);
+    
+    // 计算开始日期（向前推volatilityWindow个月）
+    const endDateObj = new Date(
+      rebalanceDate.substring(0, 4),
+      parseInt(rebalanceDate.substring(4, 6)) - 1,
+      rebalanceDate.substring(6, 8)
+    );
+    const startDateObj = new Date(endDateObj);
+    startDateObj.setMonth(startDateObj.getMonth() - volatilityWindow);
+    
+    const startDate = startDateObj.getFullYear() + 
+      String(startDateObj.getMonth() + 1).padStart(2, '0') + 
+      String(startDateObj.getDate()).padStart(2, '0');
+    
+    const expectedMinRecords = Math.floor(volatilityWindow * 20 * 0.8);
+    
+    // 批量获取数据（一次数据库查询获取所有股票数据）
+    const stockDataMap = await tushareService.getStockDailyWithCacheBatch(
+      tsCodes, 
+      startDate, 
+      rebalanceDate, 
+      expectedMinRecords
+    );
+    
+    // 2. 计算每只股票的波动率
     const stockVolatilities = [];
     let successCount = 0;
     let failCount = 0;
     
     for (const stock of stocks) {
-      const returns = await this.getStockDailyReturns(stock.con_code, rebalanceDate, volatilityWindow);
+      const dailyData = stockDataMap[stock.con_code] || [];
       
-      if (returns.length > 0) {
-        const volatility = this.calculateEWMAVolatility(returns, ewmaDecay);
-        stockVolatilities.push({
-          tsCode: stock.con_code,
-          volatility: volatility,
-          returns: returns
-        });
-        successCount++;
+      if (dailyData.length >= 2) {
+        // 按日期升序排序
+        dailyData.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
         
-        // 调试：输出前3只股票的详细信息
-        if (successCount <= 3) {
-          console.log(`  ${stock.con_code}: ${returns.length}个交易日, 波动率=${(volatility * 100).toFixed(3)}%`);
+        // 计算日收益率
+        const returns = [];
+        for (let i = 1; i < dailyData.length; i++) {
+          const prevClose = dailyData[i - 1].adj_close || dailyData[i - 1].close_price || dailyData[i - 1].close;
+          const currClose = dailyData[i].adj_close || dailyData[i].close_price || dailyData[i].close;
+          
+          if (prevClose > 0 && currClose > 0) {
+            returns.push((currClose - prevClose) / prevClose);
+          }
+        }
+        
+        if (returns.length > 0) {
+          const volatility = this.calculateEWMAVolatility(returns, ewmaDecay);
+          stockVolatilities.push({
+            tsCode: stock.con_code,
+            volatility: volatility,
+            returns: returns
+          });
+          successCount++;
+        } else {
+          // 数据不足，使用默认波动率
+          stockVolatilities.push({
+            tsCode: stock.con_code,
+            volatility: 0.02,
+            returns: []
+          });
+          failCount++;
         }
       } else {
         // 如果没有数据，使用默认波动率
@@ -1212,13 +1257,13 @@ class IndexPortfolioService {
       }
     }
     
-    console.log(`波动率计算完成: 成功${successCount}只, 失败${failCount}只`);
+    // console.log(`波动率计算完成: 成功${successCount}只, 失败${failCount}只`);
     
     // 输出波动率统计
-    const vols = stockVolatilities.map(s => s.volatility).filter(v => v > 0);
-    if (vols.length > 0) {
-      console.log(`波动率统计: 最小=${(Math.min(...vols) * 100).toFixed(3)}%, 最大=${(Math.max(...vols) * 100).toFixed(3)}%, 平均=${(vols.reduce((a, b) => a + b, 0) / vols.length * 100).toFixed(3)}%`);
-    }
+    // const vols = stockVolatilities.map(s => s.volatility).filter(v => v > 0);
+    // if (vols.length > 0) {
+    //   console.log(`波动率统计: 最小=${(Math.min(...vols) * 100).toFixed(3)}%, 最大=${(Math.max(...vols) * 100).toFixed(3)}%, 平均=${(vols.reduce((a, b) => a + b, 0) / vols.length * 100).toFixed(3)}%`);
+    // }
     
     // 2. 计算风险平价权重：权重 ∝ 1/波动率
     const invVolatilities = stockVolatilities.map(s => ({
@@ -1243,8 +1288,8 @@ class IndexPortfolioService {
       weights[tsCode] = weights[tsCode] / totalWeight;
     });
     
-    console.log(`风险平价权重计算完成，共 ${Object.keys(weights).length} 只股票`);
-    console.log(`权重范围: ${(Math.min(...Object.values(weights)) * 100).toFixed(2)}% - ${(Math.max(...Object.values(weights)) * 100).toFixed(2)}%`);
+    // console.log(`风险平价权重计算完成，共 ${Object.keys(weights).length} 只股票`);
+    // console.log(`权重范围: ${(Math.min(...Object.values(weights)) * 100).toFixed(2)}% - ${(Math.max(...Object.values(weights)) * 100).toFixed(2)}%`);
     
     return weights;
   }

@@ -36,12 +36,12 @@ FIXED_PARAMS = {
 }
 
 # 测试参数范围
-VOLATILITY_WINDOWS = [6, 12, 18, 24]
+VOLATILITY_WINDOWS = [24, 18, 12, 6]  # 从大到小测试
 EWMA_DECAYS = [round(0.85 + i * 0.01, 2) for i in range(14)]  # 0.85-0.98
 MAX_WEIGHTS = [round(0.05 + i * 0.01, 2) for i in range(11)]  # 0.05-0.15
 
 # 并发配置
-MAX_WORKERS = 15
+MAX_WORKERS = 15  # 已验证并发安全，使用15线程加速测试
 
 def test_parameter_combination(volatility_window, ewma_decay, max_weight):
     """测试单个参数组合"""

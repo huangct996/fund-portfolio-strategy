@@ -249,6 +249,35 @@ class DatabaseService {
     return rows;
   }
 
+  /**
+   * 批量获取多只股票的日线数据
+   * @param {Array} tsCodes - 股票代码数组
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Object} 股票代码到数据数组的映射
+   */
+  async getStockDailyBatch(tsCodes, startDate, endDate) {
+    if (!tsCodes || tsCodes.length === 0) return {};
+    
+    const placeholders = tsCodes.map(() => '?').join(',');
+    const [rows] = await this.pool.execute(`
+      SELECT * FROM stock_daily 
+      WHERE ts_code IN (${placeholders}) AND trade_date >= ? AND trade_date <= ?
+      ORDER BY ts_code, trade_date ASC
+    `, [...tsCodes, startDate, endDate]);
+    
+    // 按股票代码分组
+    const result = {};
+    for (const row of rows) {
+      if (!result[row.ts_code]) {
+        result[row.ts_code] = [];
+      }
+      result[row.ts_code].push(row);
+    }
+    
+    return result;
+  }
+
   async saveStockDaily(data) {
     if (!data || data.length === 0) return;
 
@@ -299,6 +328,35 @@ class DatabaseService {
       ORDER BY trade_date ASC
     `, [tsCode, startDate, endDate]);
     return rows;
+  }
+
+  /**
+   * 批量获取多只股票的复权因子
+   * @param {Array} tsCodes - 股票代码数组
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Object} 股票代码到复权因子数组的映射
+   */
+  async getAdjFactorBatch(tsCodes, startDate, endDate) {
+    if (!tsCodes || tsCodes.length === 0) return {};
+    
+    const placeholders = tsCodes.map(() => '?').join(',');
+    const [rows] = await this.pool.execute(`
+      SELECT * FROM stock_adj_factor 
+      WHERE ts_code IN (${placeholders}) AND trade_date >= ? AND trade_date <= ?
+      ORDER BY ts_code, trade_date ASC
+    `, [...tsCodes, startDate, endDate]);
+    
+    // 按股票代码分组
+    const result = {};
+    for (const row of rows) {
+      if (!result[row.ts_code]) {
+        result[row.ts_code] = [];
+      }
+      result[row.ts_code].push(row);
+    }
+    
+    return result;
   }
 
   async saveAdjFactor(data) {

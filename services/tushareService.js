@@ -822,6 +822,72 @@ class TushareService {
       return [];
     }
   }
+
+  /**
+   * 批量获取多只股票的日线数据（带缓存）
+   * @param {Array} tsCodes - 股票代码数组
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @param {number} minRecords - 最小记录数
+   * @returns {Object} 股票代码到数据数组的映射
+   */
+  async getStockDailyWithCacheBatch(tsCodes, startDate, endDate, minRecords = null) {
+    await this.ensureDbInitialized();
+    
+    if (!tsCodes || tsCodes.length === 0) return {};
+    
+    try {
+      // 1. 批量从数据库获取数据
+      const dailyDataMap = await dbService.getStockDailyBatch(tsCodes, startDate, endDate);
+      const adjFactorDataMap = await dbService.getAdjFactorBatch(tsCodes, startDate, endDate);
+      
+      // 2. 处理每只股票的数据
+      const result = {};
+      
+      for (const tsCode of tsCodes) {
+        const dailyData = dailyDataMap[tsCode] || [];
+        const adjFactorData = adjFactorDataMap[tsCode] || [];
+        
+        // 检查数据完整性
+        let requiredMinRecords = minRecords;
+        if (requiredMinRecords === null) {
+          const start = new Date(startDate.substring(0, 4), parseInt(startDate.substring(4, 6)) - 1, startDate.substring(6, 8));
+          const end = new Date(endDate.substring(0, 4), parseInt(endDate.substring(4, 6)) - 1, endDate.substring(6, 8));
+          const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+          requiredMinRecords = Math.floor(monthsDiff * 20 * 0.8);
+        }
+        
+        const hasEnoughData = dailyData.length >= requiredMinRecords && adjFactorData.length >= requiredMinRecords;
+        
+        if (hasEnoughData && dailyData.length > 0 && adjFactorData.length > 0) {
+          // 数据充足，计算后复权价格
+          const adjFactorMap = {};
+          adjFactorData.forEach(item => {
+            adjFactorMap[item.trade_date] = item.adj_factor;
+          });
+          
+          const latestAdjFactor = adjFactorData[adjFactorData.length - 1].adj_factor;
+          result[tsCode] = dailyData.map(item => ({
+            ...item,
+            adj_close: item.close * (latestAdjFactor / (adjFactorMap[item.trade_date] || 1))
+          }));
+        } else {
+          // 数据不足，降级到单个查询（会触发tushare同步）
+          result[tsCode] = await this.getStockDailyWithCache(tsCode, startDate, endDate, minRecords);
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('批量获取股票数据失败:', error.message);
+      // 降级到单个查询
+      const result = {};
+      for (const tsCode of tsCodes) {
+        result[tsCode] = await this.getStockDailyWithCache(tsCode, startDate, endDate, minRecords);
+      }
+      return result;
+    }
+  }
 }
 
 module.exports = new TushareService();
