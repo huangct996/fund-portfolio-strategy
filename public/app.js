@@ -93,8 +93,10 @@ async function loadData() {
             throw new Error('未获取到收益率数据');
         }
 
-        // 绘制收益对比曲线
-        drawCumulativeReturnChart(allReturnsData, customRisk, indexRisk);
+        // 绘制收益对比曲线（传递每日数据）
+        const dailyData = returnsResult.dailyData || null;
+        console.log('每日数据:', dailyData);
+        drawCumulativeReturnChart(allReturnsData, customRisk, indexRisk, dailyData);
         document.getElementById('chartsSection').style.display = 'block';
 
         // 显示持仓明细
@@ -155,6 +157,10 @@ async function fetchAllReturns(config) {
             params.append('enableTradingCost', config.riskParityParams.enableTradingCost);
             params.append('tradingCostRate', config.riskParityParams.tradingCostRate);
             params.append('riskFreeRate', config.riskParityParams.riskFreeRate || 0.02);
+            // 综合优化参数
+            params.append('useQualityTilt', config.riskParityParams.useQualityTilt);
+            params.append('useCovariance', config.riskParityParams.useCovariance);
+            params.append('hybridRatio', config.riskParityParams.hybridRatio);
         }
     } else if (config.useCompositeScore) {
         // 综合得分策略参数
@@ -213,25 +219,13 @@ function setupConfigPanel() {
     // 策略类型切换
     document.querySelectorAll('input[name="strategy"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
-            const compositeWeights = document.getElementById('compositeWeights');
-            const marketValueConfig = document.getElementById('marketValueConfig');
-            const riskParityConfig = document.getElementById('riskParityConfig');
-            
-            if (e.target.value === 'composite') {
-                compositeWeights.style.display = 'block';
-                marketValueConfig.style.display = 'none';
-                riskParityConfig.style.display = 'none';
-            } else if (e.target.value === 'riskParity') {
-                compositeWeights.style.display = 'none';
-                marketValueConfig.style.display = 'none';
-                riskParityConfig.style.display = 'block';
-            } else {
-                compositeWeights.style.display = 'none';
-                marketValueConfig.style.display = 'block';
-                riskParityConfig.style.display = 'none';
-            }
+            updateStrategyDisplay(e.target.value);
         });
     });
+    
+    // 初始化显示正确的策略配置区域
+    const selectedStrategy = document.querySelector('input[name="strategy"]:checked')?.value || 'riskParity';
+    updateStrategyDisplay(selectedStrategy);
     
     // 市值加权策略权重上限滑块
     const mvMaxWeightSlider = document.getElementById('mvMaxWeightSlider');
@@ -326,6 +320,24 @@ function setupConfigPanel() {
         });
     }
     
+    // 综合优化方案控件
+    const hybridRatioSlider = document.getElementById('hybridRatioSlider');
+    const hybridRatioValue = document.getElementById('hybridRatioValue');
+    if (hybridRatioSlider) {
+        hybridRatioSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            hybridRatioValue.textContent = value + '%';
+        });
+    }
+    
+    const enableHybrid = document.getElementById('enableHybrid');
+    const hybridRatioConfig = document.getElementById('hybridRatioConfig');
+    if (enableHybrid) {
+        enableHybrid.addEventListener('change', (e) => {
+            hybridRatioConfig.style.display = e.target.checked ? 'block' : 'none';
+        });
+    }
+    
     // 无风险收益率输入框不需要事件处理，直接读取值即可
     
     // 应用配置按钮
@@ -339,6 +351,26 @@ function setupConfigPanel() {
     
     // 加载调仓日期列表
     loadRebalanceDates();
+}
+
+function updateStrategyDisplay(strategy) {
+    const compositeWeights = document.getElementById('compositeWeights');
+    const marketValueConfig = document.getElementById('marketValueConfig');
+    const riskParityConfig = document.getElementById('riskParityConfig');
+    
+    if (strategy === 'composite') {
+        compositeWeights.style.display = 'block';
+        marketValueConfig.style.display = 'none';
+        riskParityConfig.style.display = 'none';
+    } else if (strategy === 'riskParity') {
+        compositeWeights.style.display = 'none';
+        marketValueConfig.style.display = 'none';
+        riskParityConfig.style.display = 'block';
+    } else {
+        compositeWeights.style.display = 'none';
+        marketValueConfig.style.display = 'block';
+        riskParityConfig.style.display = 'none';
+    }
 }
 
 function updateFactorDescription(factorType) {
@@ -412,7 +444,13 @@ async function applyConfiguration() {
             tradingCostRate: document.getElementById('enableTradingCost').checked 
                 ? parseInt(document.getElementById('tradingCostSlider').value) / 10000 
                 : 0,
-            riskFreeRate: parseFloat(document.getElementById('riskFreeRateInput').value) / 100
+            riskFreeRate: parseFloat(document.getElementById('riskFreeRateInput').value) / 100,
+            // 综合优化参数
+            useQualityTilt: document.getElementById('enableQualityTilt')?.checked || false,
+            useCovariance: document.getElementById('enableCovariance')?.checked || false,
+            hybridRatio: document.getElementById('enableHybrid')?.checked 
+                ? parseInt(document.getElementById('hybridRatioSlider').value) / 100 
+                : 0
         };
     }
     
@@ -627,7 +665,7 @@ function renderHoldingsForPeriod(period, rebalanceChange) {
     });
 }
 
-function drawCumulativeReturnChart(data, customRisk, indexRisk) {
+function drawCumulativeReturnChart(data, customRisk, indexRisk, dailyData) {
     const ctx = document.getElementById('cumulativeReturnChart').getContext('2d');
     
     // 销毁旧图表实例（如果存在）
@@ -636,84 +674,84 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
         chartInstance = null;
     }
     
-    // 调试：查看第一个调仓期的数据
-    if (data.length > 0) {
-        console.log('第一个调仓期数据:', {
-            rebalanceDate: data[0].rebalanceDate,
-            customCumulativeReturn: data[0].customCumulativeReturn,
-            indexCumulativeReturn: data[0].indexCumulativeReturn,
-            trackingError: data[0].trackingError
+    console.log('📊 绘制图表 - 数据统计:');
+    console.log('  调仓期数据点:', data.length);
+    console.log('  每日数据:', dailyData);
+    
+    // 准备数据：优先使用每日数据，否则使用调仓期数据
+    let labels = [];
+    let customData = [];
+    let indexData = [];
+    let fundData = [];
+    let pointRadiusCustom = [];
+    let pointRadiusIndex = [];
+    let pointRadiusFund = [];
+    
+    // 创建调仓日期集合用于标记
+    const rebalanceDates = new Set(data.map(d => d.rebalanceDate));
+    const yearlyRebalanceDates = new Set(data.filter(d => d.isYearlyRebalance).map(d => d.rebalanceDate));
+    
+    if (dailyData && dailyData.custom && dailyData.custom.length > 0) {
+        console.log('✅ 使用每日数据绘制平滑曲线');
+        console.log('  自定义策略每日数据点:', dailyData.custom.length);
+        console.log('  指数策略每日数据点:', dailyData.index.length);
+        
+        // 使用每日数据
+        dailyData.custom.forEach((point, idx) => {
+            const dateStr = point.date;
+            labels.push(formatDate(dateStr));
+            customData.push(point.cumulative * 100);
+            
+            // 在调仓日显示圆点
+            const isRebalanceDate = rebalanceDates.has(dateStr);
+            pointRadiusCustom.push(isRebalanceDate ? 4 : 0);
         });
-    }
-    
-    // 显示累计收益率：自定义策略 vs 原策略
-    // 横轴使用自定义策略的调仓期日期（每个调仓期的日期）
-    // 添加起点和终点以用户选择的时间为准
-    const labels = [];
-    const customData = [];
-    const indexData = [];
-    const fundData = [];
-    
-    // 添加起点（用户选择的开始时间）
-    if (data.length > 0 && currentConfig.startDate) {
-        const startDate = formatDate(currentConfig.startDate);
-        const firstRebalanceDate = formatDate(data[0].rebalanceDate);
         
-        if (startDate !== firstRebalanceDate) {
-            labels.push(startDate);
-            customData.push(0);
-            indexData.push(0);
-            fundData.push(0);
-        }
-    }
-    
-    // 添加所有调仓期数据
-    const pointRadiusCustom = [];
-    const pointRadiusIndex = [];
-    const pointRadiusFund = [];
-    
-    data.forEach(d => {
-        labels.push(formatDate(d.rebalanceDate));
-        customData.push((d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
-        indexData.push((d.indexCumulativeReturn !== undefined ? d.indexCumulativeReturn : d.indexReturn) * 100);
-        fundData.push((d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+        // 指数策略每日数据
+        dailyData.index.forEach((point, idx) => {
+            const dateStr = point.date;
+            indexData.push(point.cumulative * 100);
+            
+            // 只在年度调仓日显示圆点
+            const isYearlyRebalance = yearlyRebalanceDates.has(dateStr);
+            pointRadiusIndex.push(isYearlyRebalance ? 4 : 0);
+        });
         
-        // 只在调仓日期显示圆点（不包括开始日期和结束日期）
-        const isRebalanceDate = !d.isStartDate && !d.isEndDate;
-        pointRadiusCustom.push(isRebalanceDate ? 4 : 0);
-        pointRadiusIndex.push(isRebalanceDate && d.isYearlyRebalance ? 4 : 0);  // 指数只在年度调仓显示圆点
-        pointRadiusFund.push(isRebalanceDate ? 4 : 0);
-    });
-    
-    // 添加终点（用户选择的结束时间）
-    if (data.length > 0 && currentConfig.endDate) {
-        const endDate = formatDate(currentConfig.endDate);
-        const lastRebalanceDate = formatDate(data[data.length - 1].rebalanceDate);
+        // 基金净值数据（从调仓期数据中获取）
+        // 为每个交易日插值基金净值
+        const fundDataMap = new Map();
+        data.forEach(d => {
+            fundDataMap.set(d.rebalanceDate, (d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+        });
         
-        if (endDate !== lastRebalanceDate) {
-            labels.push(endDate);
-            // 终点使用最后一个调仓期的累计收益率
-            customData.push(customData[customData.length - 1]);
-            indexData.push(indexData[indexData.length - 1]);
-            fundData.push(fundData[fundData.length - 1]);
-            // 终点不显示圆点
-            pointRadiusCustom.push(0);
-            pointRadiusIndex.push(0);
-            pointRadiusFund.push(0);
-        }
-    }
-    
-    // 如果添加了起点，也需要为起点添加圆点半径
-    if (data.length > 0 && currentConfig.startDate) {
-        const startDate = formatDate(currentConfig.startDate);
-        const firstRebalanceDate = formatDate(data[0].rebalanceDate);
+        // 简单插值：使用最近的已知值
+        let lastKnownFundValue = 0;
+        dailyData.custom.forEach((point) => {
+            const dateStr = point.date;
+            if (fundDataMap.has(dateStr)) {
+                lastKnownFundValue = fundDataMap.get(dateStr);
+            }
+            fundData.push(lastKnownFundValue);
+            
+            const isRebalanceDate = rebalanceDates.has(dateStr);
+            pointRadiusFund.push(isRebalanceDate ? 4 : 0);
+        });
         
-        if (startDate !== firstRebalanceDate) {
-            // 起点不显示圆点
-            pointRadiusCustom.unshift(0);
-            pointRadiusIndex.unshift(0);
-            pointRadiusFund.unshift(0);
-        }
+    } else {
+        console.log('⚠️ 无每日数据，使用调仓期数据');
+        
+        // 降级：使用调仓期数据（原有逻辑）
+        data.forEach(d => {
+            labels.push(formatDate(d.rebalanceDate));
+            customData.push((d.customCumulativeReturn !== undefined ? d.customCumulativeReturn : d.customReturn) * 100);
+            indexData.push((d.indexCumulativeReturn !== undefined ? d.indexCumulativeReturn : d.indexReturn) * 100);
+            fundData.push((d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+            
+            const isRebalanceDate = !d.isStartDate && !d.isEndDate;
+            pointRadiusCustom.push(isRebalanceDate ? 4 : 0);
+            pointRadiusIndex.push(isRebalanceDate && d.isYearlyRebalance ? 4 : 0);
+            pointRadiusFund.push(isRebalanceDate ? 4 : 0);
+        });
     }
     
     chartInstance = new Chart(ctx, {
@@ -760,11 +798,31 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
         options: {
             responsive: true,
             maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
                 legend: { display: true, position: 'top' },
                 tooltip: {
                     callbacks: {
-                        label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`
+                        title: (context) => {
+                            // 显示日期
+                            return `日期: ${context[0].label}`;
+                        },
+                        label: (context) => {
+                            // 显示策略名称和累计收益率
+                            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`;
+                        },
+                        footer: (context) => {
+                            // 如果是调仓日，显示标记
+                            const dataIndex = context[0].dataIndex;
+                            const dataset = context[0].dataset;
+                            if (dataset.pointRadius && dataset.pointRadius[dataIndex] > 0) {
+                                return '📍 调仓日';
+                            }
+                            return '';
+                        }
                     }
                 }
             },
@@ -772,7 +830,9 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk) {
                 x: {
                     ticks: {
                         maxRotation: 45,
-                        minRotation: 45
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 20
                     }
                 },
                 y: {

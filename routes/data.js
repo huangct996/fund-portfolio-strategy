@@ -74,7 +74,11 @@ router.get('/index-returns', async (req, res) => {
       rebalanceFrequency,
       enableTradingCost,
       tradingCostRate,
-      riskFreeRate
+      riskFreeRate,
+      // 综合优化参数
+      useQualityTilt,
+      useCovariance,
+      hybridRatio
     } = req.query;
     
     // 使用用户配置的maxWeight，如果没有则使用环境变量的默认值
@@ -84,8 +88,13 @@ router.get('/index-returns', async (req, res) => {
     indexPortfolioService.maxWeight = effectiveMaxWeight;
     
     // 调试日志
-    console.log('收到的策略类型:', strategyType);
-    console.log('风险平价参数:', { volatilityWindow, ewmaDecay, rebalanceFrequency, enableTradingCost, tradingCostRate });
+    console.log('\n' + '='.repeat(80));
+    console.log('📥 API接收到的参数:');
+    console.log('='.repeat(80));
+    console.log('策略类型 (strategyType):', strategyType);
+    console.log('基础参数:', { volatilityWindow, ewmaDecay, rebalanceFrequency, enableTradingCost, tradingCostRate });
+    console.log('综合优化参数:', { useQualityTilt, useCovariance, hybridRatio });
+    console.log('='.repeat(80) + '\n');
     
     // 基础配置
     const config = {
@@ -106,8 +115,18 @@ router.get('/index-returns', async (req, res) => {
         rebalanceFrequency: rebalanceFrequency || 'yearly',
         enableTradingCost: enableTradingCost === 'true',
         tradingCostRate: parseFloat(tradingCostRate) || 0,
-        riskFreeRate: parseFloat(riskFreeRate) || 0.02
+        riskFreeRate: parseFloat(riskFreeRate) || 0.02,
+        // 综合优化参数
+        useQualityTilt: useQualityTilt === 'true',
+        useCovariance: useCovariance === 'true',
+        hybridRatio: parseFloat(hybridRatio) || 0
       };
+      
+      console.log('\n' + '='.repeat(80));
+      console.log('✅ 构建的配置对象:');
+      console.log('='.repeat(80));
+      console.log(JSON.stringify(config, null, 2));
+      console.log('='.repeat(80) + '\n');
     } else if (strategyType === 'composite') {
       // 综合得分策略
       config.useCompositeScore = true;
@@ -134,6 +153,7 @@ router.get('/index-returns', async (req, res) => {
         indexRisk: result.indexRisk || null,
         fundRisk: result.fundRisk || null,
         trackingError: result.trackingError || null,
+        dailyData: result.dailyData || null,  // 新增：每日数据
         indexCode: INDEX_CODE,
         fundCode: FUND_CODE,
         config: config

@@ -26,21 +26,25 @@ class IndexPortfolioService {
       riskParityParams = null
     } = config;
 
-    // console.log('\n' + '='.repeat(60));
-    // console.log(`开始计算基于指数成分股的回测收益率`);
-    // console.log(`指数代码: ${indexCode}`);
-    // console.log(`基金代码: ${fundCode} (用于净值对比)`);
-    // if (startDate) console.log(`开始日期: ${startDate}`);
-    // if (endDate) console.log(`结束日期: ${endDate}`);
-    // if (useRiskParity) {
-    //   console.log(`策略类型: 风险平价策略`);
-    //   console.log(`风险平价参数:`, riskParityParams);
-    // } else if (useCompositeScore) {
-    //   console.log(`策略类型: 综合得分策略`);
-    // } else {
-    //   console.log(`策略类型: 市值加权策略`);
-    // }
-    // console.log('='.repeat(60) + '\n');
+    console.log('\n' + '='.repeat(60));
+    console.log(`🚀 开始计算基于指数成分股的回测收益率`);
+    console.log(`指数代码: ${indexCode}`);
+    console.log(`基金代码: ${fundCode} (用于净值对比)`);
+    if (startDate) console.log(`开始日期: ${startDate}`);
+    if (endDate) console.log(`结束日期: ${endDate}`);
+    console.log(`\n📋 配置对象:`, JSON.stringify(config, null, 2));
+    console.log(`\n🎯 策略标志:`);
+    console.log(`   useCompositeScore: ${useCompositeScore}`);
+    console.log(`   useRiskParity: ${useRiskParity}`);
+    if (useRiskParity) {
+      console.log(`\n✅ 策略类型: 风险平价策略`);
+      console.log(`📊 风险平价参数:`, riskParityParams);
+    } else if (useCompositeScore) {
+      console.log(`\n✅ 策略类型: 综合得分策略`);
+    } else {
+      console.log(`\n✅ 策略类型: 市值加权策略`);
+    }
+    console.log('='.repeat(60) + '\n');
 
     // 1. 获取指数的所有调仓日期
     let rebalanceDates = await tushareService.getIndexWeightDates(indexCode);
@@ -276,20 +280,83 @@ class IndexPortfolioService {
     // 5. 计算累计收益率
     this.calculateCumulativeReturns(results);
 
-    // 5. 计算风险指标
+    // 5.5 收集所有调仓期的每日数据，并计算跨期累计收益率
+    const allCustomDailyReturns = [];
+    const allIndexDailyReturns = [];
+    
+    // 跨调仓期累计收益率：每个调仓期的期间收益率与上一期累计收益率复利
+    let customCumulativeReturn = 0;
+    let indexCumulativeReturn = 0;
+    
+    results.forEach((period, idx) => {
+      if (period.customDailyReturns && period.customDailyReturns.length > 0) {
+        // 计算当前调仓期的累计收益率：(1 + 上期累计) × (1 + 当期收益) - 1
+        period.customDailyReturns.forEach(day => {
+          // 过滤掉超过用户选择的结束日期的数据
+          if (endDate && day.date > endDate) {
+            return;
+          }
+          
+          // 当前日的累计收益率 = (1 + 上期末累计) × (1 + 当期从调仓日到当前日的收益) - 1
+          const currentCumulative = (1 + customCumulativeReturn) * (1 + day.periodReturn) - 1;
+          
+          allCustomDailyReturns.push({
+            date: day.date,
+            periodReturn: day.periodReturn,  // 从调仓日到当前日的期间收益率
+            cumulative: currentCumulative,   // 从起点到当前日的累计收益率
+            periodIndex: idx,
+            isRebalanceDate: day.date === period.rebalanceDate
+          });
+        });
+        
+        // 更新累计收益率：使用当期最后一天的累计值（在结束日期范围内）
+        const validDays = period.customDailyReturns.filter(d => !endDate || d.date <= endDate);
+        if (validDays.length > 0) {
+          const lastDay = validDays[validDays.length - 1];
+          customCumulativeReturn = (1 + customCumulativeReturn) * (1 + lastDay.periodReturn) - 1;
+        }
+      }
+      
+      if (period.indexDailyReturns && period.indexDailyReturns.length > 0) {
+        period.indexDailyReturns.forEach(day => {
+          // 过滤掉超过用户选择的结束日期的数据
+          if (endDate && day.date > endDate) {
+            return;
+          }
+          
+          const currentCumulative = (1 + indexCumulativeReturn) * (1 + day.periodReturn) - 1;
+          
+          allIndexDailyReturns.push({
+            date: day.date,
+            periodReturn: day.periodReturn,
+            cumulative: currentCumulative,
+            periodIndex: idx,
+            isRebalanceDate: day.date === period.rebalanceDate,
+            isYearlyRebalance: period.isYearlyRebalance
+          });
+        });
+        
+        const validDays = period.indexDailyReturns.filter(d => !endDate || d.date <= endDate);
+        if (validDays.length > 0) {
+          const lastDay = validDays[validDays.length - 1];
+          indexCumulativeReturn = (1 + indexCumulativeReturn) * (1 + lastDay.periodReturn) - 1;
+        }
+      }
+    });
+
+    // 6. 计算风险指标（基于每日收益率）
     const customReturns = results.map(r => r.customReturn);
     
-    // 指数收益率：使用所有调仓期的数据（包括季度/月度）
-    // 注意：指数策略在所有调仓期都计算了收益率，只是持仓只在年度调仓期更新
-    const indexReturns = results.map(r => r.indexReturn);
+    // 指数收益率：只使用年度调仓期的收益率
+    const yearlyResults = results.filter(r => r.isYearlyRebalance);
+    const indexReturns = yearlyResults.map(r => r.indexReturn);
     
     const fundReturns = results.map(r => r.fundReturn);
 
-    // console.log('\n调试：收益率数据');
-    // console.log('自定义策略收益率:', customReturns.map(r => (r * 100).toFixed(2) + '%'));
-    // console.log('指数收益率:', indexReturns.map(r => (r * 100).toFixed(2) + '%'));
-    // console.log('有负收益的期数 - 自定义:', customReturns.filter(r => r < 0).length);
-    // console.log('有负收益的期数 - 指数:', indexReturns.filter(r => r < 0).length);
+    console.log('\n📊 调仓期收益率统计:');
+    console.log(`   自定义策略: ${customReturns.length}个调仓期`);
+    console.log(`   指数策略: ${indexReturns.length}个年度调仓期`);
+    console.log(`   基金净值: ${fundReturns.length}个调仓期`);
 
     // 传入完整的调仓期数组，用于计算年化频率
     // 从配置中获取无风险收益率，默认2%
@@ -297,25 +364,14 @@ class IndexPortfolioService {
       ? riskParityParams.riskFreeRate 
       : 0.02;
     
-    const customRisk = this.calculateRiskMetrics(customReturns, results, riskFreeRate);
+    // 使用每日收益率计算精确的风险指标
+    const customRisk = allCustomDailyReturns.length > 0
+      ? this.calculateRiskMetricsFromDailyReturns(allCustomDailyReturns, riskFreeRate, '自定义策略')
+      : this.calculateRiskMetrics(customReturns, results, riskFreeRate);
     
-    // 指数风险指标：使用基金净值数据作为代理（因为基金跟踪指数）
-    let indexRisk;
-    try {
-      const firstDate = results.find(r => r.isYearlyRebalance)?.rebalanceDate;
-      const lastDate = results[results.length - 1]?.rebalanceDate;
-      
-      if (firstDate && lastDate) {
-        // console.log(`\n使用基金净值数据计算指数的准确风险指标...`);
-        indexRisk = await this.calculateIndexRiskMetricsFromFundNav(fundCode, firstDate, lastDate, riskFreeRate);
-      } else {
-        // 降级方案：使用调仓期数据
-        indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
-      }
-    } catch (error) {
-      console.warn('使用基金净值数据计算失败，降级使用调仓期数据:', error.message);
-      indexRisk = this.calculateRiskMetrics(indexReturns, results.filter(r => r.isYearlyRebalance), riskFreeRate);
-    }
+    const indexRisk = allIndexDailyReturns.length > 0
+      ? this.calculateRiskMetricsFromDailyReturns(allIndexDailyReturns, riskFreeRate, '指数策略')
+      : this.calculateRiskMetrics(indexReturns, yearlyResults, riskFreeRate);
     
     const fundRisk = this.calculateRiskMetrics(fundReturns, results, riskFreeRate);
     
@@ -337,12 +393,31 @@ class IndexPortfolioService {
     console.log(`有效调仓期数: ${results.length}`);
     console.log(`${'='.repeat(60)}\n`);
 
+    // 准备每日收益率数据用于前端绘图
+    const dailyData = {
+      custom: allCustomDailyReturns.map(d => ({
+        date: d.date,
+        cumulative: d.cumulative
+      })),
+      index: allIndexDailyReturns.map(d => ({
+        date: d.date,
+        cumulative: d.cumulative
+      })),
+      rebalanceDates: results.map(r => r.rebalanceDate)
+    };
+    
+    console.log(`\n📊 返回给前端的数据:`);
+    console.log(`   自定义策略每日数据点: ${dailyData.custom.length}`);
+    console.log(`   指数策略每日数据点: ${dailyData.index.length}`);
+    console.log(`   调仓日期标记点: ${dailyData.rebalanceDates.length}`);
+
     return {
       periods: results,
       customRisk,
       indexRisk,
       fundRisk,
-      trackingError
+      trackingError,
+      dailyData  // 新增：每日收益率数据
     };
   }
 
@@ -381,7 +456,11 @@ class IndexPortfolioService {
         {
           volatilityWindow: riskParityParams.volatilityWindow,
           ewmaDecay: riskParityParams.ewmaDecay,
-          maxWeight: config.maxWeight
+          maxWeight: config.maxWeight,
+          // 综合优化参数
+          useQualityTilt: riskParityParams.useQualityTilt || false,
+          useCovariance: riskParityParams.useCovariance || false,
+          hybridRatio: riskParityParams.hybridRatio || 0
         }
       );
       
@@ -412,40 +491,44 @@ class IndexPortfolioService {
     }
 
     // 4. 准备指数策略组合（使用指数策略的持仓权重）
-    // 获取指数策略持仓的股票数据
     const indexStocksWithData = await this.enrichStockData(indexStrategyWeights, startDate);
     const indexPortfolio = indexStocksWithData.map(stock => ({
       ...stock,
-      adjustedWeight: stock.indexWeight / 100  // 指数权重是百分比，转换为小数
+      adjustedWeight: stock.indexWeight / 100
     }));
 
-    // 5. 计算三种策略的收益率
-    const customReturns = await this.calculatePortfolioReturns(customPortfolio, startDate, endDate);
+    // 5. 计算三种策略的收益率（包含每日数据）
+    const customResult = await this.calculatePortfolioDailyReturns(customPortfolio, startDate, endDate);
+    const customReturns = customResult ? customResult.periodReturn : null;
     
-    // 指数策略在所有调仓期都计算收益率（使用当前持仓）
+    // 指数策略在所有调仓期都计算收益率
+    let indexResult = null;
     let indexReturns = null;
     if (calculateIndexReturn) {
-      indexReturns = await this.calculatePortfolioReturns(indexPortfolio, startDate, endDate);
+      indexResult = await this.calculatePortfolioDailyReturns(indexPortfolio, startDate, endDate);
+      indexReturns = indexResult ? indexResult.periodReturn : null;
     }
     
     const fundNavReturn = await this.calculateReturnsFromNav(fundCode, startDate, endDate);
 
-    if (!customReturns) {
+    if (!customReturns && customReturns !== 0) {
       return null;
     }
 
     // 扣除交易成本
-    const netCustomReturn = customReturns.portfolioReturn - tradingCost;
+    const netCustomReturn = customReturns - tradingCost;
 
     return {
       // 自定义策略
       customReturn: netCustomReturn,
-      customReturnBeforeCost: customReturns.portfolioReturn,
+      customReturnBeforeCost: customReturns,
       tradingCost: tradingCost,
-      customStockCount: customReturns.stockCount,
+      customStockCount: customResult ? customResult.tradingDays : 0,
+      customDailyReturns: customResult ? customResult.dailyReturns : [],
       // 指数策略（所有调仓期都计算收益率）
-      indexReturn: indexReturns ? indexReturns.portfolioReturn : null,
-      indexStockCount: indexReturns ? indexReturns.stockCount : 0,
+      indexReturn: indexReturns,
+      indexStockCount: indexResult ? indexResult.tradingDays : 0,
+      indexDailyReturns: indexResult ? indexResult.dailyReturns : [],
       // 不在这里设置isYearlyRebalance，由调用方设置
       // 基金净值（如果返回null，则不设置这些字段，让它们为undefined）
       fundReturn: fundNavReturn?.return || 0,
@@ -644,15 +727,18 @@ class IndexPortfolioService {
   }
 
   /**
-   * 计算投资组合收益率
+   * 计算投资组合的每日收益率序列
+   * @returns {Object} { periodReturn: 总收益率, dailyReturns: [{date, return, cumulative}] }
    */
-  async calculatePortfolioReturns(portfolio, startDate, endDate) {
+  async calculatePortfolioDailyReturns(portfolio, startDate, endDate) {
     const stockCodes = portfolio.map(p => p.con_code || p.symbol);
     
     // 获取股票价格数据
     const priceData = await tushareService.batchGetStockPrices(stockCodes, startDate, endDate);
     
-    const stockReturns = [];
+    // 收集所有股票的每日价格，按日期组织
+    const dailyPricesByDate = new Map();
+    const stockWeights = new Map();
     let validWeightSum = 0;
 
     for (const stock of portfolio) {
@@ -664,55 +750,86 @@ class IndexPortfolioService {
         continue;
       }
       
-      // 如果只有一条数据，收益率为0
-      if (prices.length === 1) {
-        stockReturns.push({
-          symbol: code,
-          return: 0,
-          weight: stock.adjustedWeight,
-          normalizedWeight: stock.adjustedWeight
-        });
-        validWeightSum += stock.adjustedWeight;
-        continue;
-      }
-
-      const startPrice = prices[0].close;
-      const endPrice = prices[prices.length - 1].close;
-      const stockReturn = (endPrice - startPrice) / startPrice;
-
-      stockReturns.push({
-        symbol: code,
-        return: stockReturn,
-        weight: stock.adjustedWeight,
-        normalizedWeight: stock.adjustedWeight
-      });
-
+      stockWeights.set(code, stock.adjustedWeight);
       validWeightSum += stock.adjustedWeight;
+      
+      // 按日期组织价格数据
+      prices.forEach(price => {
+        if (!dailyPricesByDate.has(price.trade_date)) {
+          dailyPricesByDate.set(price.trade_date, new Map());
+        }
+        dailyPricesByDate.get(price.trade_date).set(code, price.close);
+      });
     }
 
-    if (stockReturns.length === 0) {
+    if (stockWeights.size === 0) {
       return null;
     }
 
     // 归一化权重
-    stockReturns.forEach(s => {
-      s.normalizedWeight = s.weight / validWeightSum;
+    const normalizedWeights = new Map();
+    stockWeights.forEach((weight, code) => {
+      normalizedWeights.set(code, weight / validWeightSum);
     });
 
-    // 计算组合收益率
-    const portfolioReturn = stockReturns.reduce((sum, s) => {
-      return sum + s.return * s.normalizedWeight;
-    }, 0);
+    // 按日期排序
+    const sortedDates = Array.from(dailyPricesByDate.keys()).sort();
+    
+    // 计算期间收益率：从调仓日到当前日的收益率
+    // 权重在期间内保持不变，直接用价格比计算
+    const dailyReturns = [];
+    const firstPrices = dailyPricesByDate.get(sortedDates[0]);
+    
+    for (let i = 0; i < sortedDates.length; i++) {
+      const currDate = sortedDates[i];
+      const currPrices = dailyPricesByDate.get(currDate);
+      
+      // 计算组合价值：Σ(当前价格/起始价格 × 权重)
+      let portfolioValue = 0;
+      let validWeightSum = 0;
+      normalizedWeights.forEach((weight, code) => {
+        const firstPrice = firstPrices.get(code);
+        const currPrice = currPrices.get(code);
+        
+        if (firstPrice && currPrice && firstPrice > 0) {
+          portfolioValue += (currPrice / firstPrice) * weight;
+          validWeightSum += weight;
+        }
+      });
+      
+      // 归一化：如果有股票缺失数据，按有效权重归一化
+      if (validWeightSum > 0 && validWeightSum < 0.999) {
+        portfolioValue = portfolioValue / validWeightSum;
+      }
+      
+      // 期间收益率 = 组合价值 - 1
+      const periodReturn = portfolioValue - 1;
+      
+      dailyReturns.push({
+        date: currDate,
+        periodReturn: periodReturn,  // 从调仓日到当前日的收益率（非复利）
+        portfolioValue: portfolioValue
+      });
+    }
+
+    // 计算期间总收益率
+    const periodReturn = dailyReturns.length > 0 
+      ? dailyReturns[dailyReturns.length - 1].periodReturn 
+      : 0;
 
     return {
-      startDate,
-      endDate,
-      portfolioReturn,
-      stockCount: stockReturns.length,
-      totalStocks: portfolio.length,
-      stockReturns,
-      validWeightSum
+      periodReturn,
+      dailyReturns,
+      tradingDays: dailyReturns.length
     };
+  }
+
+  /**
+   * 计算投资组合收益率（向后兼容的简化版本）
+   */
+  async calculatePortfolioReturns(portfolio, startDate, endDate) {
+    const result = await this.calculatePortfolioDailyReturns(portfolio, startDate, endDate);
+    return result ? result.periodReturn : null;
   }
 
   /**
@@ -806,8 +923,9 @@ class IndexPortfolioService {
         // 后续调仓期：累加收益率
         customCumulative *= (1 + r.customReturn);
         
-        // 指数收益率：只在年度调仓期更新，非年度调仓期保持不变
-        if (r.indexReturn !== null && r.indexReturn !== undefined) {
+        // 指数收益率：只在年度调仓期累加收益率
+        // 关键修复：只有年度调仓期才累加指数收益率，非年度调仓期保持上一期的累计值
+        if (r.isYearlyRebalance && r.indexReturn !== null && r.indexReturn !== undefined) {
           indexCumulative *= (1 + r.indexReturn);
         }
         
@@ -931,7 +1049,105 @@ class IndexPortfolioService {
   }
 
   /**
-   * 计算风险指标
+   * 基于每日收益率计算精确的风险指标
+   * 使用 √252 进行年化，确保不同策略的比较基准一致
+   */
+  calculateRiskMetricsFromDailyReturns(dailyReturns, annualRiskFreeRate = 0.02, strategyName = '') {
+    if (!dailyReturns || dailyReturns.length === 0) return null;
+
+    // 计算每日收益率变化（用于波动率计算）
+    const returns = [];
+    for (let i = 1; i < dailyReturns.length; i++) {
+      const prevCumulative = dailyReturns[i - 1].cumulative;
+      const currCumulative = dailyReturns[i].cumulative;
+      const dailyReturn = (1 + currCumulative) / (1 + prevCumulative) - 1;
+      returns.push(dailyReturn);
+    }
+    const tradingDays = dailyReturns.length;
+    
+    // 1. 计算累计收益率
+    const totalReturn = dailyReturns[dailyReturns.length - 1].cumulative;
+    
+    // 2. 计算实际时间跨度（年数）
+    const firstDate = dailyReturns[0].date;
+    const lastDate = dailyReturns[dailyReturns.length - 1].date;
+    const firstDateObj = new Date(
+      firstDate.substring(0, 4),
+      parseInt(firstDate.substring(4, 6)) - 1,
+      firstDate.substring(6, 8)
+    );
+    const lastDateObj = new Date(
+      lastDate.substring(0, 4),
+      parseInt(lastDate.substring(4, 6)) - 1,
+      lastDate.substring(6, 8)
+    );
+    const totalDays = (lastDateObj - firstDateObj) / (1000 * 60 * 60 * 24);
+    const actualYears = totalDays / 365;
+    
+    // 3. 年化收益率
+    const annualizedReturn = Math.pow(1 + totalReturn, 1 / actualYears) - 1;
+    
+    // 4. 计算每日平均收益率和波动率
+    const avgDailyReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+    const dailyVariance = returns.reduce((sum, r) => sum + Math.pow(r - avgDailyReturn, 2), 0) / returns.length;
+    const dailyVolatility = Math.sqrt(dailyVariance);
+    
+    // 5. 年化波动率 - 使用 √252
+    const TRADING_DAYS_PER_YEAR = 252;
+    const annualizedVolatility = dailyVolatility * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    
+    // 6. 夏普比率
+    const sharpeRatio = annualizedVolatility > 0 
+      ? (annualizedReturn - annualRiskFreeRate) / annualizedVolatility 
+      : 0;
+    
+    // 7. 索提诺比率（只考虑下行波动）
+    const downReturns = returns.filter(r => r < 0);
+    let sortinoRatio = 0;
+    if (downReturns.length > 0) {
+      const downVariance = downReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / returns.length;
+      const downVolatility = Math.sqrt(downVariance) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+      sortinoRatio = downVolatility > 0 ? (annualizedReturn - annualRiskFreeRate) / downVolatility : 0;
+    }
+    
+    // 8. 最大回撤
+    let maxDrawdown = 0;
+    let peak = 1;
+    
+    dailyReturns.forEach(d => {
+      const cumulative = 1 + d.cumulative;
+      if (cumulative > peak) {
+        peak = cumulative;
+      }
+      const drawdown = (peak - cumulative) / peak;
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    });
+    
+    console.log(`\n${strategyName} 风险指标: 累计收益${(totalReturn * 100).toFixed(2)}%, 年化收益${(annualizedReturn * 100).toFixed(2)}%, 夏普${sharpeRatio.toFixed(2)}, 最大回撤${(maxDrawdown * 100).toFixed(2)}%`);
+
+    return {
+      totalReturn,
+      annualizedReturn,
+      volatility: annualizedVolatility,
+      sharpeRatio,
+      sortinoRatio,
+      maxDrawdown,
+      tradingDays,
+      actualYears,
+      // 添加详细的计算参数说明
+      calculationMethod: {
+        dataType: 'daily',
+        tradingDaysPerYear: TRADING_DAYS_PER_YEAR,
+        volatilityAnnualizationFactor: Math.sqrt(TRADING_DAYS_PER_YEAR),
+        riskFreeRateConversion: `(1 + ${annualRiskFreeRate})^(1/252) - 1`
+      }
+    };
+  }
+
+  /**
+   * 计算风险指标（基于调仓期收益率，向后兼容）
    */
   calculateRiskMetrics(returns, periods, riskFreeRate = 0.02) {
     if (!returns || returns.length === 0) return null;
@@ -972,10 +1188,11 @@ class IndexPortfolioService {
     const totalReturn = returns.reduce((prod, r) => prod * (1 + r), 1) - 1;
     const annualizedReturn = Math.pow(1 + totalReturn, 1 / actualYears) - 1;
     
-    // 波动率年化：使用实际年化频率（不四舍五入）
-    // 这样可以更准确地反映波动率
-    const actualPeriodsPerYear = periods && periods.length > 1 
-      ? (periods.length - 1) / actualYears 
+    // 波动率年化：使用收益率数据的实际频率
+    // 关键：必须使用 returns.length（收益率数据点数量），而不是 periods.length
+    // 因为年化频率 = 收益率数据点数量 / 实际年数
+    const actualPeriodsPerYear = returns.length > 1 
+      ? (returns.length - 1) / actualYears 
       : periodsPerYear;
     const annualizedVolatility = volatility * Math.sqrt(actualPeriodsPerYear);
     
@@ -985,21 +1202,24 @@ class IndexPortfolioService {
       : 0;
     
     console.log(`  📈 风险指标详情:`);
+    console.log(`     收益率数据点: ${returns.length}个`);
+    console.log(`     时间跨度数据点: ${periods ? periods.length : 'N/A'}个`);
     console.log(`     期间平均收益率: ${(avgReturn * 100).toFixed(2)}%`);
     console.log(`     期间波动率: ${(volatility * 100).toFixed(2)}%`);
     console.log(`     累计收益率: ${(totalReturn * 100).toFixed(2)}%`);
     console.log(`     年化收益率: ${(annualizedReturn * 100).toFixed(2)}% (基于${actualYears.toFixed(2)}年)`);
-    console.log(`     实际年化频率: ${actualPeriodsPerYear.toFixed(2)}次/年 (${returns.length}期 / ${actualYears.toFixed(2)}年)`);
+    console.log(`     实际年化频率: ${actualPeriodsPerYear.toFixed(2)}次/年 (${returns.length}期收益率 / ${actualYears.toFixed(2)}年)`);
     console.log(`     年化波动率: ${(annualizedVolatility * 100).toFixed(2)}% = ${(volatility * 100).toFixed(2)}% × √${actualPeriodsPerYear.toFixed(2)}`);
     console.log(`     无风险收益率: ${(riskFreeRate * 100).toFixed(2)}%`);
     console.log(`     夏普比率: ${sharpeRatio.toFixed(2)} = (${(annualizedReturn * 100).toFixed(2)}% - ${(riskFreeRate * 100).toFixed(2)}%) / ${(annualizedVolatility * 100).toFixed(2)}%`);
+    console.log(`\n     ⚠️ 注意：指数策略收益率数据点=${returns.length}，但只有${periods ? periods.length : 'N/A'}个年度调仓期`);
     
     // 索提诺比率（只考虑下行波动）
     const downReturns = returns.filter(r => r < 0);
     let sortinoRatio = 0;
     if (downReturns.length > 0) {
       const downVariance = downReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / returns.length;
-      const downVolatility = Math.sqrt(downVariance) * Math.sqrt(periodsPerYear);
+      const downVolatility = Math.sqrt(downVariance) * Math.sqrt(actualPeriodsPerYear);
       sortinoRatio = downVolatility > 0 ? (annualizedReturn - riskFreeRate) / downVolatility : 0;
     }
     
@@ -1174,11 +1394,15 @@ class IndexPortfolioService {
     const {
       volatilityWindow = 12,
       ewmaDecay = 0.94,
-      maxWeight = 0.15
+      maxWeight = 0.15,
+      useQualityTilt = false,  // 是否使用质量因子倾斜
+      useCovariance = false,   // 是否使用协方差矩阵优化
+      hybridRatio = 0          // 混合策略比例：0=纯风险平价，0.3=70%风险平价+30%市值
     } = params;
     
-    // console.log(`\n计算风险平价权重 - 调仓日期: ${rebalanceDate}`);
-    // console.log(`参数: 窗口=${volatilityWindow}月, EWMA衰减=${ewmaDecay}, 最大权重=${maxWeight}`);
+    console.log(`\n🔧 计算风险平价权重 - 调仓日期: ${rebalanceDate}`);
+    console.log(`📊 基础参数: 窗口=${volatilityWindow}月, EWMA=${ewmaDecay}, 最大权重=${maxWeight}`);
+    console.log(`🚀 综合优化: 质量因子=${useQualityTilt}, 协方差=${useCovariance}, 混合比例=${hybridRatio}`);
     
     // 1. 批量获取所有股票的历史数据
     const tsCodes = stocks.map(s => s.con_code);
@@ -1265,31 +1489,186 @@ class IndexPortfolioService {
     //   console.log(`波动率统计: 最小=${(Math.min(...vols) * 100).toFixed(3)}%, 最大=${(Math.max(...vols) * 100).toFixed(3)}%, 平均=${(vols.reduce((a, b) => a + b, 0) / vols.length * 100).toFixed(3)}%`);
     // }
     
-    // 2. 计算风险平价权重：权重 ∝ 1/波动率
-    const invVolatilities = stockVolatilities.map(s => ({
-      tsCode: s.tsCode,
-      invVol: s.volatility > 0 ? 1 / s.volatility : 0
-    }));
+    // 2. 计算基础风险平价权重
+    let riskParityWeights = {};
     
-    const totalInvVol = invVolatilities.reduce((sum, s) => sum + s.invVol, 0);
+    if (useCovariance && stockVolatilities.length >= 2) {
+      // 方案三：使用协方差矩阵优化
+      riskParityWeights = this.calculateCovarianceBasedRiskParity(stockVolatilities, stocks, maxWeight);
+    } else {
+      // 标准风险平价：权重 ∝ 1/波动率
+      const invVolatilities = stockVolatilities.map((s, idx) => {
+        const stock = stocks[idx];
+        let invVol = s.volatility > 0 ? 1 / s.volatility : 0;
+        
+        // 方案一：质量因子倾斜
+        if (useQualityTilt && stock.dvRatio && stock.peTtm > 0) {
+          // 高股息率、低PE的股票获得额外权重
+          const qualityScore = stock.dvRatio * 10 + (stock.peTtm > 0 ? 1 / stock.peTtm : 0);
+          const qualityMultiplier = 1 + Math.min(qualityScore * 0.1, 0.3); // 最多增加30%权重
+          invVol *= qualityMultiplier;
+        }
+        
+        return {
+          tsCode: s.tsCode,
+          invVol: invVol
+        };
+      });
+      
+      const totalInvVol = invVolatilities.reduce((sum, s) => sum + s.invVol, 0);
+      
+      // 归一化权重
+      invVolatilities.forEach(s => {
+        let weight = totalInvVol > 0 ? s.invVol / totalInvVol : 1 / stocks.length;
+        weight = Math.min(weight, maxWeight);
+        riskParityWeights[s.tsCode] = weight;
+      });
+      
+      // 重新归一化
+      const totalWeight = Object.values(riskParityWeights).reduce((sum, w) => sum + w, 0);
+      Object.keys(riskParityWeights).forEach(tsCode => {
+        riskParityWeights[tsCode] = riskParityWeights[tsCode] / totalWeight;
+      });
+    }
     
-    // 3. 归一化权重
+    // 方案二：混合策略（如果启用）
+    let finalWeights = riskParityWeights;
+    if (hybridRatio > 0 && hybridRatio <= 1) {
+      // 计算市值加权
+      const marketCapWeights = this.calculateMarketCapWeightsFromStocks(stocks, maxWeight);
+      
+      // 混合：(1-hybridRatio)风险平价 + hybridRatio市值加权
+      finalWeights = {};
+      Object.keys(riskParityWeights).forEach(tsCode => {
+        finalWeights[tsCode] = 
+          (1 - hybridRatio) * riskParityWeights[tsCode] + 
+          hybridRatio * (marketCapWeights[tsCode] || 0);
+      });
+      
+      // 重新归一化
+      const totalWeight = Object.values(finalWeights).reduce((sum, w) => sum + w, 0);
+      Object.keys(finalWeights).forEach(tsCode => {
+        finalWeights[tsCode] = finalWeights[tsCode] / totalWeight;
+      });
+    }
+    
+    // console.log(`风险平价权重计算完成，共 ${Object.keys(finalWeights).length} 只股票`);
+    // console.log(`权重范围: ${(Math.min(...Object.values(finalWeights)) * 100).toFixed(2)}% - ${(Math.max(...Object.values(finalWeights)) * 100).toFixed(2)}%`);
+    
+    return finalWeights;
+  }
+
+  /**
+   * 基于协方差矩阵的风险平价权重计算
+   * @param {Array} stockVolatilities - 股票波动率数据
+   * @param {Array} stocks - 股票列表
+   * @param {number} maxWeight - 最大权重限制
+   * @returns {Object} 股票代码到权重的映射
+   */
+  calculateCovarianceBasedRiskParity(stockVolatilities, stocks, maxWeight) {
+    // 构建收益率矩阵
+    const returnsMatrix = [];
+    const validStocks = [];
+    
+    stockVolatilities.forEach((sv, idx) => {
+      if (sv.returns && sv.returns.length > 0) {
+        returnsMatrix.push(sv.returns);
+        validStocks.push(stocks[idx]);
+      }
+    });
+    
+    if (returnsMatrix.length < 2) {
+      // 数据不足，降级为标准风险平价
+      const weights = {};
+      stockVolatilities.forEach((sv, idx) => {
+        const invVol = sv.volatility > 0 ? 1 / sv.volatility : 0;
+        weights[stocks[idx].con_code] = invVol;
+      });
+      
+      const totalInvVol = Object.values(weights).reduce((sum, w) => sum + w, 0);
+      Object.keys(weights).forEach(code => {
+        weights[code] = Math.min(weights[code] / totalInvVol, maxWeight);
+      });
+      
+      const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+      Object.keys(weights).forEach(code => {
+        weights[code] = weights[code] / totalWeight;
+      });
+      
+      return weights;
+    }
+    
+    // 计算协方差矩阵
+    const n = returnsMatrix.length;
+    const means = returnsMatrix.map(returns => 
+      returns.reduce((sum, r) => sum + r, 0) / returns.length
+    );
+    
+    const covMatrix = Array(n).fill(0).map(() => Array(n).fill(0));
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const returns_i = returnsMatrix[i];
+        const returns_j = returnsMatrix[j];
+        const minLen = Math.min(returns_i.length, returns_j.length);
+        
+        let cov = 0;
+        for (let k = 0; k < minLen; k++) {
+          cov += (returns_i[k] - means[i]) * (returns_j[k] - means[j]);
+        }
+        covMatrix[i][j] = cov / minLen;
+      }
+    }
+    
+    // 基于协方差矩阵计算风险平价权重
+    const volatilities = covMatrix.map((row, i) => Math.sqrt(row[i]));
+    const invVols = volatilities.map(v => v > 0 ? 1 / v : 0);
+    const totalInvVol = invVols.reduce((sum, v) => sum + v, 0);
+    
     const weights = {};
-    invVolatilities.forEach(s => {
-      let weight = totalInvVol > 0 ? s.invVol / totalInvVol : 1 / stocks.length;
-      // 应用最大权重限制
+    validStocks.forEach((stock, i) => {
+      let weight = totalInvVol > 0 ? invVols[i] / totalInvVol : 1 / n;
       weight = Math.min(weight, maxWeight);
-      weights[s.tsCode] = weight;
+      weights[stock.con_code] = weight;
     });
     
-    // 4. 重新归一化（因为应用了最大权重限制）
+    // 归一化
     const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
-    Object.keys(weights).forEach(tsCode => {
-      weights[tsCode] = weights[tsCode] / totalWeight;
+    Object.keys(weights).forEach(code => {
+      weights[code] = weights[code] / totalWeight;
     });
     
-    // console.log(`风险平价权重计算完成，共 ${Object.keys(weights).length} 只股票`);
-    // console.log(`权重范围: ${(Math.min(...Object.values(weights)) * 100).toFixed(2)}% - ${(Math.max(...Object.values(weights)) * 100).toFixed(2)}%`);
+    return weights;
+  }
+
+  /**
+   * 从股票列表计算市值加权
+   * @param {Array} stocks - 股票列表
+   * @param {number} maxWeight - 最大权重限制
+   * @returns {Object} 股票代码到权重的映射
+   */
+  calculateMarketCapWeightsFromStocks(stocks, maxWeight) {
+    const weights = {};
+    let totalMarketCap = 0;
+    
+    // 计算总市值
+    stocks.forEach(stock => {
+      const marketCap = stock.totalMv || 0;
+      totalMarketCap += marketCap;
+    });
+    
+    // 计算权重
+    stocks.forEach(stock => {
+      const marketCap = stock.totalMv || 0;
+      let weight = totalMarketCap > 0 ? marketCap / totalMarketCap : 1 / stocks.length;
+      weight = Math.min(weight, maxWeight);
+      weights[stock.con_code] = weight;
+    });
+    
+    // 归一化
+    const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+    Object.keys(weights).forEach(code => {
+      weights[code] = weights[code] / totalWeight;
+    });
     
     return weights;
   }
