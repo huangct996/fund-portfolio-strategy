@@ -449,9 +449,10 @@ class IndexPortfolioService {
     let currentWeights = null;
     let tradingCost = 0;
     
+    let filteredOutStocks = [];
     if (useRiskParity && riskParityParams) {
       // 风险平价策略
-      const riskParityWeights = await this.calculateRiskParityWeights(
+      const riskParityResult = await this.calculateRiskParityWeights(
         stocksWithData,
         startDate,
         {
@@ -462,11 +463,18 @@ class IndexPortfolioService {
           useQualityTilt: riskParityParams.useQualityTilt || false,
           useCovariance: riskParityParams.useCovariance || false,
           hybridRatio: riskParityParams.hybridRatio || 0,
+          // 动量因子参数
+          useMomentumTilt: riskParityParams.useMomentumTilt || false,
+          momentumWindow: riskParityParams.momentumWindow || 6,
+          momentumWeight: riskParityParams.momentumWeight || 0.3,
           // 股票池筛选参数
           enableStockFilter: riskParityParams.enableStockFilter || false,
           stockFilterParams: riskParityParams.stockFilterParams || null
         }
       );
+      
+      const riskParityWeights = riskParityResult.weights;
+      filteredOutStocks = riskParityResult.removedStocks || [];
       
       customPortfolio = stocksWithData.map(stock => ({
         ...stock,
@@ -552,7 +560,15 @@ class IndexPortfolioService {
         pb: p.pb,
         compositeScore: p.compositeScore || 0,
         qualityFactor: p.qualityFactor || 0,
-        isLimited: p.isLimited || false
+        isLimited: p.isLimited || false,
+        isFiltered: false
+      })),
+      // 添加被筛选掉的股票信息
+      filteredOutStocks: filteredOutStocks.map(p => ({
+        symbol: p.con_code,
+        name: p.name,
+        indexWeight: p.indexWeight,
+        filterReason: p.filterReason || '未通过筛选'
       }))
     };
   }
@@ -1404,6 +1420,9 @@ class IndexPortfolioService {
       useQualityTilt = false,  // 是否使用质量因子倾斜
       useCovariance = false,   // 是否使用协方差矩阵优化
       hybridRatio = 0,         // 混合策略比例：0=纯风险平价，0.3=70%风险平价+30%市值
+      useMomentumTilt = false, // 是否使用动量因子倾斜
+      momentumWindow = 6,      // 动量计算窗口（月）
+      momentumWeight = 0.3,    // 动量因子权重
       enableStockFilter = false,  // 是否启用股票池筛选
       stockFilterParams = null    // 股票池筛选参数
     } = params;
@@ -1414,11 +1433,15 @@ class IndexPortfolioService {
     
     // 0. 股票池筛选（仅针对自定义策略）
     let filteredStocks = stocks;
+    let removedStocks = [];
     if (enableStockFilter && stockFilterParams) {
-      filteredStocks = await stockFilterService.filterStocks(stocks, stockFilterParams, rebalanceDate);
+      const filterResult = await stockFilterService.filterStocks(stocks, stockFilterParams, rebalanceDate);
+      filteredStocks = filterResult.filteredStocks;
+      removedStocks = filterResult.removedStocks;
       if (filteredStocks.length === 0) {
         console.warn(`⚠️  股票池筛选后无有效股票，使用原始股票池`);
         filteredStocks = stocks;
+        removedStocks = [];
       }
     } else {
       console.log(`📋 未启用股票池筛选，使用全部${stocks.length}只股票`);
@@ -1575,10 +1598,17 @@ class IndexPortfolioService {
       });
     }
     
+    // 方案一：动量因子倾斜（如果启用）
+    if (useMomentumTilt && momentumWeight > 0) {
+      console.log(`🚀 应用动量因子倾斜: 窗口=${momentumWindow}月, 权重=${momentumWeight}`);
+      finalWeights = await this.applyMomentumTilt(finalWeights, stocks, rebalanceDate, momentumWindow, momentumWeight, maxWeight);
+    }
+    
     // console.log(`风险平价权重计算完成，共 ${Object.keys(finalWeights).length} 只股票`);
     // console.log(`权重范围: ${(Math.min(...Object.values(finalWeights)) * 100).toFixed(2)}% - ${(Math.max(...Object.values(finalWeights)) * 100).toFixed(2)}%`);
     
-    return finalWeights;
+    // 返回权重和被筛选掉的股票信息
+    return { weights: finalWeights, removedStocks };
   }
 
   /**
@@ -1810,6 +1840,101 @@ class IndexPortfolioService {
     
     // 交易成本 = 换手率 × 成本率
     return turnover * tradingCostRate;
+  }
+
+  /**
+   * 应用动量因子倾斜
+   * @param {Object} baseWeights - 基础权重（风险平价或混合权重）
+   * @param {Array} stocks - 股票列表
+   * @param {string} rebalanceDate - 调仓日期
+   * @param {number} momentumWindow - 动量窗口（月）
+   * @param {number} momentumWeight - 动量因子权重（0-1）
+   * @param {number} maxWeight - 最大权重限制
+   * @returns {Object} 应用动量倾斜后的权重
+   */
+  async applyMomentumTilt(baseWeights, stocks, rebalanceDate, momentumWindow, momentumWeight, maxWeight) {
+    // 计算动量开始日期
+    const endDateObj = new Date(
+      rebalanceDate.substring(0, 4),
+      parseInt(rebalanceDate.substring(4, 6)) - 1,
+      rebalanceDate.substring(6, 8)
+    );
+    const startDateObj = new Date(endDateObj);
+    startDateObj.setMonth(startDateObj.getMonth() - momentumWindow);
+    
+    const startDate = startDateObj.getFullYear() + 
+      String(startDateObj.getMonth() + 1).padStart(2, '0') + 
+      String(startDateObj.getDate()).padStart(2, '0');
+    
+    // 批量获取股票价格数据
+    const stockCodes = stocks.map(s => s.con_code);
+    const pricesData = await tushareService.batchGetStockPrices(stockCodes, startDate, rebalanceDate);
+    
+    // 计算每只股票的动量得分
+    const momentumScores = {};
+    for (const stock of stocks) {
+      const prices = pricesData[stock.con_code];
+      if (!prices || prices.length < 2) {
+        momentumScores[stock.con_code] = 0;
+        continue;
+      }
+      
+      const firstPrice = prices[0].close;
+      const lastPrice = prices[prices.length - 1].close;
+      const momentum = (lastPrice - firstPrice) / firstPrice;
+      momentumScores[stock.con_code] = momentum;
+    }
+    
+    // 将动量得分标准化到0-1范围（使用min-max归一化）
+    const momentumValues = Object.values(momentumScores);
+    const minMomentum = Math.min(...momentumValues);
+    const maxMomentum = Math.max(...momentumValues);
+    const momentumRange = maxMomentum - minMomentum;
+    
+    const normalizedMomentum = {};
+    if (momentumRange > 0) {
+      Object.keys(momentumScores).forEach(code => {
+        normalizedMomentum[code] = (momentumScores[code] - minMomentum) / momentumRange;
+      });
+    } else {
+      // 如果所有动量相同，设为0.5
+      Object.keys(momentumScores).forEach(code => {
+        normalizedMomentum[code] = 0.5;
+      });
+    }
+    
+    // 应用动量倾斜：新权重 = (1-momentumWeight) * 基础权重 + momentumWeight * 动量得分
+    const tiltedWeights = {};
+    Object.keys(baseWeights).forEach(code => {
+      const baseWeight = baseWeights[code];
+      const momentum = normalizedMomentum[code] || 0.5;
+      // 动量倾斜：高动量股票获得更高权重
+      tiltedWeights[code] = baseWeight * (1 + momentumWeight * (momentum - 0.5) * 2);
+    });
+    
+    // 应用最大权重限制
+    Object.keys(tiltedWeights).forEach(code => {
+      tiltedWeights[code] = Math.min(tiltedWeights[code], maxWeight);
+    });
+    
+    // 重新归一化
+    const totalWeight = Object.values(tiltedWeights).reduce((sum, w) => sum + w, 0);
+    Object.keys(tiltedWeights).forEach(code => {
+      tiltedWeights[code] = tiltedWeights[code] / totalWeight;
+    });
+    
+    // 输出动量倾斜效果
+    const topMomentum = Object.entries(momentumScores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    console.log(`   📈 动量最高的3只股票:`);
+    topMomentum.forEach(([code, momentum]) => {
+      const stock = stocks.find(s => s.con_code === code);
+      const name = stock?.name || code;
+      console.log(`      ${name}: ${(momentum * 100).toFixed(2)}%`);
+    });
+    
+    return tiltedWeights;
   }
 }
 

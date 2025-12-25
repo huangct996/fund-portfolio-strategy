@@ -339,18 +339,13 @@ function setupConfigPanel() {
         });
     }
     
-    const enableHybrid = document.getElementById('enableHybrid');
-    const hybridRatioConfig = document.getElementById('hybridRatioConfig');
-    if (enableHybrid) {
-        enableHybrid.addEventListener('change', (e) => {
-            hybridRatioConfig.style.display = e.target.checked ? 'block' : 'none';
-        });
-    }
-    
     // 股票池筛选控件
     const enableStockFilter = document.getElementById('enableStockFilter');
     const stockFilterConfig = document.getElementById('stockFilterConfig');
     if (enableStockFilter) {
+        // 默认显示配置面板（因为默认勾选）
+        stockFilterConfig.style.display = enableStockFilter.checked ? 'block' : 'none';
+        
         enableStockFilter.addEventListener('change', (e) => {
             stockFilterConfig.style.display = e.target.checked ? 'block' : 'none';
         });
@@ -690,6 +685,29 @@ function renderHoldingsForPeriod(period, rebalanceChange) {
         tr.innerHTML = rowHtml;
         adjustedBody.appendChild(tr);
     });
+    
+    // 显示被筛选掉的股票（如果有）
+    if (period.filteredOutStocks && period.filteredOutStocks.length > 0) {
+        const separatorRow = document.createElement('tr');
+        separatorRow.innerHTML = `<td colspan="8" style="background: #f8f9fa; padding: 10px; text-align: center; font-weight: bold; color: #666;">
+            ❌ 以下股票被筛选掉（共${period.filteredOutStocks.length}只）
+        </td>`;
+        adjustedBody.appendChild(separatorRow);
+        
+        period.filteredOutStocks.forEach((stock, index) => {
+            const tr = document.createElement('tr');
+            tr.style.background = '#fff3cd';
+            tr.style.opacity = '0.7';
+            tr.innerHTML = `
+                <td>${sortedByAdjusted.length + index + 1}</td>
+                <td>${stock.symbol}</td>
+                <td>${stock.name || stock.symbol}</td>
+                <td style="color: #999;">-</td>
+                <td colspan="4" style="color: #856404; font-size: 0.9em;">${stock.filterReason || '未通过筛选'}</td>
+            `;
+            adjustedBody.appendChild(tr);
+        });
+    }
 }
 
 function drawCumulativeReturnChart(data, customRisk, indexRisk, dailyData) {

@@ -79,6 +79,10 @@ router.get('/index-returns', async (req, res) => {
       useQualityTilt,
       useCovariance,
       hybridRatio,
+      // 动量因子参数
+      useMomentumTilt,
+      momentumWindow,
+      momentumWeight,
       // 股票池筛选参数
       enableStockFilter,
       minROE,
@@ -127,6 +131,10 @@ router.get('/index-returns', async (req, res) => {
         useQualityTilt: useQualityTilt === 'true',
         useCovariance: useCovariance === 'true',
         hybridRatio: parseFloat(hybridRatio) || 0,
+        // 动量因子参数
+        useMomentumTilt: useMomentumTilt === 'true',
+        momentumWindow: parseInt(momentumWindow) || 6,
+        momentumWeight: parseFloat(momentumWeight) || 0.3,
         // 股票池筛选参数
         enableStockFilter: enableStockFilter === 'true',
         stockFilterParams: enableStockFilter === 'true' ? {

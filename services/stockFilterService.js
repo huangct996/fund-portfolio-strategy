@@ -15,7 +15,7 @@ class StockFilterService {
    */
   async filterStocks(stocks, filterParams, rebalanceDate) {
     if (!filterParams || stocks.length === 0) {
-      return stocks;
+      return { filteredStocks: stocks, removedStocks: [] };
     }
 
     console.log(`\n🔍 股票池筛选 - 调仓日期: ${rebalanceDate}`);
@@ -23,12 +23,21 @@ class StockFilterService {
     console.log(`   筛选条件:`, filterParams);
 
     let filteredStocks = [...stocks];
+    const removedStocks = [];
+    const filterReasons = new Map(); // 记录每只股票被筛选的原因
 
     // 1. ROE筛选（暂时跳过，数据库中没有ROE数据）
     if (filterParams.minROE > 0) {
       const beforeCount = filteredStocks.length;
       const withROE = filteredStocks.filter(stock => stock.roe && stock.roe > 0);
       if (withROE.length > 0) {
+        const removed = filteredStocks.filter(stock => {
+          const roe = stock.roe || 0;
+          return roe < filterParams.minROE;
+        });
+        removed.forEach(stock => {
+          filterReasons.set(stock.con_code, `ROE过低(${((stock.roe || 0) * 100).toFixed(1)}%)`);
+        });
         filteredStocks = filteredStocks.filter(stock => {
           const roe = stock.roe || 0;
           return roe >= filterParams.minROE;
@@ -44,6 +53,13 @@ class StockFilterService {
       const beforeCount = filteredStocks.length;
       const withDebt = filteredStocks.filter(stock => stock.debtRatio && stock.debtRatio > 0);
       if (withDebt.length > 0) {
+        const removed = filteredStocks.filter(stock => {
+          const debtRatio = stock.debtRatio || 0;
+          return debtRatio > filterParams.maxDebtRatio;
+        });
+        removed.forEach(stock => {
+          filterReasons.set(stock.con_code, `负债率过高(${((stock.debtRatio || 0) * 100).toFixed(0)}%)`);
+        });
         filteredStocks = filteredStocks.filter(stock => {
           const debtRatio = stock.debtRatio || 0;
           return debtRatio <= filterParams.maxDebtRatio;
@@ -57,25 +73,48 @@ class StockFilterService {
     // 3. 动量筛选（基于历史价格）
     if (filterParams.momentumMonths > 0 && filterParams.minMomentumReturn !== undefined) {
       const beforeCount = filteredStocks.length;
-      filteredStocks = await this.filterByMomentum(
+      const result = await this.filterByMomentum(
         filteredStocks, 
         rebalanceDate, 
         filterParams.momentumMonths, 
         filterParams.minMomentumReturn
       );
+      result.removed.forEach(stock => {
+        filterReasons.set(stock.con_code, `动量过低(${(stock.momentumReturn * 100).toFixed(1)}%)`);
+      });
+      filteredStocks = result.filtered;
       console.log(`   ✓ ${filterParams.momentumMonths}月动量 >= ${(filterParams.minMomentumReturn * 100).toFixed(0)}%: ${beforeCount} → ${filteredStocks.length}`);
     }
 
     // 4. 质量得分筛选（基于PE、PB、股息率）
     if (filterParams.filterByQuality) {
       const beforeCount = filteredStocks.length;
-      filteredStocks = this.filterByQualityScore(filteredStocks);
+      const result = this.filterByQualityScore(filteredStocks);
+      result.removed.forEach(stock => {
+        filterReasons.set(stock.con_code, `质量得分过低(${stock.qualityScore?.toFixed(2) || 'N/A'})`);
+      });
+      filteredStocks = result.filtered;
       console.log(`   ✓ 质量得分 >= 中位数: ${beforeCount} → ${filteredStocks.length}`);
     }
 
-    console.log(`   📊 最终筛选结果: ${stocks.length} → ${filteredStocks.length} (保留${(filteredStocks.length / stocks.length * 100).toFixed(1)}%)\n`);
+    // 收集所有被筛选掉的股票
+    const filteredCodes = new Set(filteredStocks.map(s => s.con_code));
+    stocks.forEach(stock => {
+      if (!filteredCodes.has(stock.con_code)) {
+        removedStocks.push({
+          ...stock,
+          filterReason: filterReasons.get(stock.con_code) || '未通过筛选'
+        });
+      }
+    });
 
-    return filteredStocks;
+    console.log(`   📊 最终筛选结果: ${stocks.length} → ${filteredStocks.length} (保留${(filteredStocks.length / stocks.length * 100).toFixed(1)}%)`);
+    if (removedStocks.length > 0) {
+      console.log(`   ❌ 筛选掉 ${removedStocks.length} 只股票`);
+    }
+    console.log('');
+
+    return { filteredStocks, removedStocks };
   }
 
   /**
@@ -92,6 +131,7 @@ class StockFilterService {
 
     // 计算每只股票的动量收益率
     const stocksWithMomentum = [];
+    const removed = [];
     for (const stock of stocks) {
       const prices = pricesData[stock.con_code];
       if (!prices || prices.length < 2) {
@@ -108,27 +148,33 @@ class StockFilterService {
       stocksWithMomentum.push({ ...stock, momentumReturn });
     }
 
-    // 筛选动量收益率大于阈值的股票
+    // 筛选动量收益率 >= minReturn 的股票
+    stocksWithMomentum.forEach(stock => {
+      if (stock.momentumReturn >= minReturn) {
+        // 通过筛选
+      } else {
+        removed.push(stock);
+      }
+    });
     const filtered = stocksWithMomentum.filter(stock => stock.momentumReturn >= minReturn);
     
-    // 输出被剔除的股票信息（前5个）
-    const removed = stocksWithMomentum.filter(stock => stock.momentumReturn < minReturn)
+    // 输出动量最差的5只股票（用于调试）
+    const worstMomentum = stocksWithMomentum
       .sort((a, b) => a.momentumReturn - b.momentumReturn)
       .slice(0, 5);
-    if (removed.length > 0) {
-      console.log(`   ⚠️  动量最差的5只股票:`);
-      removed.forEach(s => {
-        console.log(`      ${s.name || s.con_code}: ${(s.momentumReturn * 100).toFixed(2)}%`);
-      });
-    }
-    
-    return filtered;
+    console.log(`   ⚠️  动量最差的5只股票:`);
+    worstMomentum.forEach(stock => {
+      console.log(`      ${stock.name || stock.con_code}: ${(stock.momentumReturn * 100).toFixed(2)}%`);
+    });
+
+    return { filtered, removed };
   }
 
   /**
-   * 按质量得分筛选股票（保留得分高于中位数的股票）
+   * 按质量得分筛选股票（剔除低于中位数的股票）
    */
   filterByQualityScore(stocks) {
+    const removed = [];
     // 计算每只股票的质量得分
     const stocksWithScore = stocks.map(stock => {
       let qualityScore = 0;
@@ -166,10 +212,16 @@ class StockFilterService {
 
     // 计算中位数
     const scores = stocksWithScore.map(s => s.qualityScore).sort((a, b) => a - b);
-    const median = scores[Math.floor(scores.length / 2)];
+    const medianScore = scores[Math.floor(scores.length / 2)];
 
-    // 筛选得分高于中位数的股票
-    return stocksWithScore.filter(stock => stock.qualityScore >= median);
+    // 筛选质量得分 >= 中位数的股票
+    stocksWithScore.forEach(stock => {
+      if (stock.qualityScore < medianScore) {
+        removed.push(stock);
+      }
+    });
+    const filtered = stocksWithScore.filter(stock => stock.qualityScore >= medianScore);
+    return { filtered, removed };
   }
 
   /**

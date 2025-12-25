@@ -221,46 +221,21 @@
                         <small style="color: #666;">用于计算夏普比率，中国10年期国债收益率约2-2.5%</small>
                     </div>
                     
-                    <div class="info-note" style="margin-top: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-left: none;">
-                        <strong>🚀 综合优化方案（推荐）</strong>
-                        <p style="margin: 10px 0 5px 0;">启用以下优化可显著提升夏普比率：</p>
-                    </div>
-                    
-                    <div class="weight-item">
-                        <label>
-                            <input type="checkbox" id="enableQualityTilt" checked>
-                            <strong>★ 方案一：质量因子倾斜</strong>
-                        </label>
-                        <small style="color: #666; display: block; margin-left: 20px;">
-                            对高股息率、低PE的股票增加10-30%权重，预期提升收益率+0.5%-1%，夏普比率+0.05-0.10
-                        </small>
-                    </div>
-                    
                     <div class="weight-item">
                         <label>
                             <input type="checkbox" id="enableCovariance">
-                            <strong>★ 方案二：协方差矩阵优化</strong>
+                            协方差矩阵优化
                         </label>
                         <small style="color: #666; display: block; margin-left: 20px;">
-                            考虑股票间相关性，更好的分散化效果，预期降低波动率-0.3%-0.5%，夏普比率+0.03-0.05
+                            考虑股票间相关性，更好的分散化效果
                         </small>
                     </div>
                     
                     <div class="weight-item">
-                        <label>
-                            <input type="checkbox" id="enableHybrid" checked>
-                            <strong>★ 方案三：混合策略</strong>
-                        </label>
-                        <small style="color: #666; display: block; margin-left: 20px;">
-                            风险平价 + 市值加权混合，平衡风险控制和收益追求
-                        </small>
-                    </div>
-                    
-                    <div class="weight-item" id="hybridRatioConfig" style="margin-left: 20px;">
-                        <label>市值加权比例: <span id="hybridRatioValue">30%</span></label>
-                        <input type="range" id="hybridRatioSlider" min="0" max="50" step="5" value="30">
+                        <label>市值加权比例: <span id="hybridRatioValue">0%</span></label>
+                        <input type="range" id="hybridRatioSlider" min="0" max="50" step="5" value="0">
                         <small style="color: #666;">
-                            0%=纯风险平价，30%=70%风险平价+30%市值加权（推荐），50%=各區50%
+                            0%=纯风险平价，30%=70%风险平价+30%市值加权，50%=各占50%
                         </small>
                     </div>
                     
@@ -269,10 +244,10 @@
                         <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合，预期夏普比率+0.08-0.15</p>
                     </div>
                     
-                    <div class="weight-item">
+                    <div style="margin-top: 15px;">
                         <label>
-                            <input type="checkbox" id="enableStockFilter">
-                            <strong>★ 启用股票池筛选</strong>
+                            <input type="checkbox" id="enableStockFilter" checked>
+                            <strong>★ 启用股票池筛选（激进配置）</strong>
                         </label>
                         <small style="color: #666; display: block; margin-left: 20px;">
                             仅针对自定义策略，指数策略保持原有成分股不变
@@ -283,13 +258,13 @@
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div>
                                 <label style="font-size: 0.9em; color: #333;">最低ROE (%):</label>
-                                <input type="number" id="minROE" min="0" max="30" step="1" value="5" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                <small style="color: #666; font-size: 0.85em;">剔除ROE低于此值的股票</small>
+                                <input type="number" id="minROE" min="0" max="30" step="1" value="8" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除ROE低于此值的股票（暂无数据）</small>
                             </div>
                             <div>
                                 <label style="font-size: 0.9em; color: #333;">最高负债率 (%):</label>
-                                <input type="number" id="maxDebtRatio" min="0" max="100" step="5" value="70" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                <small style="color: #666; font-size: 0.85em;">剔除负债率高于此值的股票</small>
+                                <input type="number" id="maxDebtRatio" min="0" max="100" step="5" value="60" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除负债率高于此值的股票（暂无数据）</small>
                             </div>
                             <div>
                                 <label style="font-size: 0.9em; color: #333;">动量期间（月）:</label>
@@ -298,7 +273,7 @@
                             </div>
                             <div>
                                 <label style="font-size: 0.9em; color: #333;">最低动量收益率 (%):</label>
-                                <input type="number" id="minMomentumReturn" min="-50" max="50" step="5" value="-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <input type="number" id="minMomentumReturn" min="-50" max="50" step="5" value="-10" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
                                 <small style="color: #666; font-size: 0.85em;">剔除动量收益率低于此值的股票</small>
                             </div>
                         </div>
