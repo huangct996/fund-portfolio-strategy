@@ -351,6 +351,24 @@ function setupConfigPanel() {
         });
     }
     
+    // ROE筛选复选框
+    const enableROEFilter = document.getElementById('enableROEFilter');
+    const roeFilterConfig = document.getElementById('roeFilterConfig');
+    if (enableROEFilter) {
+        enableROEFilter.addEventListener('change', (e) => {
+            roeFilterConfig.style.display = e.target.checked ? 'block' : 'none';
+        });
+    }
+    
+    // 负债率筛选复选框
+    const enableDebtFilter = document.getElementById('enableDebtFilter');
+    const debtFilterConfig = document.getElementById('debtFilterConfig');
+    if (enableDebtFilter) {
+        enableDebtFilter.addEventListener('change', (e) => {
+            debtFilterConfig.style.display = e.target.checked ? 'block' : 'none';
+        });
+    }
+    
     // 无风险收益率输入框不需要事件处理，直接读取值即可
     
     // 应用配置按钮
@@ -467,8 +485,12 @@ async function applyConfiguration() {
             // 股票池筛选参数
             enableStockFilter: document.getElementById('enableStockFilter')?.checked || false,
             stockFilterParams: document.getElementById('enableStockFilter')?.checked ? {
-                minROE: parseFloat(document.getElementById('minROE').value) / 100,
-                maxDebtRatio: parseFloat(document.getElementById('maxDebtRatio').value) / 100,
+                minROE: document.getElementById('enableROEFilter')?.checked 
+                    ? parseFloat(document.getElementById('minROE').value) / 100 
+                    : 0,
+                maxDebtRatio: document.getElementById('enableDebtFilter')?.checked 
+                    ? parseFloat(document.getElementById('maxDebtRatio').value) / 100 
+                    : 1.0,
                 momentumMonths: parseInt(document.getElementById('momentumMonths').value),
                 minMomentumReturn: parseFloat(document.getElementById('minMomentumReturn').value) / 100,
                 filterByQuality: document.getElementById('filterByQuality')?.checked || false

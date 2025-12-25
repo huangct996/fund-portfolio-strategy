@@ -558,6 +558,8 @@ class IndexPortfolioService {
         dvRatio: p.dvRatio,
         peTtm: p.peTtm,
         pb: p.pb,
+        roe: p.roe || 0,
+        debtRatio: p.debtRatio || 0,
         compositeScore: p.compositeScore || 0,
         qualityFactor: p.qualityFactor || 0,
         isLimited: p.isLimited || false,
@@ -822,6 +824,11 @@ class IndexPortfolioService {
       // 归一化：如果有股票缺失数据，按有效权重归一化
       if (validWeightSum > 0 && validWeightSum < 0.999) {
         portfolioValue = portfolioValue / validWeightSum;
+      } else if (validWeightSum === 0) {
+        // 如果所有股票权重都是0或没有有效数据，保持上一期的价值（收益率为0）
+        // 这种情况可能发生在筛选后没有符合条件的股票时
+        portfolioValue = i > 0 ? dailyReturns[i - 1].portfolioValue : 1;
+        console.warn(`⚠️  ${currDate}: 所有股票权重为0，保持上一期价值`);
       }
       
       // 期间收益率 = 组合价值 - 1
@@ -1572,9 +1579,17 @@ class IndexPortfolioService {
       
       // 重新归一化
       const totalWeight = Object.values(riskParityWeights).reduce((sum, w) => sum + w, 0);
-      Object.keys(riskParityWeights).forEach(tsCode => {
-        riskParityWeights[tsCode] = riskParityWeights[tsCode] / totalWeight;
-      });
+      if (totalWeight > 0) {
+        Object.keys(riskParityWeights).forEach(tsCode => {
+          riskParityWeights[tsCode] = riskParityWeights[tsCode] / totalWeight;
+        });
+      } else {
+        // 如果总权重为0，使用等权重
+        console.warn(`⚠️  风险平价权重总和为0，使用等权重分配`);
+        Object.keys(riskParityWeights).forEach(tsCode => {
+          riskParityWeights[tsCode] = 1 / stocks.length;
+        });
+      }
     }
     
     // 方案二：混合策略（如果启用）
@@ -1593,9 +1608,16 @@ class IndexPortfolioService {
       
       // 重新归一化
       const totalWeight = Object.values(finalWeights).reduce((sum, w) => sum + w, 0);
-      Object.keys(finalWeights).forEach(tsCode => {
-        finalWeights[tsCode] = finalWeights[tsCode] / totalWeight;
-      });
+      if (totalWeight > 0) {
+        Object.keys(finalWeights).forEach(tsCode => {
+          finalWeights[tsCode] = finalWeights[tsCode] / totalWeight;
+        });
+      } else {
+        console.warn(`⚠️  混合策略权重总和为0，使用等权重分配`);
+        Object.keys(finalWeights).forEach(tsCode => {
+          finalWeights[tsCode] = 1 / stocks.length;
+        });
+      }
     }
     
     // 方案一：动量因子倾斜（如果启用）

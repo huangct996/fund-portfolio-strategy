@@ -257,14 +257,26 @@
                     <div id="stockFilterConfig" style="display: none; margin-left: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; margin-top: 10px;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div>
-                                <label style="font-size: 0.9em; color: #333;">最低ROE (%):</label>
-                                <input type="number" id="minROE" min="0" max="30" step="1" value="8" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                <small style="color: #666; font-size: 0.85em;">剔除ROE低于此值的股票（暂无数据）</small>
+                                <label>
+                                    <input type="checkbox" id="enableROEFilter">
+                                    <span style="font-size: 0.9em; color: #333;">启用ROE筛选</span>
+                                </label>
+                                <div id="roeFilterConfig" style="display: none; margin-top: 5px;">
+                                    <label style="font-size: 0.85em; color: #666;">最低ROE (%):</label>
+                                    <input type="number" id="minROE" min="0" max="30" step="1" value="8" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 2px;">剔除ROE低于此值的股票</small>
+                                </div>
                             </div>
                             <div>
-                                <label style="font-size: 0.9em; color: #333;">最高负债率 (%):</label>
-                                <input type="number" id="maxDebtRatio" min="0" max="100" step="5" value="60" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                <small style="color: #666; font-size: 0.85em;">剔除负债率高于此值的股票（暂无数据）</small>
+                                <label>
+                                    <input type="checkbox" id="enableDebtFilter">
+                                    <span style="font-size: 0.9em; color: #333;">启用负债率筛选</span>
+                                </label>
+                                <div id="debtFilterConfig" style="display: none; margin-top: 5px;">
+                                    <label style="font-size: 0.85em; color: #666;">最高负债率 (%):</label>
+                                    <input type="number" id="maxDebtRatio" min="0" max="100" step="5" value="60" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 2px;">剔除负债率高于此值的股票</small>
+                                </div>
                             </div>
                             <div>
                                 <label style="font-size: 0.9em; color: #333;">动量期间（月）:</label>

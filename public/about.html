@@ -342,6 +342,79 @@
                     <h4>综合得分策略</h4>
                     <p>综合考虑市值、股息率、质量因子（PE/PB/ROE）</p>
                 </div>
+                <div class="feature-card">
+                    <h4>⭐ 风险平价策略</h4>
+                    <p>基于波动率的风险平衡配置，让每只股票的风险贡献相等</p>
+                </div>
+            </div>
+
+            <h3>2.1 风险平价策略详解</h3>
+            <div class="info-box">
+                <strong>🎯 核心原理：</strong>让每只股票对组合总风险的贡献相等，而不是让权重相等。
+            </div>
+            
+            <h4>计算流程：</h4>
+            <ul>
+                <li><strong>步骤1：股票池筛选（可选）</strong>
+                    <ul style="padding-left: 20px; margin-top: 5px;">
+                        <li>ROE筛选：剔除ROE低于设定阈值的股票（可勾选启用）</li>
+                        <li>负债率筛选：剔除负债率高于设定阈值的股票（可勾选启用）</li>
+                        <li>动量筛选：剔除过去N个月动量收益率低于阈值的股票</li>
+                        <li>质量筛选：剔除质量得分（基于PE、PB）低于中位数的股票</li>
+                    </ul>
+                </li>
+                <li><strong>步骤2：获取历史价格数据</strong>
+                    <ul style="padding-left: 20px; margin-top: 5px;">
+                        <li>时间范围：调仓日往前推N个月（默认12个月）</li>
+                        <li>数据要求：至少N×20×0.8个交易日的数据</li>
+                        <li>价格类型：使用复权后的收盘价</li>
+                    </ul>
+                </li>
+                <li><strong>步骤3：计算波动率（EWMA方法）</strong>
+                    <ul style="padding-left: 20px; margin-top: 5px;">
+                        <li>EWMA波动率 = √(EWMA方差)</li>
+                        <li>EWMA方差ₜ = λ × EWMA方差ₜ₋₁ + (1-λ) × 收益率ₜ²</li>
+                        <li>衰减因子λ：默认0.94，对近期数据赋予更高权重</li>
+                    </ul>
+                </li>
+                <li><strong>步骤4：计算风险平价权重</strong>
+                    <ul style="padding-left: 20px; margin-top: 5px;">
+                        <li>权重ᵢ ∝ 1 / 波动率ᵢ</li>
+                        <li>归一化后：权重ᵢ = (1/波动率ᵢ) / Σ(1/波动率ⱼ)</li>
+                        <li>应用权重上限（默认10%）并重新归一化</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h4>数据使用时间段：</h4>
+            <div class="code-block">
+数据类型          时间范围              用途
+─────────────────────────────────────────────
+股票日收益率      调仓日往前12个月      计算波动率（EWMA）
+动量价格数据      调仓日往前6个月       计算动量收益率
+ROE、负债率       最近一期财报          股票池筛选
+PE、PB、股息率    调仓日当天            质量因子计算
+市值              调仓日当天            市值加权（混合策略）
+            </div>
+
+            <h4>可选增强功能：</h4>
+            <ul>
+                <li><strong>协方差矩阵优化：</strong>考虑股票之间的相关性，更好的分散化效果</li>
+                <li><strong>混合策略：</strong>将风险平价权重与市值加权混合（如70%风险平价+30%市值）</li>
+                <li><strong>质量因子倾斜：</strong>给高股息率、低PE的股票增加权重（最多+30%）</li>
+                <li><strong>动量因子倾斜：</strong>给高动量股票增加权重</li>
+            </ul>
+
+            <div class="success-box">
+                <strong>✅ 推荐配置（最大化夏普比率）：</strong>
+                <ul style="margin-top: 10px; padding-left: 20px;">
+                    <li>波动率窗口：9-12个月</li>
+                    <li>EWMA衰减：0.94</li>
+                    <li>调仓频率：季度或年度</li>
+                    <li>最大权重：10%</li>
+                    <li>启用股票池筛选：ROE≥8%，负债率≤60%，动量≥-10%，质量筛选</li>
+                    <li>不启用倾斜因子（保持策略简单）</li>
+                </ul>
             </div>
 
             <h3>3. 基金净值（参考）</h3>

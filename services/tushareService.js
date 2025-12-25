@@ -152,7 +152,77 @@ class TushareService {
   }
 
   /**
-   * 批量获取股票基本信息（包含名称、市值、股息率、质量因子，优先从数据库查询）
+   * 获取股票财务指标（ROE、资产负债率等）
+   * @param {Array} tsCodes - 股票代码数组
+   * @param {string} period - 报告期（YYYYMMDD格式，如20231231表示2023年年报）
+   * @returns {Object} 股票代码到财务指标的映射
+   */
+  async getFinancialIndicators(tsCodes, period) {
+    const results = {};
+    
+    if (!tsCodes || tsCodes.length === 0) {
+      return results;
+    }
+    
+    // 批量获取财务指标，每次最多50只股票
+    const batchSize = 50;
+    
+    for (let i = 0; i < tsCodes.length; i += batchSize) {
+      const batch = tsCodes.slice(i, i + batchSize);
+      const tsCodeStr = batch.join(',');
+      
+      try {
+        // 调用fina_indicator接口获取财务指标
+        const data = await this.callApi('fina_indicator', {
+          ts_code: tsCodeStr,
+          period: period,
+          fields: 'ts_code,end_date,roe,debt_to_assets'
+        });
+        
+        data.forEach(item => {
+          results[item.ts_code] = {
+            roe: parseFloat(item.roe) || 0,  // ROE净资产收益率（%）
+            debtRatio: parseFloat(item.debt_to_assets) || 0  // 资产负债率（%）
+          };
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        console.warn(`批量获取财务指标失败:`, error.message);
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * 根据交易日期推算最近的财报期
+   * @param {string} tradeDate - 交易日期（YYYYMMDD）
+   * @returns {string} 财报期（YYYYMMDD）
+   */
+  getRecentReportPeriod(tradeDate) {
+    const year = parseInt(tradeDate.substring(0, 4));
+    const month = parseInt(tradeDate.substring(4, 6));
+    
+    // 根据月份确定最近的财报期
+    // 一季报(0331)、中报(0630)、三季报(0930)、年报(1231)
+    if (month >= 1 && month < 5) {
+      // 1-4月：使用上一年年报
+      return `${year - 1}1231`;
+    } else if (month >= 5 && month < 9) {
+      // 5-8月：使用当年一季报
+      return `${year}0331`;
+    } else if (month >= 9 && month < 11) {
+      // 9-10月：使用当年中报
+      return `${year}0630`;
+    } else {
+      // 11-12月：使用当年三季报
+      return `${year}0930`;
+    }
+  }
+
+  /**
+   * 批量获取股票基本信息（包含名称、市值、股息率、质量因子、ROE、负债率，优先从数据库查询）
    */
   async batchGetStockBasic(stockCodes, tradeDate) {
     await this.ensureDbInitialized();
@@ -178,6 +248,7 @@ class TushareService {
     // 先从数据库查询
     const missingCodes = [];
     const missingNames = [];  // 缺少名称的股票代码
+    const missingFinancials = [];  // 缺少财务数据的股票代码
     
     for (const tsCode of tsCodes) {
       const dbData = await dbService.getStockBasicInfo(tsCode, tradeDate);
@@ -195,6 +266,11 @@ class TushareService {
         // 如果数据库中没有股票名称，标记为需要获取
         if (!dbData.name) {
           missingNames.push(tsCode);
+        }
+        
+        // 如果数据库中没有财务数据（ROE或负债率为null/undefined/0），标记为需要获取
+        if (dbData.roe === null || dbData.roe === undefined || dbData.debt_ratio === null || dbData.debt_ratio === undefined) {
+          missingFinancials.push(tsCode);
         }
         
         // 计算质量因子
@@ -235,9 +311,15 @@ class TushareService {
       }
     }
 
-    if (missingCodes.length === 0) {
-      console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票基本信息`);
+    console.log(`数据库查询结果: 找到${tsCodes.length - missingCodes.length}只, 缺失${missingCodes.length}只, 需要财务数据${missingFinancials.length}只`);
+    
+    if (missingCodes.length === 0 && missingFinancials.length === 0) {
+      console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票基本信息（含完整财务数据）`);
       return results;
+    }
+    
+    if (missingCodes.length === 0 && missingFinancials.length > 0) {
+      console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票基本信息，但${missingFinancials.length}只缺少财务数据`);
     }
 
     console.log(`数据库缺失 ${missingCodes.length}/${tsCodes.length} 只股票基本信息，从Tushare获取`);
@@ -368,6 +450,44 @@ class TushareService {
     if (dataToSave.length > 0) {
       await dbService.saveStockBasicInfo(dataToSave);
       console.log('✅ 股票基本信息已同步到数据库');
+    }
+    
+    // 获取财务指标（ROE、负债率）
+    const needFinancials = [...new Set([...missingCodes, ...missingFinancials])];
+    if (needFinancials.length > 0) {
+      console.log(`需要获取 ${needFinancials.length} 只股票的财务指标（ROE、负债率）`);
+      
+      // 根据交易日期推算最近的财报期
+      const reportPeriod = this.getRecentReportPeriod(tradeDate);
+      console.log(`使用财报期: ${reportPeriod}`);
+      
+      const financialData = await this.getFinancialIndicators(needFinancials, reportPeriod);
+      
+      // 更新results和dataToSave
+      const financialDataToUpdate = [];
+      for (const tsCode of needFinancials) {
+        if (financialData[tsCode]) {
+          if (!results[tsCode]) {
+            results[tsCode] = {};
+          }
+          results[tsCode].roe = financialData[tsCode].roe / 100;  // 转换为小数
+          results[tsCode].debtRatio = financialData[tsCode].debtRatio / 100;  // 转换为小数
+          
+          // 准备更新数据库
+          financialDataToUpdate.push({
+            ts_code: tsCode,
+            trade_date: tradeDate,
+            roe: results[tsCode].roe,
+            debt_ratio: results[tsCode].debtRatio
+          });
+        }
+      }
+      
+      // 更新数据库中的财务数据
+      if (financialDataToUpdate.length > 0) {
+        await dbService.updateStockFinancialInfo(financialDataToUpdate);
+        console.log(`✅ 已更新 ${financialDataToUpdate.length} 只股票的财务指标到数据库`);
+      }
     }
 
     return results;

@@ -474,6 +474,39 @@ class DatabaseService {
     }
   }
 
+  async updateStockFinancialInfo(data) {
+    if (!data || data.length === 0) return;
+
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const item of data) {
+        await connection.execute(`
+          INSERT INTO stock_basic_info 
+          (ts_code, trade_date, roe, debt_ratio)
+          VALUES (?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            roe = VALUES(roe),
+            debt_ratio = VALUES(debt_ratio),
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+          item.ts_code,
+          item.trade_date,
+          item.roe,
+          item.debt_ratio
+        ]);
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   // ==================== 基金净值相关 ====================
   
   async getFundNav(tsCode, startDate, endDate = null) {
