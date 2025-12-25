@@ -196,20 +196,22 @@ class IndexPortfolioService {
         
         // 计算持有时间段
         const startDate = currentDate;  // 在调仓日建仓
-        const endDate = nextDate || this.getTodayDate();  // 持有到下一个调仓日或今天
+        const periodEndDate = nextDate || (endDate && endDate > currentDate ? endDate : this.getTodayDate());  // 持有到下一个调仓日、用户结束日期或今天
         
         // console.log(`持有时间段: ${startDate} → ${endDate}`);
 
         // 3. 计算三种策略的收益率
         // 自定义策略使用customIndexWeights，指数策略使用currentIndexWeights
+        // 指数策略需要在所有期间都计算收益率，以确保数据连续性
+        // 但只在年度调仓期标记为isYearlyRebalance，用于后续筛选
         const periodResult = await this.calculatePeriodReturns(
           customIndexWeights,
           startDate,
-          endDate,
+          periodEndDate,
           fundCode,
           config,
           previousWeights,
-          true,  // 总是计算指数收益率
+          true,  // 总是计算指数收益率，确保数据连续性
           currentIndexWeights,  // 传入指数策略的持仓
           isYearlyRebalance  // 传入是否年度调仓的标记
         );
@@ -218,7 +220,7 @@ class IndexPortfolioService {
           results.push({
             rebalanceDate: currentDate,
             startDate,
-            endDate,
+            endDate: periodEndDate,
             isYearlyRebalance,  // 添加年度调仓标记
             ...periodResult
           });
@@ -239,8 +241,11 @@ class IndexPortfolioService {
     if (endDate && results.length > 0) {
       const lastResult = results[results.length - 1];
       const lastRebalanceDate = lastResult.rebalanceDate;
+      const lastPeriodEndDate = lastResult.endDate;
+      const lastYearlyRebalanceDate = yearlyRebalanceDates[yearlyRebalanceDates.length - 1];
       
-      if (endDate > lastRebalanceDate) {
+      // 只有当最后一个期间的结束日期早于用户结束日期时，才添加额外的期间
+      if (endDate > lastRebalanceDate && lastPeriodEndDate < endDate) {
         // console.log(`\n${'='.repeat(60)}`);
         // console.log(`持仓到用户选择的结束日期: ${endDate}`);
         // console.log(`${'='.repeat(60)}`);
@@ -249,8 +254,10 @@ class IndexPortfolioService {
         const indexWeights = await tushareService.getIndexWeightByDate(indexCode, lastRebalanceDate);
         
         if (indexWeights && indexWeights.length > 0) {
-          // 结束日期不是年度调仓期
-          const isYearlyRebalance = false;
+          // 对于结束日期期间，如果最后一个调仓日期是年度调仓日期，或者最后一个调仓日期在年度调仓日期之后，
+          // 都应该计算指数收益率，以确保指数策略的数据完整性
+          const isLastYearlyPeriod = lastRebalanceDate === lastYearlyRebalanceDate;
+          const shouldCalculateIndex = isLastYearlyPeriod || lastRebalanceDate >= lastYearlyRebalanceDate;
           
           const periodResult = await this.calculatePeriodReturns(
             indexWeights,
@@ -259,9 +266,9 @@ class IndexPortfolioService {
             fundCode,
             config,
             previousWeights,
-            true,  // 总是计算指数收益率
+            shouldCalculateIndex,  // 如果是年度调仓期或之后的期间，都计算指数收益率
             currentIndexWeights,  // 使用当前指数策略持仓
-            isYearlyRebalance  // 结束日期不是年度调仓
+            isLastYearlyPeriod  // 传入是否年度调仓的标记
           );
           
           if (periodResult) {
@@ -270,11 +277,15 @@ class IndexPortfolioService {
               startDate: lastRebalanceDate,
               endDate: endDate,
               isEndDate: true,  // 标记为结束日期
-              isYearlyRebalance: false,  // 结束日期不是年度调仓
+              isYearlyRebalance: isLastYearlyPeriod,  // 根据实际情况设置
               ...periodResult
             });
           }
         }
+      } else if (endDate > lastYearlyRebalanceDate && lastRebalanceDate > lastYearlyRebalanceDate) {
+        // 特殊情况：自定义策略的最后调仓日期在年度调仓日期之后，但用户结束日期在自定义策略最后调仓日期之前或等于
+        // 这种情况下，需要为指数策略添加从最后年度调仓日期到用户结束日期的期间
+        // 但自定义策略已经覆盖了这个期间，所以不需要额外处理
       }
     }
 

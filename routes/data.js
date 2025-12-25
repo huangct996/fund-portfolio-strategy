@@ -138,10 +138,10 @@ router.get('/index-returns', async (req, res) => {
         // 股票池筛选参数
         enableStockFilter: enableStockFilter === 'true',
         stockFilterParams: enableStockFilter === 'true' ? {
-          minROE: parseFloat(minROE) || 0.05,
-          maxDebtRatio: parseFloat(maxDebtRatio) || 0.70,
+          minROE: minROE !== undefined && minROE !== null ? parseFloat(minROE) : 0.05,
+          maxDebtRatio: maxDebtRatio !== undefined && maxDebtRatio !== null ? parseFloat(maxDebtRatio) : 0.70,
           momentumMonths: parseInt(momentumMonths) || 6,
-          minMomentumReturn: parseFloat(minMomentumReturn) || -0.20,
+          minMomentumReturn: minMomentumReturn !== undefined && minMomentumReturn !== null ? parseFloat(minMomentumReturn) : -0.20,
           filterByQuality: filterByQuality === 'true'
         } : null
       };

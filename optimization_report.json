@@ -1,0 +1,358 @@
+{
+  "testDate": "2025-12-25T05:18:07.370Z",
+  "totalTests": 30,
+  "validTests": 30,
+  "paramRanges": {
+    "volatilityWindow": {
+      "min": 6,
+      "max": 6,
+      "step": 1
+    },
+    "minMomentumReturn": {
+      "min": -0.2,
+      "max": 0.1,
+      "step": 0.01
+    },
+    "momentumMonths": {
+      "min": 6,
+      "max": 6,
+      "step": 1
+    }
+  },
+  "fixedParams": {
+    "fundCode": "512890.SH",
+    "startDate": "20200101",
+    "endDate": "20241231",
+    "strategyType": "riskParity",
+    "ewmaDecay": 0.94,
+    "rebalanceFrequency": "yearly",
+    "enableTradingCost": false,
+    "maxWeight": 0.1,
+    "enableStockFilter": true,
+    "minROE": 0,
+    "maxDebtRatio": 1,
+    "filterByQuality": true,
+    "useQualityTilt": false,
+    "useCovariance": false,
+    "useMomentumTilt": false,
+    "hybridRatio": 0
+  },
+  "bestConfig": {
+    "volatilityWindow": 6,
+    "momentumMonths": 6,
+    "minMomentumReturn": -0.1,
+    "sharpeRatio": 0.7343676146302638,
+    "annualizedReturn": 0.14244011354775576,
+    "maxDrawdown": 0.1668439568011951,
+    "volatility": 0.1667286398643837,
+    "totalReturn": 0.9461092576719872,
+    "success": true
+  },
+  "top10": [
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.1,
+      "sharpeRatio": 0.7343676146302638,
+      "annualizedReturn": 0.14244011354775576,
+      "maxDrawdown": 0.1668439568011951,
+      "volatility": 0.1667286398643837,
+      "totalReturn": 0.9461092576719872,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.09,
+      "sharpeRatio": 0.7235108576493882,
+      "annualizedReturn": 0.14127490972284495,
+      "maxDrawdown": 0.1668439568011951,
+      "volatility": 0.16762002731632056,
+      "totalReturn": 0.9362050489323503,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.08,
+      "sharpeRatio": 0.7071037164472267,
+      "annualizedReturn": 0.14092621448653242,
+      "maxDrawdown": 0.1650991910133056,
+      "volatility": 0.17101623379115347,
+      "totalReturn": 0.9332489993373632,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.03,
+      "sharpeRatio": 0.6867458177125987,
+      "annualizedReturn": 0.15357249481112456,
+      "maxDrawdown": 0.17189799236382539,
+      "volatility": 0.19450063089721548,
+      "totalReturn": 1.0427934751967318,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.07,
+      "sharpeRatio": 0.6827609650921769,
+      "annualizedReturn": 0.1403283298324065,
+      "maxDrawdown": 0.1650991910133056,
+      "volatility": 0.17623785773423858,
+      "totalReturn": 0.9281888600029453,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": 0.04,
+      "sharpeRatio": 0.6826334132388058,
+      "annualizedReturn": 0.1962412205562687,
+      "maxDrawdown": 0.22596937028298014,
+      "volatility": 0.25817842657317186,
+      "totalReturn": 1.4495923503511352,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.06,
+      "sharpeRatio": 0.6726909652743899,
+      "annualizedReturn": 0.13818176772927582,
+      "maxDrawdown": 0.1650991910133056,
+      "volatility": 0.1756850824970863,
+      "totalReturn": 0.9101088743879713,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.05,
+      "sharpeRatio": 0.6605866322879846,
+      "annualizedReturn": 0.13855571067798778,
+      "maxDrawdown": 0.16266136637791725,
+      "volatility": 0.1794703448166403,
+      "totalReturn": 0.9132487122369402,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": -0.11,
+      "sharpeRatio": 0.6587618772865368,
+      "annualizedReturn": 0.12969375745072576,
+      "maxDrawdown": 0.1668439568011951,
+      "volatility": 0.1665150356036967,
+      "totalReturn": 0.8399399301727823,
+      "success": true
+    },
+    {
+      "volatilityWindow": 6,
+      "momentumMonths": 6,
+      "minMomentumReturn": 0.05,
+      "sharpeRatio": 0.6301131051424305,
+      "annualizedReturn": 0.1907241975702636,
+      "maxDrawdown": 0.25691406313340515,
+      "volatility": 0.2709421470160872,
+      "totalReturn": 1.3936238122179967,
+      "success": true
+    }
+  ],
+  "parameterSensitivity": {
+    "volatilityWindow": {
+      "best": {
+        "value": 6,
+        "avgSharpe": 0.6074118479931797,
+        "count": 30
+      },
+      "min": 0.6074118479931797,
+      "max": 0.6074118479931797,
+      "all": [
+        {
+          "value": 6,
+          "avgSharpe": 0.6074118479931797,
+          "count": 30
+        }
+      ]
+    },
+    "momentumMonths": {
+      "best": {
+        "value": 6,
+        "avgSharpe": 0.6074118479931797,
+        "count": 30
+      },
+      "min": 0.6074118479931797,
+      "max": 0.6074118479931797,
+      "all": [
+        {
+          "value": 6,
+          "avgSharpe": 0.6074118479931797,
+          "count": 30
+        }
+      ]
+    },
+    "minMomentumReturn": {
+      "best": {
+        "value": -0.1,
+        "avgSharpe": 0.7343676146302638,
+        "count": 1
+      },
+      "min": 0.4740300722847243,
+      "max": 0.7343676146302638,
+      "all": [
+        {
+          "value": -0.1,
+          "avgSharpe": 0.7343676146302638,
+          "count": 1
+        },
+        {
+          "value": -0.09,
+          "avgSharpe": 0.7235108576493882,
+          "count": 1
+        },
+        {
+          "value": -0.08,
+          "avgSharpe": 0.7071037164472267,
+          "count": 1
+        },
+        {
+          "value": -0.03,
+          "avgSharpe": 0.6867458177125987,
+          "count": 1
+        },
+        {
+          "value": -0.07,
+          "avgSharpe": 0.6827609650921769,
+          "count": 1
+        },
+        {
+          "value": 0.04,
+          "avgSharpe": 0.6826334132388058,
+          "count": 1
+        },
+        {
+          "value": -0.06,
+          "avgSharpe": 0.6726909652743899,
+          "count": 1
+        },
+        {
+          "value": -0.05,
+          "avgSharpe": 0.6605866322879846,
+          "count": 1
+        },
+        {
+          "value": -0.11,
+          "avgSharpe": 0.6587618772865368,
+          "count": 1
+        },
+        {
+          "value": 0.05,
+          "avgSharpe": 0.6301131051424305,
+          "count": 1
+        },
+        {
+          "value": -0.04,
+          "avgSharpe": 0.6270563661582578,
+          "count": 1
+        },
+        {
+          "value": -0.14,
+          "avgSharpe": 0.6264994519644461,
+          "count": 1
+        },
+        {
+          "value": -0.12,
+          "avgSharpe": 0.6217340720817373,
+          "count": 1
+        },
+        {
+          "value": -0.02,
+          "avgSharpe": 0.6201883595778,
+          "count": 1
+        },
+        {
+          "value": 0.03,
+          "avgSharpe": 0.6189997571555047,
+          "count": 1
+        },
+        {
+          "value": -0.13,
+          "avgSharpe": 0.6034894478077962,
+          "count": 1
+        },
+        {
+          "value": 0.06,
+          "avgSharpe": 0.5964822533901505,
+          "count": 1
+        },
+        {
+          "value": -0.16,
+          "avgSharpe": 0.5850907500588024,
+          "count": 1
+        },
+        {
+          "value": -0.15,
+          "avgSharpe": 0.5850907500588024,
+          "count": 1
+        },
+        {
+          "value": -0.17,
+          "avgSharpe": 0.5803857856024119,
+          "count": 1
+        },
+        {
+          "value": -0.01,
+          "avgSharpe": 0.5738009688258832,
+          "count": 1
+        },
+        {
+          "value": -0.18,
+          "avgSharpe": 0.5699958501324758,
+          "count": 1
+        },
+        {
+          "value": 0.02,
+          "avgSharpe": 0.555966721984056,
+          "count": 1
+        },
+        {
+          "value": -0.19,
+          "avgSharpe": 0.5483577907376214,
+          "count": 1
+        },
+        {
+          "value": 0.01,
+          "avgSharpe": 0.5376900045307437,
+          "count": 1
+        },
+        {
+          "value": 0,
+          "avgSharpe": 0.5366735774576903,
+          "count": 1
+        },
+        {
+          "value": -0.2,
+          "avgSharpe": 0.5232213831274498,
+          "count": 1
+        },
+        {
+          "value": 0.07,
+          "avgSharpe": 0.49991205664002786,
+          "count": 1
+        },
+        {
+          "value": 0.08,
+          "avgSharpe": 0.4984150554572111,
+          "count": 1
+        },
+        {
+          "value": 0.09,
+          "avgSharpe": 0.4740300722847243,
+          "count": 1
+        }
+      ]
+    }
+  }
+}
