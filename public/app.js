@@ -469,8 +469,8 @@ async function applyConfiguration() {
     let riskParityParams = null;
     if (useRiskParity) {
         riskParityParams = {
-            volatilityWindow: 6,  // 由自适应策略自动调整
-            ewmaDecay: 0.91,      // 由自适应策略自动调整
+            volatilityWindow: parseInt(document.getElementById('volatilityWindowInput').value) || 6,
+            ewmaDecay: parseFloat(document.getElementById('ewmaDecayInput').value) || 0.91,
             rebalanceFrequency: document.getElementById('rebalanceFrequency').value,
             enableTradingCost: document.getElementById('enableTradingCost').checked,
             tradingCostRate: document.getElementById('enableTradingCost').checked 

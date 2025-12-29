@@ -721,21 +721,44 @@ class TushareService {
   }
 
   /**
-   * 获取指数日线数据
+   * 获取指数日线数据（优先从本地数据库读取）
    */
   async getIndexDaily(indexCode, startDate, endDate) {
     try {
-      // 转换指数代码格式：h30269.CSI -> 930269.CSI
+      await this.ensureDbInitialized();
+      
+      // 转换指数代码格式：h30269.CSI -> 930269.CSI, 000300.SH保持不变
       const tsCode = indexCode.replace(/^h/, '9');
       
+      // 1. 先从数据库查询
+      const connection = await dbService.pool.getConnection();
+      try {
+        const [rows] = await connection.execute(`
+          SELECT trade_date, open_price as open, high_price as high, 
+                 low_price as low, close_price as close, volume as vol, amount
+          FROM index_daily
+          WHERE ts_code = ? AND trade_date >= ? AND trade_date <= ?
+          ORDER BY trade_date ASC
+        `, [tsCode, startDate, endDate]);
+        
+        connection.release();
+        
+        if (rows && rows.length > 0) {
+          return rows;
+        }
+      } catch (dbError) {
+        connection.release();
+        console.warn(`从数据库读取指数数据失败，尝试API: ${dbError.message}`);
+      }
+      
+      // 2. 数据库没有，调用Tushare API
       const data = await this.callApi('index_daily', {
         ts_code: tsCode,
         start_date: startDate,
         end_date: endDate
       });
       
-      console.log(`✅ 获取指数 ${indexCode} 日线数据 ${data.length} 条`);
-      return data;
+      return data || [];
     } catch (error) {
       console.error(`获取指数日线数据失败 (${indexCode}):`, error.message);
       return [];

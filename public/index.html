@@ -202,6 +202,18 @@
                         <small style="color: #666;">用于计算夏普比率，中国10年期国债收益率约2-2.5%</small>
                     </div>
                     
+                    <div class="weight-item">
+                        <label>波动率窗口 (月):</label>
+                        <input type="number" id="volatilityWindowInput" min="3" max="24" step="1" value="6" style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">计算波动率的时间窗口，自适应策略会使用此值作为基础</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>EWMA衰减系数:</label>
+                        <input type="number" id="ewmaDecayInput" min="0.80" max="0.99" step="0.01" value="0.91" style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">指数加权移动平均的衰减系数，越大越重视近期数据</small>
+                    </div>
+                    
                     <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
                         <strong>🎯 股票池筛选（可选辅助功能）</strong>
                         <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合。自适应策略会根据市场状态自动调整筛选参数。</p>

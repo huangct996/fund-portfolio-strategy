@@ -28,8 +28,8 @@ class MarketRegimeService {
       const volatilityLevel = await this.calculateVolatilityLevel(indexCode, date);
       const momentumStrength = await this.calculateMomentumStrength(indexCode, date);
       
-      // 🔍 调试日志：输出实际指标值
-      console.log(`[${date}] 市场指标 - 趋势:${(trendStrength*100).toFixed(2)}%, 宽度:${(marketBreadth*100).toFixed(1)}%, 波动:${(volatilityLevel*100).toFixed(0)}%, 动量:${(momentumStrength*100).toFixed(2)}%`);
+      // 精简日志：只在关键时刻输出
+      // console.log(`[${date}] 市场指标 - 趋势:${(trendStrength*100).toFixed(2)}%, 宽度:${(marketBreadth*100).toFixed(1)}%, 波动:${(volatilityLevel*100).toFixed(0)}%, 动量:${(momentumStrength*100).toFixed(2)}%`);
       
       // 2. 判断市场状态
       const regime = this.classifyRegime(trendStrength, marketBreadth, volatilityLevel, momentumStrength);
@@ -253,9 +253,9 @@ class MarketRegimeService {
     const baseMinMomentumReturn = baseParams.minMomentumReturn || -0.10;
     
     const paramsMap = {
-      // 强势牛市：适度进攻（基于市场宽度>52%的客观判断）
+      // 强势牛市：高度进攻（基于市场宽度>52%的客观判断）
       AGGRESSIVE_BULL: {
-        maxWeight: 0.10,           // 10%（测试显示低maxWeight收益更高，牛市时适度提高）
+        maxWeight: 0.15,           // 15%（高于固定策略13%，充分捕捉牛市收益）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
@@ -265,9 +265,9 @@ class MarketRegimeService {
         filterByQuality: false
       },
       
-      // 温和牛市：平衡策略（基于市场宽度42-52%的客观判断）
+      // 温和牛市：适度进攻（基于市场宽度42-52%的客观判断）
       MODERATE_BULL: {
-        maxWeight: 0.08,           // 8%
+        maxWeight: 0.13,           // 13%（与固定策略持平）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
@@ -277,9 +277,9 @@ class MarketRegimeService {
         filterByQuality: false
       },
       
-      // 震荡市场：最优策略（市场宽度32-42%）
+      // 震荡市场：平衡策略（市场宽度32-42%）
       SIDEWAYS: {
-        maxWeight: 0.06,           // 6%（测试显示的最优值）
+        maxWeight: 0.11,           // 11%（略低于固定策略）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
@@ -291,7 +291,7 @@ class MarketRegimeService {
       
       // 弱势市场：保守策略（市场宽度<32%）
       WEAK_BEAR: {
-        maxWeight: 0.05,           // 5%（更低集中度，控制风险）
+        maxWeight: 0.10,           // 10%（保持较高水平，避免过度保守）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
@@ -301,9 +301,9 @@ class MarketRegimeService {
         filterByQuality: false
       },
       
-      // 恐慌市场：极度防守
+      // 恐慌市场：防守策略
       PANIC: {
-        maxWeight: 0.04,           // 4%（极低集中度）
+        maxWeight: 0.06,           // 6%（仅在恐慌时显著降低）
         volatilityWindow: Math.max(3, Math.floor(baseVolatilityWindow / 2)),
         ewmaDecay: Math.max(0.80, baseEwmaDecay - 0.10),
         minROE: 0.12,

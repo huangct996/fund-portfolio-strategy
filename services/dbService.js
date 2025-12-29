@@ -88,7 +88,27 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='复权因子表'
       `);
 
-      // 4. 股票基本信息表（市值、股息率、PE、PB、ROE、负债率等）
+      // 4. 指数日线行情表
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS index_daily (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ts_code VARCHAR(20) NOT NULL COMMENT '指数代码',
+          trade_date VARCHAR(8) NOT NULL COMMENT '交易日期',
+          open_price DECIMAL(10, 3) COMMENT '开盘价',
+          high_price DECIMAL(10, 3) COMMENT '最高价',
+          low_price DECIMAL(10, 3) COMMENT '最低价',
+          close_price DECIMAL(10, 3) COMMENT '收盘价',
+          volume BIGINT COMMENT '成交量',
+          amount DECIMAL(20, 2) COMMENT '成交额',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_index_daily (ts_code, trade_date),
+          KEY idx_ts_code (ts_code),
+          KEY idx_trade_date (trade_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数日线行情表'
+      `);
+
+      // 5. 股票基本信息表（市值、股息率、PE、PB、ROE、负债率等）
       await connection.execute(`
         CREATE TABLE IF NOT EXISTS stock_basic_info (
           id INT AUTO_INCREMENT PRIMARY KEY,
