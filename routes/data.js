@@ -63,6 +63,7 @@ router.get('/index-returns', async (req, res) => {
       endDate,
       strategyType,
       maxWeight,
+      useAdaptive,  // 新增：自适应策略开关
       // 综合得分策略参数
       mvWeight,
       dvWeight,
@@ -113,7 +114,8 @@ router.get('/index-returns', async (req, res) => {
       endDate: endDate || '',
       maxWeight: effectiveMaxWeight,
       useCompositeScore: false,
-      useRiskParity: false
+      useRiskParity: false,
+      useAdaptive: useAdaptive === 'true'  // 自适应策略开关
     };
     
     // 根据策略类型添加对应参数

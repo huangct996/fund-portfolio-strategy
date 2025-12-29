@@ -1,5 +1,6 @@
 const tushareService = require('./tushareService');
 const stockFilterService = require('./stockFilterService');
+const marketRegimeService = require('./marketRegimeService');
 
 /**
  * 基于指数成分股的投资组合回测服务
@@ -22,6 +23,7 @@ class IndexPortfolioService {
       endDate = '',
       useCompositeScore = false,
       useRiskParity = false,
+      useAdaptive = false,
       scoreWeights = { mvWeight: 0.5, dvWeight: 0.3, qualityWeight: 0.2 },
       qualityFactorType = 'pe_pb',
       riskParityParams = null
@@ -159,6 +161,40 @@ class IndexPortfolioService {
         const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
         // console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
         
+        // 🔄 自适应策略：识别市场状态并调整参数
+        let marketRegime = null;
+        let effectiveRiskParityParams = riskParityParams;
+        
+        if (useAdaptive && useRiskParity && riskParityParams) {
+          try {
+            // 获取成分股列表用于市场宽度计算
+            let tempWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
+            if (!tempWeights || tempWeights.length === 0) {
+              const nearestDate = yearlyRebalanceDates.filter(d => d <= currentDate).sort((a, b) => b.localeCompare(a))[0];
+              if (nearestDate) tempWeights = await tushareService.getIndexWeightByDate(indexCode, nearestDate);
+            }
+            
+            if (tempWeights && tempWeights.length > 0) {
+              marketRegime = await marketRegimeService.identifyMarketRegime(indexCode, tempWeights, currentDate);
+              
+              // 合并自适应参数到基础参数
+              effectiveRiskParityParams = {
+                ...riskParityParams,
+                ...marketRegime.params
+              };
+              
+              // 每4个调仓期输出一次，避免日志过多
+              if (i === 0 || i % 4 === 0) {
+                console.log(`\n🔍 [${currentDate}] 市场状态: ${marketRegime.regimeName} (置信度: ${(marketRegime.confidence * 100).toFixed(0)}%)`);
+                console.log(`   趋势: ${(marketRegime.trendStrength * 100).toFixed(2)}%, 宽度: ${(marketRegime.marketBreadth * 100).toFixed(1)}%, 波动: ${(marketRegime.volatilityLevel * 100).toFixed(0)}%`);
+                console.log(`   调整参数: maxWeight=${(marketRegime.params.maxWeight * 100).toFixed(0)}%, volatilityWindow=${marketRegime.params.volatilityWindow}月, minROE=${(marketRegime.params.minROE * 100).toFixed(0)}%`);
+              }
+            }
+          } catch (error) {
+            console.warn(`⚠️  识别市场状态失败，使用默认参数: ${error.message}`);
+          }
+        }
+        
         // 获取自定义策略的成分股权重
         // 对于季度/月度调仓，如果当前日期没有成分股数据，则使用最近的历史年度调仓日期的数据
         let customIndexWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
@@ -204,12 +240,19 @@ class IndexPortfolioService {
         // 自定义策略使用customIndexWeights，指数策略使用currentIndexWeights
         // 指数策略需要在所有期间都计算收益率，以确保数据连续性
         // 但只在年度调仓期标记为isYearlyRebalance，用于后续筛选
+        
+        // 如果启用自适应策略，使用调整后的参数
+        const effectiveConfig = useAdaptive && effectiveRiskParityParams ? {
+          ...config,
+          riskParityParams: effectiveRiskParityParams
+        } : config;
+        
         const periodResult = await this.calculatePeriodReturns(
           customIndexWeights,
           startDate,
           periodEndDate,
           fundCode,
-          config,
+          effectiveConfig,
           previousWeights,
           true,  // 总是计算指数收益率，确保数据连续性
           currentIndexWeights,  // 传入指数策略的持仓
@@ -222,6 +265,9 @@ class IndexPortfolioService {
             startDate,
             endDate: periodEndDate,
             isYearlyRebalance,  // 添加年度调仓标记
+            marketRegime: marketRegime ? marketRegime.regime : null,
+            marketRegimeName: marketRegime ? marketRegime.regimeName : null,
+            adaptiveParams: marketRegime ? marketRegime.params : null,
             ...periodResult
           });
           
@@ -560,22 +606,25 @@ class IndexPortfolioService {
       // 统计信息
       stockCount: stocksWithData.length,
       currentWeights: currentWeights, // 用于下一期计算交易成本
-      holdings: customPortfolio.map(p => ({
-        symbol: p.con_code,
-        name: p.name,
-        indexWeight: p.indexWeight,
-        customWeight: p.adjustedWeight,
-        marketValue: p.marketValue,
-        dvRatio: p.dvRatio,
-        peTtm: p.peTtm,
-        pb: p.pb,
-        roe: p.roe || 0,
-        debtRatio: p.debtRatio || 0,
-        compositeScore: p.compositeScore || 0,
-        qualityFactor: p.qualityFactor || 0,
-        isLimited: p.isLimited || false,
-        isFiltered: false
-      })),
+      // 只包含权重>0的股票（过滤后的持仓）
+      holdings: customPortfolio
+        .filter(p => p.adjustedWeight > 0)
+        .map(p => ({
+          symbol: p.con_code,
+          name: p.name,
+          indexWeight: p.indexWeight,
+          customWeight: p.adjustedWeight,
+          marketValue: p.marketValue,
+          dvRatio: p.dvRatio,
+          peTtm: p.peTtm,
+          pb: p.pb,
+          roe: p.roe || 0,
+          debtRatio: p.debtRatio || 0,
+          compositeScore: p.compositeScore || 0,
+          qualityFactor: p.qualityFactor || 0,
+          isLimited: p.isLimited || false,
+          isFiltered: false
+        })),
       // 添加被筛选掉的股票信息
       filteredOutStocks: filteredOutStocks.map(p => ({
         symbol: p.con_code,
