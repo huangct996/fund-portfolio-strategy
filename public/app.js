@@ -150,6 +150,7 @@ async function fetchAllReturns(config) {
     if (config.useRiskParity) {
         // 风险平价策略参数
         params.append('strategyType', 'riskParity');
+        params.append('useAdaptive', 'true');  // 启用自适应策略
         if (config.riskParityParams) {
             params.append('volatilityWindow', config.riskParityParams.volatilityWindow);
             params.append('ewmaDecay', config.riskParityParams.ewmaDecay);
