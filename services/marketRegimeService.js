@@ -243,52 +243,52 @@ class MarketRegimeService {
    */
   getRegimeParams(regime) {
     const paramsMap = {
-      // 强势牛市：极高进攻性，最大化收益（基于市场宽度>52%的客观判断）
+      // 强势牛市：适度进攻，优化分散化（基于市场宽度>52%的客观判断）
       AGGRESSIVE_BULL: {
-        maxWeight: 0.25,           // 提升至25%（极高集中度）
-        volatilityWindow: 12,
-        ewmaDecay: 0.97,           // 提升至0.97，更重视近期数据
-        minROE: 0,                 // 完全放开质量限制
+        maxWeight: 0.08,           // 8%（测试显示较低maxWeight收益更高）
+        volatilityWindow: 6,
+        ewmaDecay: 0.91,
+        minROE: 0,
         maxDebtRatio: 1,
-        momentumMonths: 3,         // 短周期动量，快速响应
-        minMomentumReturn: -0.05,  // 放宽至-5%，允许小幅回调
+        momentumMonths: 6,
+        minMomentumReturn: -0.10,
         filterByQuality: false
       },
       
-      // 温和牛市：高进攻性（基于市场宽度42-52%的客观判断）
+      // 温和牛市：平衡策略（基于市场宽度42-52%的客观判断）
       MODERATE_BULL: {
-        maxWeight: 0.20,           // 提升至20%（高集中度）
+        maxWeight: 0.07,           // 7%
         volatilityWindow: 6,
-        ewmaDecay: 0.94,           // 提升至0.94
-        minROE: 0,                 // 放开ROE限制
+        ewmaDecay: 0.91,
+        minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: 6,
-        minMomentumReturn: -0.08,  // 放宽至-8%
-        filterByQuality: false     // 不筛选质量，最大化参与
+        minMomentumReturn: -0.10,
+        filterByQuality: false
       },
       
-      // 震荡市场：偏进攻策略（市场宽度32-42%，大幅提升以应对牛市误判）
+      // 震荡市场：保守策略（市场宽度32-42%）
       SIDEWAYS: {
-        maxWeight: 0.18,           // 大幅提升至18%（原10%）
+        maxWeight: 0.06,           // 6%（最优值）
         volatilityWindow: 6,
-        ewmaDecay: 0.92,           // 提升至0.92
-        minROE: 0,                 // 完全放开质量要求
+        ewmaDecay: 0.91,
+        minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: 6,
-        minMomentumReturn: -0.10,  // 放宽至-10%
-        filterByQuality: false     // 不筛选质量
+        minMomentumReturn: -0.10,
+        filterByQuality: false
       },
       
-      // 弱势市场：中性偏进攻策略（市场宽度<32%，大幅提升以应对牛市误判）
+      // 弱势市场：极度保守（市场宽度<32%）
       WEAK_BEAR: {
-        maxWeight: 0.16,           // 大幅提升至16%（原8%，提升100%）
+        maxWeight: 0.05,           // 5%（更分散）
         volatilityWindow: 6,
-        ewmaDecay: 0.91,           // 提升至0.91
-        minROE: 0,                 // 完全放开质量要求
-        maxDebtRatio: 1,           // 完全放开债务限制
-        momentumMonths: 6,         // 缩短至6个月
-        minMomentumReturn: -0.10,  // 放宽至-10%
-        filterByQuality: false     // 不筛选质量
+        ewmaDecay: 0.91,
+        minROE: 0,
+        maxDebtRatio: 1,
+        momentumMonths: 6,
+        minMomentumReturn: -0.10,
+        filterByQuality: false
       },
       
       // 恐慌市场：极度防守
