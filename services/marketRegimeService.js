@@ -274,74 +274,77 @@ class MarketRegimeService {
     const baseMinMomentumReturn = baseParams.minMomentumReturn || -0.10;
     
     const paramsMap = {
-      // 强势牛市：完全跟随指数（基于市场宽度>52%的客观判断）
+      // 强势牛市：高度进攻（基于市场宽度>52%的客观判断）
       AGGRESSIVE_BULL: {
-        maxWeight: 1.0,            // 100%（不限制，完全跟随指数权重）
+        maxWeight: 0.20,           // 20%（高集中度）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
-        minMomentumReturn: -1.0,   // 不过滤任何股票
-        filterByQuality: false,
-        hybridRatio: 1.0,          // 100%市值加权，完全跟随指数
-        useCovariance: false,      // 禁用协方差优化
-        enableStockFilter: false   // 完全禁用股票筛选
-      },
-      
-      // 温和牛市：高度跟随指数（基于市场宽度42-52%的客观判断）
-      MODERATE_BULL: {
-        maxWeight: 1.0,            // 100%（不限制）
-        volatilityWindow: baseVolatilityWindow,
-        ewmaDecay: baseEwmaDecay,
-        minROE: 0,
-        maxDebtRatio: 1,
-        momentumMonths: baseMomentumMonths,
-        minMomentumReturn: -1.0,   // 不过滤任何股票
-        filterByQuality: false,
-        hybridRatio: 1.0,          // 100%市值加权
+        minMomentumReturn: -0.10,
+        filterByQuality: true,     // 启用质量筛选（关键！）
+        hybridRatio: 0.2,          // 20%市值加权
         useCovariance: false,
-        enableStockFilter: false   // 完全禁用股票筛选
+        enableStockFilter: true
       },
       
-      // 震荡市场：轻度市值倾斜（市场宽度32-42%）
-      SIDEWAYS: {
-        maxWeight: 0.20,           // 20%（适度限制）
+      // 温和牛市：适度进攻（基于市场宽度42-52%的客观判断）
+      MODERATE_BULL: {
+        maxWeight: 0.18,           // 18%
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
-        minMomentumReturn: baseMinMomentumReturn,
-        filterByQuality: false,
-        hybridRatio: 0.5,          // 50%市值加权混合
-        useCovariance: false
+        minMomentumReturn: -0.10,
+        filterByQuality: true,     // 启用质量筛选
+        hybridRatio: 0.15,         // 15%市值加权
+        useCovariance: false,
+        enableStockFilter: true
+      },
+      
+      // 震荡市场：平衡策略（市场宽度32-42%）
+      SIDEWAYS: {
+        maxWeight: 0.15,           // 15%
+        volatilityWindow: baseVolatilityWindow,
+        ewmaDecay: baseEwmaDecay,
+        minROE: 0,
+        maxDebtRatio: 1,
+        momentumMonths: baseMomentumMonths,
+        minMomentumReturn: -0.10,
+        filterByQuality: true,     // 启用质量筛选
+        hybridRatio: 0.1,          // 10%市值加权
+        useCovariance: false,
+        enableStockFilter: true
       },
       
       // 弱势市场：保守策略（市场宽度<32%）
       WEAK_BEAR: {
-        maxWeight: 0.10,           // 10%
+        maxWeight: 0.13,           // 13%
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
-        minMomentumReturn: baseMinMomentumReturn,
-        filterByQuality: false,
-        hybridRatio: 0
+        minMomentumReturn: -0.10,
+        filterByQuality: true,     // 启用质量筛选
+        hybridRatio: 0,
+        enableStockFilter: true
       },
       
-      // 恐慌市场：防守策略
+      // 恐慌市场：高度防守策略
       PANIC: {
-        maxWeight: 0.06,           // 6%
+        maxWeight: 0.10,           // 10%
         volatilityWindow: Math.max(3, Math.floor(baseVolatilityWindow / 2)),
         ewmaDecay: Math.max(0.80, baseEwmaDecay - 0.10),
-        minROE: 0.12,
-        maxDebtRatio: 0.40,
+        minROE: 0.08,
+        maxDebtRatio: 0.60,
         momentumMonths: Math.max(12, baseMomentumMonths * 2),
-        minMomentumReturn: -0.05,
+        minMomentumReturn: -0.10,
         filterByQuality: true,
-        hybridRatio: 0
+        hybridRatio: 0,
+        enableStockFilter: true
       }
     };
     
