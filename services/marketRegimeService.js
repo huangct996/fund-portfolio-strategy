@@ -243,9 +243,9 @@ class MarketRegimeService {
    */
   getRegimeParams(regime) {
     const paramsMap = {
-      // 强势牛市：极高进攻性，最大化收益（大幅提升以产生明显差异）
+      // 强势牛市：极高进攻性，最大化收益（基于市场宽度>52%的客观判断）
       AGGRESSIVE_BULL: {
-        maxWeight: 0.25,           // 提升至25%（原20%），充分集中优质股票
+        maxWeight: 0.25,           // 提升至25%（极高集中度）
         volatilityWindow: 12,
         ewmaDecay: 0.97,           // 提升至0.97，更重视近期数据
         minROE: 0,                 // 完全放开质量限制
@@ -255,9 +255,9 @@ class MarketRegimeService {
         filterByQuality: false
       },
       
-      // 温和牛市：高进攻性（提升以产生差异）
+      // 温和牛市：高进攻性（基于市场宽度42-52%的客观判断）
       MODERATE_BULL: {
-        maxWeight: 0.20,           // 提升至20%（原16%）
+        maxWeight: 0.20,           // 提升至20%（高集中度）
         volatilityWindow: 6,
         ewmaDecay: 0.94,           // 提升至0.94
         minROE: 0,                 // 放开ROE限制
@@ -267,7 +267,7 @@ class MarketRegimeService {
         filterByQuality: false     // 不筛选质量，最大化参与
       },
       
-      // 震荡市场：偏进攻策略（大幅提升以应对牛市误判）
+      // 震荡市场：偏进攻策略（市场宽度32-42%，大幅提升以应对牛市误判）
       SIDEWAYS: {
         maxWeight: 0.18,           // 大幅提升至18%（原10%）
         volatilityWindow: 6,
@@ -279,7 +279,7 @@ class MarketRegimeService {
         filterByQuality: false     // 不筛选质量
       },
       
-      // 弱势市场：中性偏进攻策略（大幅提升以应对牛市误判）
+      // 弱势市场：中性偏进攻策略（市场宽度<32%，大幅提升以应对牛市误判）
       WEAK_BEAR: {
         maxWeight: 0.16,           // 大幅提升至16%（原8%，提升100%）
         volatilityWindow: 6,

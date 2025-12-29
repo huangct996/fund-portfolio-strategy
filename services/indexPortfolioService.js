@@ -515,7 +515,7 @@ class IndexPortfolioService {
         {
           volatilityWindow: riskParityParams.volatilityWindow,
           ewmaDecay: riskParityParams.ewmaDecay,
-          maxWeight: config.maxWeight,
+          maxWeight: riskParityParams.maxWeight || config.maxWeight,  // 优先使用riskParityParams.maxWeight（自适应策略）
           // 综合优化参数
           useQualityTilt: riskParityParams.useQualityTilt || false,
           useCovariance: riskParityParams.useCovariance || false,
