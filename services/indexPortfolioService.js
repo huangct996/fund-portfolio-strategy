@@ -517,6 +517,16 @@ class IndexPortfolioService {
     let filteredOutStocks = [];
     if (useRiskParity && riskParityParams) {
       // 风险平价策略
+      // 如果启用自适应策略，需要合并stockFilterParams
+      let finalStockFilterParams = riskParityParams.stockFilterParams || null;
+      if (config.useAdaptive && riskParityParams.filterByQuality !== undefined) {
+        // 自适应策略的filterByQuality参数优先级更高
+        finalStockFilterParams = {
+          ...(riskParityParams.stockFilterParams || {}),
+          filterByQuality: riskParityParams.filterByQuality
+        };
+      }
+      
       const riskParityResult = await this.calculateRiskParityWeights(
         stocksWithData,
         startDate,
@@ -534,7 +544,7 @@ class IndexPortfolioService {
           momentumWeight: riskParityParams.momentumWeight || 0.3,
           // 股票池筛选参数
           enableStockFilter: riskParityParams.enableStockFilter || false,
-          stockFilterParams: riskParityParams.stockFilterParams || null
+          stockFilterParams: finalStockFilterParams
         }
       );
       

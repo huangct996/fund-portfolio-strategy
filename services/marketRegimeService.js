@@ -283,7 +283,7 @@ class MarketRegimeService {
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
         minMomentumReturn: -0.10,
-        filterByQuality: true,     // 启用质量筛选（关键！）
+        filterByQuality: false,    // 禁用质量筛选，保留更多牛市股票！
         hybridRatio: 0.2,          // 20%市值加权
         useCovariance: false,
         enableStockFilter: true
@@ -298,7 +298,7 @@ class MarketRegimeService {
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
         minMomentumReturn: -0.10,
-        filterByQuality: true,     // 启用质量筛选
+        filterByQuality: false,    // 禁用质量筛选
         hybridRatio: 0.15,         // 15%市值加权
         useCovariance: false,
         enableStockFilter: true
