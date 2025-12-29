@@ -27,6 +27,9 @@ class MarketRegimeService {
       const volatilityLevel = await this.calculateVolatilityLevel(indexCode, date);
       const momentumStrength = await this.calculateMomentumStrength(indexCode, date);
       
+      // 🔍 调试日志：输出实际指标值
+      console.log(`[${date}] 市场指标 - 趋势:${(trendStrength*100).toFixed(2)}%, 宽度:${(marketBreadth*100).toFixed(1)}%, 波动:${(volatilityLevel*100).toFixed(0)}%, 动量:${(momentumStrength*100).toFixed(2)}%`);
+      
       // 2. 判断市场状态
       const regime = this.classifyRegime(trendStrength, marketBreadth, volatilityLevel, momentumStrength);
       
@@ -206,84 +209,86 @@ class MarketRegimeService {
   }
   
   /**
-   * 分类市场状态（5状态）- 优化后的阈值
+   * 分类市场状态（5状态）- 优化版：主要依赖市场宽度判断（更可靠）
    */
   classifyRegime(trend, breadth, volatility, momentum) {
-    // 1. 强势牛市：趋势强+宽度高+动量强（降低门槛）
-    if (trend > 0.03 && breadth > 0.55 && momentum > 0.10) {
+    // 优先使用市场宽度作为主要判断依据（因为趋势和动量可能为0）
+    
+    // 1. 强势牛市：市场宽度高（55%以上股票上涨）- 降低阈值
+    if (breadth >= 0.55) {
       return 'AGGRESSIVE_BULL';
     }
     
-    // 2. 温和牛市：趋势正+宽度中等（降低门槛）
-    if (trend > 0.01 && breadth > 0.45 && momentum > 0.02) {
+    // 2. 温和牛市：市场宽度中等（45-55%股票上涨）- 降低阈值
+    if (breadth >= 0.45) {
       return 'MODERATE_BULL';
     }
     
-    // 3. 恐慌市场：趋势负+波动极高+宽度低+动量负
-    if (trend < -0.05 && volatility > 0.80 && breadth < 0.30 && momentum < -0.10) {
+    // 3. 恐慌市场：波动极高且宽度极低
+    if (volatility > 0.80 && breadth < 0.25) {
       return 'PANIC';
     }
     
-    // 4. 弱势市场：趋势负+宽度低（降低门槛）
-    if (trend < -0.01 && breadth < 0.45) {
+    // 4. 弱势市场：市场宽度低（35%以下股票上涨）- 降低阈值
+    if (breadth < 0.35) {
       return 'WEAK_BEAR';
     }
     
-    // 5. 震荡市场：其他情况
+    // 5. 震荡市场：其他情况（35-45%）
     return 'SIDEWAYS';
   }
   
   /**
-   * 获取市场状态对应的策略参数
+   * 获取市场状态对应的策略参数（优化版：提升牛市进攻性）
    */
   getRegimeParams(regime) {
     const paramsMap = {
-      // 强势牛市：高进攻性
+      // 强势牛市：极高进攻性，最大化收益
       AGGRESSIVE_BULL: {
-        maxWeight: 0.15,
+        maxWeight: 0.20,           // 提升至20%，充分集中优质股票
         volatilityWindow: 12,
-        ewmaDecay: 0.95,
-        minROE: 0,
+        ewmaDecay: 0.96,           // 更重视近期数据
+        minROE: 0,                 // 完全放开质量限制
         maxDebtRatio: 1,
-        momentumMonths: 3,
-        minMomentumReturn: 0.05,
+        momentumMonths: 3,         // 短周期动量，快速响应
+        minMomentumReturn: 0,      // 降低动量要求
         filterByQuality: false
       },
       
-      // 温和牛市：中等进攻性
+      // 温和牛市：高进攻性
       MODERATE_BULL: {
-        maxWeight: 0.13,
+        maxWeight: 0.16,           // 提升至16%
         volatilityWindow: 6,
-        ewmaDecay: 0.91,
-        minROE: 0,
+        ewmaDecay: 0.93,
+        minROE: 0,                 // 放开ROE限制
         maxDebtRatio: 1,
         momentumMonths: 6,
-        minMomentumReturn: 0,
-        filterByQuality: true
+        minMomentumReturn: -0.05,  // 允许小幅下跌
+        filterByQuality: false     // 不筛选质量，最大化参与
       },
       
-      // 震荡市场：平衡策略
+      // 震荡市场：偏进攻策略（提升以应对牛市误判）
       SIDEWAYS: {
-        maxWeight: 0.10,
+        maxWeight: 0.15,           // 提升至15%（原10%）
         volatilityWindow: 6,
-        ewmaDecay: 0.88,
-        minROE: 0.08,
+        ewmaDecay: 0.91,           // 提升至0.91
+        minROE: 0,                 // 完全放开（原8%）
         maxDebtRatio: 1,
         momentumMonths: 6,
-        minMomentumReturn: -0.05,
-        filterByQuality: true
+        minMomentumReturn: -0.10,  // 放宽至-10%
+        filterByQuality: false     // 不筛选质量
       },
       
-      // 弱势市场：防守策略
+      // 弱势市场：中性策略（大幅提升进攻性）
       WEAK_BEAR: {
-        maxWeight: 0.08,
-        volatilityWindow: 3,
-        ewmaDecay: 0.85,
-        minROE: 0.10,
-        maxDebtRatio: 0.60,
-        momentumMonths: 12,
-        minMomentumReturn: -0.10,
-        filterByQuality: true
+        maxWeight: 0.15,           // 提升至15%（原8%）
+        volatilityWindow: 6,
+        ewmaDecay: 0.90,           // 提升至0.90
+        minROE: 0,                 // 完全放开
+        maxDebtRatio: 1,           // 完全放开
+        momentumMonths: 6,
+        minMomentumReturn: -0.10,  // 放宽至-10%
+        filterByQuality: false     // 不筛选质量
       },
       
       // 恐慌市场：极度防守
