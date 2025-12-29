@@ -17,9 +17,10 @@ class MarketRegimeService {
    * @param {string} indexCode - 指数代码
    * @param {Array} stocks - 成分股列表
    * @param {string} date - 日期 YYYYMMDD
+   * @param {Object} baseParams - 用户配置的基础参数（volatilityWindow, ewmaDecay等）
    * @returns {Object} 市场状态信息
    */
-  async identifyMarketRegime(indexCode, stocks, date) {
+  async identifyMarketRegime(indexCode, stocks, date, baseParams = {}) {
     try {
       // 1. 计算各项指标
       const trendStrength = await this.calculateTrendStrength(indexCode, date);
@@ -33,8 +34,8 @@ class MarketRegimeService {
       // 2. 判断市场状态
       const regime = this.classifyRegime(trendStrength, marketBreadth, volatilityLevel, momentumStrength);
       
-      // 3. 获取对应的策略参数
-      const params = this.getRegimeParams(regime);
+      // 3. 获取对应的策略参数（传入用户配置的基础参数）
+      const params = this.getRegimeParams(regime, baseParams);
       
       // 4. 计算置信度
       const confidence = this.calculateConfidence(trendStrength, marketBreadth, volatilityLevel, momentumStrength, regime);
@@ -53,7 +54,7 @@ class MarketRegimeService {
     } catch (error) {
       console.error('识别市场状态失败:', error.message);
       // 返回默认状态（震荡市场）
-      return this.getDefaultRegime(date);
+      return this.getDefaultRegime(date, baseParams);
     }
   }
   
@@ -239,67 +240,76 @@ class MarketRegimeService {
   }
   
   /**
-   * 获取市场状态对应的策略参数（优化版：提升牛市进攻性）
+   * 获取市场状态对应的策略参数
+   * @param {string} regime - 市场状态
+   * @param {Object} baseParams - 用户配置的基础参数
+   * @returns {Object} 策略参数
    */
-  getRegimeParams(regime) {
+  getRegimeParams(regime, baseParams = {}) {
+    // 从用户配置读取基础参数，如果没有则使用默认值
+    const baseVolatilityWindow = baseParams.volatilityWindow || 6;
+    const baseEwmaDecay = baseParams.ewmaDecay || 0.91;
+    const baseMomentumMonths = baseParams.momentumMonths || 6;
+    const baseMinMomentumReturn = baseParams.minMomentumReturn || -0.10;
+    
     const paramsMap = {
-      // 强势牛市：适度进攻，优化分散化（基于市场宽度>52%的客观判断）
+      // 强势牛市：适度进攻（基于市场宽度>52%的客观判断）
       AGGRESSIVE_BULL: {
-        maxWeight: 0.08,           // 8%（测试显示较低maxWeight收益更高）
-        volatilityWindow: 6,
-        ewmaDecay: 0.91,
+        maxWeight: 0.10,           // 10%（测试显示低maxWeight收益更高，牛市时适度提高）
+        volatilityWindow: baseVolatilityWindow,
+        ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
-        momentumMonths: 6,
-        minMomentumReturn: -0.10,
+        momentumMonths: baseMomentumMonths,
+        minMomentumReturn: baseMinMomentumReturn,
         filterByQuality: false
       },
       
       // 温和牛市：平衡策略（基于市场宽度42-52%的客观判断）
       MODERATE_BULL: {
-        maxWeight: 0.07,           // 7%
-        volatilityWindow: 6,
-        ewmaDecay: 0.91,
+        maxWeight: 0.08,           // 8%
+        volatilityWindow: baseVolatilityWindow,
+        ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
-        momentumMonths: 6,
-        minMomentumReturn: -0.10,
+        momentumMonths: baseMomentumMonths,
+        minMomentumReturn: baseMinMomentumReturn,
         filterByQuality: false
       },
       
-      // 震荡市场：保守策略（市场宽度32-42%）
+      // 震荡市场：最优策略（市场宽度32-42%）
       SIDEWAYS: {
-        maxWeight: 0.06,           // 6%（最优值）
-        volatilityWindow: 6,
-        ewmaDecay: 0.91,
+        maxWeight: 0.06,           // 6%（测试显示的最优值）
+        volatilityWindow: baseVolatilityWindow,
+        ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
-        momentumMonths: 6,
-        minMomentumReturn: -0.10,
+        momentumMonths: baseMomentumMonths,
+        minMomentumReturn: baseMinMomentumReturn,
         filterByQuality: false
       },
       
-      // 弱势市场：极度保守（市场宽度<32%）
+      // 弱势市场：保守策略（市场宽度<32%）
       WEAK_BEAR: {
-        maxWeight: 0.05,           // 5%（更分散）
-        volatilityWindow: 6,
-        ewmaDecay: 0.91,
+        maxWeight: 0.05,           // 5%（更低集中度，控制风险）
+        volatilityWindow: baseVolatilityWindow,
+        ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
-        momentumMonths: 6,
-        minMomentumReturn: -0.10,
+        momentumMonths: baseMomentumMonths,
+        minMomentumReturn: baseMinMomentumReturn,
         filterByQuality: false
       },
       
       // 恐慌市场：极度防守
       PANIC: {
-        maxWeight: 0.06,
-        volatilityWindow: 3,
-        ewmaDecay: 0.80,
+        maxWeight: 0.04,           // 4%（极低集中度）
+        volatilityWindow: Math.max(3, Math.floor(baseVolatilityWindow / 2)),
+        ewmaDecay: Math.max(0.80, baseEwmaDecay - 0.10),
         minROE: 0.12,
         maxDebtRatio: 0.40,
-        momentumMonths: 12,
-        minMomentumReturn: -0.15,
+        momentumMonths: Math.max(12, baseMomentumMonths * 2),
+        minMomentumReturn: -0.05,
         filterByQuality: true
       }
     };
@@ -372,16 +382,16 @@ class MarketRegimeService {
   /**
    * 获取默认状态（震荡市场）
    */
-  getDefaultRegime(date) {
+  getDefaultRegime(date, baseParams = {}) {
     return {
       regime: 'SIDEWAYS',
       regimeName: '震荡市场',
-      trendStrength: 0,
-      marketBreadth: 0.5,
-      volatilityLevel: 0.5,
-      momentumStrength: 0,
-      confidence: 0.5,
-      params: this.getRegimeParams('SIDEWAYS'),
+      trendStrength: null,
+      marketBreadth: null,
+      volatilityLevel: null,
+      momentumStrength: null,
+      confidence: 0,
+      params: this.getRegimeParams('SIDEWAYS', baseParams),
       date
     };
   }

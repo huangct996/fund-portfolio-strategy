@@ -175,7 +175,15 @@ class IndexPortfolioService {
             }
             
             if (tempWeights && tempWeights.length > 0) {
-              marketRegime = await marketRegimeService.identifyMarketRegime(indexCode, tempWeights, currentDate);
+              // 传入用户配置的基础参数
+              const baseParams = {
+                volatilityWindow: config.riskParityParams?.volatilityWindow,
+                ewmaDecay: config.riskParityParams?.ewmaDecay,
+                momentumMonths: config.riskParityParams?.stockFilterParams?.momentumMonths,
+                minMomentumReturn: config.riskParityParams?.stockFilterParams?.minMomentumReturn
+              };
+              
+              marketRegime = await marketRegimeService.identifyMarketRegime(indexCode, tempWeights, currentDate, baseParams);
               
               // 合并自适应参数到基础参数
               effectiveRiskParityParams = {
