@@ -214,13 +214,13 @@ class MarketRegimeService {
   classifyRegime(trend, breadth, volatility, momentum) {
     // 优先使用市场宽度作为主要判断依据（因为趋势和动量可能为0）
     
-    // 1. 强势牛市：市场宽度高（55%以上股票上涨）- 降低阈值
-    if (breadth >= 0.55) {
+    // 1. 强势牛市：市场宽度高（52%以上股票上涨）- 进一步降低阈值
+    if (breadth >= 0.52) {
       return 'AGGRESSIVE_BULL';
     }
     
-    // 2. 温和牛市：市场宽度中等（45-55%股票上涨）- 降低阈值
-    if (breadth >= 0.45) {
+    // 2. 温和牛市：市场宽度中等（42-52%股票上涨）- 进一步降低阈值
+    if (breadth >= 0.42) {
       return 'MODERATE_BULL';
     }
     
@@ -229,12 +229,12 @@ class MarketRegimeService {
       return 'PANIC';
     }
     
-    // 4. 弱势市场：市场宽度低（35%以下股票上涨）- 降低阈值
-    if (breadth < 0.35) {
+    // 4. 弱势市场：市场宽度低（32%以下股票上涨）- 进一步降低阈值
+    if (breadth < 0.32) {
       return 'WEAK_BEAR';
     }
     
-    // 5. 震荡市场：其他情况（35-45%）
+    // 5. 震荡市场：其他情况（32-42%）
     return 'SIDEWAYS';
   }
   
@@ -243,50 +243,50 @@ class MarketRegimeService {
    */
   getRegimeParams(regime) {
     const paramsMap = {
-      // 强势牛市：极高进攻性，最大化收益
+      // 强势牛市：极高进攻性，最大化收益（大幅提升以产生明显差异）
       AGGRESSIVE_BULL: {
-        maxWeight: 0.20,           // 提升至20%，充分集中优质股票
+        maxWeight: 0.25,           // 提升至25%（原20%），充分集中优质股票
         volatilityWindow: 12,
-        ewmaDecay: 0.96,           // 更重视近期数据
+        ewmaDecay: 0.97,           // 提升至0.97，更重视近期数据
         minROE: 0,                 // 完全放开质量限制
         maxDebtRatio: 1,
         momentumMonths: 3,         // 短周期动量，快速响应
-        minMomentumReturn: 0,      // 降低动量要求
+        minMomentumReturn: -0.05,  // 放宽至-5%，允许小幅回调
         filterByQuality: false
       },
       
-      // 温和牛市：高进攻性
+      // 温和牛市：高进攻性（提升以产生差异）
       MODERATE_BULL: {
-        maxWeight: 0.16,           // 提升至16%
+        maxWeight: 0.20,           // 提升至20%（原16%）
         volatilityWindow: 6,
-        ewmaDecay: 0.93,
+        ewmaDecay: 0.94,           // 提升至0.94
         minROE: 0,                 // 放开ROE限制
         maxDebtRatio: 1,
         momentumMonths: 6,
-        minMomentumReturn: -0.05,  // 允许小幅下跌
+        minMomentumReturn: -0.08,  // 放宽至-8%
         filterByQuality: false     // 不筛选质量，最大化参与
       },
       
-      // 震荡市场：偏进攻策略（提升以应对牛市误判）
+      // 震荡市场：偏进攻策略（大幅提升以应对牛市误判）
       SIDEWAYS: {
-        maxWeight: 0.15,           // 提升至15%（原10%）
+        maxWeight: 0.18,           // 大幅提升至18%（原10%）
         volatilityWindow: 6,
-        ewmaDecay: 0.91,           // 提升至0.91
-        minROE: 0,                 // 完全放开（原8%）
+        ewmaDecay: 0.92,           // 提升至0.92
+        minROE: 0,                 // 完全放开质量要求
         maxDebtRatio: 1,
         momentumMonths: 6,
         minMomentumReturn: -0.10,  // 放宽至-10%
         filterByQuality: false     // 不筛选质量
       },
       
-      // 弱势市场：中性策略（大幅提升进攻性）
+      // 弱势市场：中性偏进攻策略（大幅提升以应对牛市误判）
       WEAK_BEAR: {
-        maxWeight: 0.15,           // 提升至15%（原8%）
+        maxWeight: 0.16,           // 大幅提升至16%（原8%，提升100%）
         volatilityWindow: 6,
-        ewmaDecay: 0.90,           // 提升至0.90
-        minROE: 0,                 // 完全放开
-        maxDebtRatio: 1,           // 完全放开
-        momentumMonths: 6,
+        ewmaDecay: 0.91,           // 提升至0.91
+        minROE: 0,                 // 完全放开质量要求
+        maxDebtRatio: 1,           // 完全放开债务限制
+        momentumMonths: 6,         // 缩短至6个月
         minMomentumReturn: -0.10,  // 放宽至-10%
         filterByQuality: false     // 不筛选质量
       },
