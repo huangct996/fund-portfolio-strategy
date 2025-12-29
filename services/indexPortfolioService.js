@@ -191,6 +191,14 @@ class IndexPortfolioService {
                 ...marketRegime.params
               };
               
+              // 关键修复：如果自适应策略设置了filterByQuality，需要覆盖stockFilterParams中的值
+              if (marketRegime.params.filterByQuality !== undefined && effectiveRiskParityParams.stockFilterParams) {
+                effectiveRiskParityParams.stockFilterParams = {
+                  ...effectiveRiskParityParams.stockFilterParams,
+                  filterByQuality: marketRegime.params.filterByQuality
+                };
+              }
+              
               // 每4个调仓期输出一次，避免日志过多
               if (i === 0 || i % 4 === 0) {
                 console.log(`\n🔍 [${currentDate}] 市场状态: ${marketRegime.regimeName} (置信度: ${(marketRegime.confidence * 100).toFixed(0)}%)`);
@@ -517,16 +525,6 @@ class IndexPortfolioService {
     let filteredOutStocks = [];
     if (useRiskParity && riskParityParams) {
       // 风险平价策略
-      // 如果启用自适应策略，需要合并stockFilterParams
-      let finalStockFilterParams = riskParityParams.stockFilterParams || null;
-      if (config.useAdaptive && riskParityParams.filterByQuality !== undefined) {
-        // 自适应策略的filterByQuality参数优先级更高
-        finalStockFilterParams = {
-          ...(riskParityParams.stockFilterParams || {}),
-          filterByQuality: riskParityParams.filterByQuality
-        };
-      }
-      
       const riskParityResult = await this.calculateRiskParityWeights(
         stocksWithData,
         startDate,
@@ -542,9 +540,9 @@ class IndexPortfolioService {
           useMomentumTilt: riskParityParams.useMomentumTilt || false,
           momentumWindow: riskParityParams.momentumWindow || 6,
           momentumWeight: riskParityParams.momentumWeight || 0.3,
-          // 股票池筛选参数
+          // 股票池筛选参数（已在第194-200行处理过filterByQuality覆盖）
           enableStockFilter: riskParityParams.enableStockFilter || false,
-          stockFilterParams: finalStockFilterParams
+          stockFilterParams: riskParityParams.stockFilterParams || null
         }
       );
       

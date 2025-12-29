@@ -266,9 +266,14 @@
                         </div>
                         <div style="margin-top: 10px;">
                             <label>
-                                <input type="checkbox" id="filterByQuality" checked>
+                                <input type="checkbox" id="filterByQuality">
                                 <span style="font-size: 0.9em;">剔除质量得分低于中位数的股票（基于PE、PB、股息率）</span>
                             </label>
+                            <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.85em; color: #856404;">
+                                <strong>💡 提示：</strong>启用自适应策略时，此选项将根据市场状态自动调整：<br>
+                                • 牛市期间：自动禁用质量筛选，保留更多股票捕捉收益<br>
+                                • 熊市期间：自动启用质量筛选，过滤低质量股票防守
+                            </div>
                         </div>
                     </div>
                 </div>
