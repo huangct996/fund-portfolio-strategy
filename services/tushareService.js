@@ -7,6 +7,11 @@ class TushareService {
     this.token = process.env.TUSHARE_TOKEN;
     this.baseUrl = 'http://api.tushare.pro';
     this.dbInitialized = false;
+    this.requestQueue = [];
+    this.requestCount = 0;
+    this.lastResetTime = Date.now();
+    this.maxRequestsPerMinute = 700; // 设置为700，留有余量
+    this.isProcessing = false;
   }
 
   async ensureDbInitialized() {
@@ -17,34 +22,79 @@ class TushareService {
   }
 
   /**
-   * 调用Tushare API
+   * 检查并等待频率限制
    */
-  async callApi(apiName, params = {}) {
-    try {
-      const response = await axios.post(this.baseUrl, {
-        api_name: apiName,
-        token: this.token,
-        params: params,
-        fields: ''
-      });
+  async checkRateLimit() {
+    const now = Date.now();
+    const timeSinceReset = now - this.lastResetTime;
+    
+    // 每分钟重置计数器
+    if (timeSinceReset >= 60000) {
+      this.requestCount = 0;
+      this.lastResetTime = now;
+    }
+    
+    // 如果接近限制，等待到下一分钟
+    if (this.requestCount >= this.maxRequestsPerMinute) {
+      const waitTime = 60000 - timeSinceReset + 1000; // 多等1秒确保安全
+      console.log(`⏳ API频率限制：已达${this.requestCount}次，等待${Math.ceil(waitTime/1000)}秒...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      this.requestCount = 0;
+      this.lastResetTime = Date.now();
+    }
+    
+    this.requestCount++;
+  }
 
-      if (response.data.code !== 0) {
-        throw new Error(response.data.msg || 'API调用失败');
-      }
-
-      const fields = response.data.data.fields;
-      const items = response.data.data.items;
-
-      return items.map(item => {
-        const obj = {};
-        fields.forEach((field, index) => {
-          obj[field] = item[index];
+  /**
+   * 调用Tushare API（带频率限制和重试）
+   */
+  async callApi(apiName, params = {}, retries = 3) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // 检查频率限制
+        await this.checkRateLimit();
+        
+        const response = await axios.post(this.baseUrl, {
+          api_name: apiName,
+          token: this.token,
+          params: params,
+          fields: ''
         });
-        return obj;
-      });
-    } catch (error) {
-      console.error(`Tushare API错误 (${apiName}):`, error.message);
-      throw error;
+
+        if (response.data.code !== 0) {
+          // 如果是频率限制错误，等待后重试
+          if (response.data.msg && response.data.msg.includes('每分钟最多访问')) {
+            const waitTime = 61000;
+            console.log(`⏳ API频率限制错误，等待${Math.ceil(waitTime/1000)}秒后重试...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            this.requestCount = 0;
+            this.lastResetTime = Date.now();
+            continue; // 重试
+          }
+          throw new Error(response.data.msg || 'API调用失败');
+        }
+
+        const fields = response.data.data.fields;
+        const items = response.data.data.items;
+
+        return items.map(item => {
+          const obj = {};
+          fields.forEach((field, index) => {
+            obj[field] = item[index];
+          });
+          return obj;
+        });
+      } catch (error) {
+        if (attempt === retries - 1) {
+          console.error(`Tushare API错误 (${apiName}):`, error.message);
+          throw error;
+        }
+        // 等待后重试
+        const waitTime = (attempt + 1) * 2000;
+        console.log(`⚠️  API调用失败，${waitTime/1000}秒后重试 (${attempt + 1}/${retries})...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
   }
 

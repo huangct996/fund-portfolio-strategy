@@ -68,24 +68,45 @@ class MarketRegimeService {
       const startDate = this.getDateBefore(date, 150);
       const prices = await tushareService.getIndexDaily(marketIndex, startDate, date);
       
-      if (!prices || prices.length < 120) {
-        console.warn('数据不足，无法计算趋势强度');
+      if (!prices || prices.length < 20) {
+        // 数据严重不足，返回中性值
         return 0;
       }
       
       const current = prices[prices.length - 1].close;
-      const ma20 = this.calculateMA(prices, 20);
-      const ma60 = this.calculateMA(prices, 60);
-      const ma120 = this.calculateMA(prices, 120);
       
-      if (!ma20 || !ma60 || !ma120) return 0;
-      
-      // 多周期趋势加权
-      const score = (current - ma20) / ma20 * 0.5 +
-                    (ma20 - ma60) / ma60 * 0.3 +
-                    (ma60 - ma120) / ma120 * 0.2;
-      
-      return score;
+      // 根据数据量动态调整计算方式
+      if (prices.length >= 120) {
+        // 完整数据：使用多周期趋势
+        const ma20 = this.calculateMA(prices, 20);
+        const ma60 = this.calculateMA(prices, 60);
+        const ma120 = this.calculateMA(prices, 120);
+        
+        if (!ma20 || !ma60 || !ma120) return 0;
+        
+        const score = (current - ma20) / ma20 * 0.5 +
+                      (ma20 - ma60) / ma60 * 0.3 +
+                      (ma60 - ma120) / ma120 * 0.2;
+        return score;
+      } else if (prices.length >= 60) {
+        // 中等数据：使用双周期趋势
+        const ma20 = this.calculateMA(prices, 20);
+        const ma60 = this.calculateMA(prices, 60);
+        
+        if (!ma20 || !ma60) return 0;
+        
+        const score = (current - ma20) / ma20 * 0.6 +
+                      (ma20 - ma60) / ma60 * 0.4;
+        return score;
+      } else {
+        // 最少数据：仅使用单周期趋势
+        const ma20 = this.calculateMA(prices, 20);
+        
+        if (!ma20) return 0;
+        
+        const score = (current - ma20) / ma20;
+        return score;
+      }
     } catch (error) {
       console.warn('计算趋势强度失败:', error.message);
       return 0;
@@ -253,64 +274,74 @@ class MarketRegimeService {
     const baseMinMomentumReturn = baseParams.minMomentumReturn || -0.10;
     
     const paramsMap = {
-      // 强势牛市：高度进攻（基于市场宽度>52%的客观判断）
+      // 强势牛市：完全跟随指数（基于市场宽度>52%的客观判断）
       AGGRESSIVE_BULL: {
-        maxWeight: 0.15,           // 15%（高于固定策略13%，充分捕捉牛市收益）
+        maxWeight: 1.0,            // 100%（不限制，完全跟随指数权重）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
-        minMomentumReturn: baseMinMomentumReturn,
-        filterByQuality: false
+        minMomentumReturn: -1.0,   // 不过滤任何股票
+        filterByQuality: false,
+        hybridRatio: 1.0,          // 100%市值加权，完全跟随指数
+        useCovariance: false,      // 禁用协方差优化
+        enableStockFilter: false   // 完全禁用股票筛选
       },
       
-      // 温和牛市：适度进攻（基于市场宽度42-52%的客观判断）
+      // 温和牛市：高度跟随指数（基于市场宽度42-52%的客观判断）
       MODERATE_BULL: {
-        maxWeight: 0.13,           // 13%（与固定策略持平）
+        maxWeight: 1.0,            // 100%（不限制）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
-        minMomentumReturn: baseMinMomentumReturn,
-        filterByQuality: false
+        minMomentumReturn: -1.0,   // 不过滤任何股票
+        filterByQuality: false,
+        hybridRatio: 1.0,          // 100%市值加权
+        useCovariance: false,
+        enableStockFilter: false   // 完全禁用股票筛选
       },
       
-      // 震荡市场：平衡策略（市场宽度32-42%）
+      // 震荡市场：轻度市值倾斜（市场宽度32-42%）
       SIDEWAYS: {
-        maxWeight: 0.11,           // 11%（略低于固定策略）
+        maxWeight: 0.20,           // 20%（适度限制）
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
         minMomentumReturn: baseMinMomentumReturn,
-        filterByQuality: false
+        filterByQuality: false,
+        hybridRatio: 0.5,          // 50%市值加权混合
+        useCovariance: false
       },
       
       // 弱势市场：保守策略（市场宽度<32%）
       WEAK_BEAR: {
-        maxWeight: 0.10,           // 10%（保持较高水平，避免过度保守）
+        maxWeight: 0.10,           // 10%
         volatilityWindow: baseVolatilityWindow,
         ewmaDecay: baseEwmaDecay,
         minROE: 0,
         maxDebtRatio: 1,
         momentumMonths: baseMomentumMonths,
         minMomentumReturn: baseMinMomentumReturn,
-        filterByQuality: false
+        filterByQuality: false,
+        hybridRatio: 0
       },
       
       // 恐慌市场：防守策略
       PANIC: {
-        maxWeight: 0.06,           // 6%（仅在恐慌时显著降低）
+        maxWeight: 0.06,           // 6%
         volatilityWindow: Math.max(3, Math.floor(baseVolatilityWindow / 2)),
         ewmaDecay: Math.max(0.80, baseEwmaDecay - 0.10),
         minROE: 0.12,
         maxDebtRatio: 0.40,
         momentumMonths: Math.max(12, baseMomentumMonths * 2),
         minMomentumReturn: -0.05,
-        filterByQuality: true
+        filterByQuality: true,
+        hybridRatio: 0
       }
     };
     
