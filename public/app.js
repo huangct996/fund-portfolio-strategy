@@ -455,34 +455,32 @@ async function applyConfiguration() {
     const dvWeight = parseFloat(document.getElementById('dvWeight').value);
     const qualityWeight = parseFloat(document.getElementById('qualityWeight').value);
     
-    // 获取权重上限
+    // 获取权重上限（自适应策略会动态调整，这里只是基础值）
     let maxWeight;
     if (useCompositeScore) {
         maxWeight = parseInt(document.getElementById('maxWeightSlider').value) / 100;
     } else if (useRiskParity) {
-        maxWeight = parseInt(document.getElementById('rpMaxWeightSlider').value) / 100;
+        maxWeight = 0.13;  // 自适应策略的基础值，实际会根据市场状态动态调整
     } else {
         maxWeight = parseInt(document.getElementById('mvMaxWeightSlider').value) / 100;
     }
     
-    // 风险平价策略参数
+    // 风险平价策略参数（自适应策略会自动调整这些参数）
     let riskParityParams = null;
     if (useRiskParity) {
         riskParityParams = {
-            volatilityWindow: parseInt(document.getElementById('volatilityWindowSlider').value),
-            ewmaDecay: parseInt(document.getElementById('ewmaDecaySlider').value) / 100,
+            volatilityWindow: 6,  // 由自适应策略自动调整
+            ewmaDecay: 0.91,      // 由自适应策略自动调整
             rebalanceFrequency: document.getElementById('rebalanceFrequency').value,
             enableTradingCost: document.getElementById('enableTradingCost').checked,
             tradingCostRate: document.getElementById('enableTradingCost').checked 
                 ? parseInt(document.getElementById('tradingCostSlider').value) / 10000 
                 : 0,
             riskFreeRate: parseFloat(document.getElementById('riskFreeRateInput').value) / 100,
-            // 综合优化参数
-            useQualityTilt: document.getElementById('enableQualityTilt')?.checked || false,
-            useCovariance: document.getElementById('enableCovariance')?.checked || false,
-            hybridRatio: document.getElementById('enableHybrid')?.checked 
-                ? parseInt(document.getElementById('hybridRatioSlider').value) / 100 
-                : 0,
+            // 综合优化参数（已移除，由自适应策略控制）
+            useQualityTilt: false,
+            useCovariance: false,
+            hybridRatio: 0,
             // 股票池筛选参数
             enableStockFilter: document.getElementById('enableStockFilter')?.checked || false,
             stockFilterParams: document.getElementById('enableStockFilter')?.checked ? {

@@ -163,29 +163,16 @@
                 <h3>风险平价策略配置</h3>
                 
                 <div class="info-note" style="margin-bottom: 15px;">
-                    <strong>📌 策略说明：</strong>
+                    <strong>📌 自适应风险平价策略：</strong>
                     <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li><strong>核心原理：</strong>使用EWMA计算股票波动率，权重与波动率成反比，使每只股票风险贡献相等</li>
-                        <li><strong>调仓机制：</strong>支持季度/月度调仓，使用最近年度成分股数据（非年度调仓期使用最近一次年度调仓的成分股）</li>
-                        <li><strong>年化夏普比率：</strong>通过年化波动率（周期波动率 × √年化频率）计算，确保不同调仓频率的策略可比</li>
-                        <li><strong>优化目标：</strong>提高年化夏普比率，降低组合波动率，优化风险调整后收益</li>
-                        <li><strong>最优参数：</strong>根据回测，波动率窗口6月、EWMA衰减0.91、季度调仓效果最佳（年化夏普比率1.04）</li>
+                        <li><strong>核心原理：</strong>风险平价权重计算 + 自适应参数调整</li>
+                        <li><strong>自适应机制：</strong>根据市场宽度自动识别市场状态（强势牛市/温和牛市/震荡/弱势/恐慌），动态调整maxWeight、波动率窗口、EWMA衰减等参数</li>
+                        <li><strong>避免过拟合：</strong>基于市场宽度客观指标（>52%、42-52%、32-42%、<32%），不依赖"已知牛熊"</li>
+                        <li><strong>股票池筛选：</strong>可选的辅助功能，剔除低质量股票提升组合质量</li>
                     </ul>
                 </div>
                 
                 <div class="weight-config">
-                    <div class="weight-item">
-                        <label>波动率计算窗口: <span id="volatilityWindowValue">6个月</span></label>
-                        <input type="range" id="volatilityWindowSlider" min="6" max="24" step="1" value="6">
-                        <small style="color: #666;">用于计算历史波动率的时间窗口（月）</small>
-                    </div>
-                    
-                    <div class="weight-item">
-                        <label>EWMA衰减系数: <span id="ewmaDecayValue">0.91</span></label>
-                        <input type="range" id="ewmaDecaySlider" min="85" max="98" step="1" value="91">
-                        <small style="color: #666;">控制近期数据权重，值越大越重视历史数据</small>
-                    </div>
-                    
                     <div class="weight-item">
                         <label>调仓频率:</label>
                         <select id="rebalanceFrequency" class="select-input">
@@ -210,38 +197,14 @@
                     </div>
                     
                     <div class="weight-item">
-                        <label>单只股票最大权重: <span id="rpMaxWeightValue">13%</span></label>
-                        <input type="range" id="rpMaxWeightSlider" min="5" max="30" step="1" value="13">
-                        <small style="color: #666;">防止极端情况下权重过度集中</small>
-                    </div>
-                    
-                    <div class="weight-item">
                         <label>无风险收益率 (%):</label>
                         <input type="number" id="riskFreeRateInput" min="0" max="10" step="0.1" value="2.0" style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
                         <small style="color: #666;">用于计算夏普比率，中国10年期国债收益率约2-2.5%</small>
                     </div>
                     
-                    <div class="weight-item">
-                        <label>
-                            <input type="checkbox" id="enableCovariance">
-                            协方差矩阵优化
-                        </label>
-                        <small style="color: #666; display: block; margin-left: 20px;">
-                            考虑股票间相关性，更好的分散化效果
-                        </small>
-                    </div>
-                    
-                    <div class="weight-item">
-                        <label>市值加权比例: <span id="hybridRatioValue">0%</span></label>
-                        <input type="range" id="hybridRatioSlider" min="0" max="50" step="5" value="0">
-                        <small style="color: #666;">
-                            0%=纯风险平价，30%=70%风险平价+30%市值加权，50%=各占50%
-                        </small>
-                    </div>
-                    
                     <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
-                        <strong>🎯 方案四：股票池优化筛选</strong>
-                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合，预期夏普比率+0.08-0.15</p>
+                        <strong>🎯 股票池筛选（可选辅助功能）</strong>
+                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合。自适应策略会根据市场状态自动调整筛选参数。</p>
                     </div>
                     
                     <div style="margin-top: 15px;">
