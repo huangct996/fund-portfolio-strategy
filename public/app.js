@@ -81,6 +81,7 @@ async function loadData() {
         allReturnsData = returnsResult.periods;
         const customRisk = returnsResult.customRisk;
         const indexRisk = returnsResult.indexRisk;
+        const fundRisk = returnsResult.fundRisk;
         const trackingError = returnsResult.trackingError;
         
         console.log('获取到的数据:', allReturnsData);
@@ -103,7 +104,7 @@ async function loadData() {
         displayHoldingsTable(allReturnsData);
         
         // 显示风险指标
-        displayRiskMetrics(customRisk, indexRisk, trackingError);
+        displayRiskMetrics(customRisk, indexRisk, fundRisk, trackingError);
 
         showLoading(false);
     } catch (error) {
@@ -203,6 +204,40 @@ async function fetchRebalanceChanges() {
     }
 
     return result.data;
+}
+
+async function fetchFundHoldings(reportDate) {
+    try {
+        // 基金持仓数据通常按季度披露，需要找到最近的披露日期
+        // 披露日期通常是 0331, 0630, 0930, 1231
+        const year = reportDate.substring(0, 4);
+        const month = reportDate.substring(4, 6);
+        
+        // 根据月份确定最近的披露期
+        let endDate;
+        if (month <= '03') {
+            endDate = `${parseInt(year) - 1}1231`;
+        } else if (month <= '06') {
+            endDate = `${year}0331`;
+        } else if (month <= '09') {
+            endDate = `${year}0630`;
+        } else {
+            endDate = `${year}0930`;
+        }
+        
+        const response = await fetch(`${API_BASE}/fund-holdings?endDate=${endDate}`);
+        const result = await response.json();
+        
+        if (!result.success) {
+            console.warn('获取基金持仓失败:', result.error);
+            return [];
+        }
+        
+        return result.data || [];
+    } catch (error) {
+        console.error('获取基金持仓失败:', error);
+        return [];
+    }
 }
 
 function displayFundInfo(info) {
@@ -666,6 +701,35 @@ function renderHoldingsForPeriod(period, rebalanceChange) {
         indexBody.appendChild(tr);
     });
     
+    // 填充512890.SH基金持仓表格
+    const fundBody = document.getElementById('fundHoldingsTable');
+    if (fundBody) {
+        fundBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">加载中...</td></tr>';
+        
+        // 异步获取基金持仓数据
+        fetchFundHoldings(period.rebalanceDate || period.reportDate).then(fundHoldings => {
+            if (fundHoldings && fundHoldings.length > 0) {
+                fundBody.innerHTML = '';
+                fundHoldings.forEach((stock, index) => {
+                    const tr = document.createElement('tr');
+                    const ratio = parseFloat(stock.stk_mkv_ratio) || 0;
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${stock.symbol}</td>
+                        <td>${stock.name || stock.symbol}</td>
+                        <td>${ratio.toFixed(2)}%</td>
+                    `;
+                    fundBody.appendChild(tr);
+                });
+            } else {
+                fundBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #999;">暂无持仓数据</td></tr>';
+            }
+        }).catch(error => {
+            console.error('获取基金持仓失败:', error);
+            fundBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #FF6B6B;">获取失败</td></tr>';
+        });
+    }
+    
     // 填充策略持仓表格（按策略权重排序）
     const adjustedBody = document.getElementById('adjustedHoldingsTable');
     adjustedBody.innerHTML = '';
@@ -783,25 +847,80 @@ function drawCumulativeReturnChart(data, customRisk, indexRisk, dailyData) {
             pointRadiusIndex.push(isYearlyRebalance ? 4 : 0);
         });
         
-        // 基金净值数据（从调仓期数据中获取）
-        // 为每个交易日插值基金净值
-        const fundDataMap = new Map();
-        data.forEach(d => {
-            fundDataMap.set(d.rebalanceDate, (d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
-        });
-        
-        // 简单插值：使用最近的已知值
-        let lastKnownFundValue = 0;
-        dailyData.custom.forEach((point) => {
-            const dateStr = point.date;
-            if (fundDataMap.has(dateStr)) {
-                lastKnownFundValue = fundDataMap.get(dateStr);
-            }
-            fundData.push(lastKnownFundValue);
+        // 基金净值数据：优先使用后端返回的每日数据
+        if (dailyData.fund && dailyData.fund.length > 0) {
+            console.log('✅ 使用基金每日净值数据');
+            console.log('  基金每日数据点:', dailyData.fund.length);
             
-            const isRebalanceDate = rebalanceDates.has(dateStr);
-            pointRadiusFund.push(isRebalanceDate ? 4 : 0);
-        });
+            // 创建基金数据映射
+            const fundDataMap = new Map();
+            dailyData.fund.forEach(point => {
+                fundDataMap.set(point.date, point.cumulative * 100);
+            });
+            
+            // 为每个交易日填充基金数据（使用线性插值）
+            const fundDates = dailyData.fund.map(p => p.date).sort();
+            let fundIndex = 0;
+            
+            dailyData.custom.forEach((point) => {
+                const dateStr = point.date;
+                
+                if (fundDataMap.has(dateStr)) {
+                    // 有实际数据，直接使用
+                    fundData.push(fundDataMap.get(dateStr));
+                    pointRadiusFund.push(0);
+                } else {
+                    // 无实际数据，使用线性插值
+                    let prevDate = null, nextDate = null;
+                    let prevValue = 0, nextValue = 0;
+                    
+                    for (let i = 0; i < fundDates.length; i++) {
+                        if (fundDates[i] < dateStr) {
+                            prevDate = fundDates[i];
+                            prevValue = fundDataMap.get(prevDate);
+                        } else if (fundDates[i] > dateStr && !nextDate) {
+                            nextDate = fundDates[i];
+                            nextValue = fundDataMap.get(nextDate);
+                            break;
+                        }
+                    }
+                    
+                    // 线性插值（仅在两个数据点之间）
+                    if (prevDate && nextDate) {
+                        const prevNum = parseInt(prevDate);
+                        const nextNum = parseInt(nextDate);
+                        const currNum = parseInt(dateStr);
+                        const ratio = (currNum - prevNum) / (nextNum - prevNum);
+                        const interpolatedValue = prevValue + (nextValue - prevValue) * ratio;
+                        fundData.push(interpolatedValue);
+                    } else {
+                        // 没有前后数据点，不绘制
+                        fundData.push(null);
+                    }
+                    pointRadiusFund.push(0);
+                }
+            });
+        } else {
+            console.log('⚠️ 无基金每日数据，使用调仓期数据插值');
+            
+            // 降级：使用调仓期数据插值
+            const fundDataMap = new Map();
+            data.forEach(d => {
+                fundDataMap.set(d.rebalanceDate, (d.fundCumulativeReturn !== undefined ? d.fundCumulativeReturn : d.fundReturn) * 100);
+            });
+            
+            let lastKnownFundValue = 0;
+            dailyData.custom.forEach((point) => {
+                const dateStr = point.date;
+                if (fundDataMap.has(dateStr)) {
+                    lastKnownFundValue = fundDataMap.get(dateStr);
+                }
+                fundData.push(lastKnownFundValue);
+                
+                const isRebalanceDate = rebalanceDates.has(dateStr);
+                pointRadiusFund.push(isRebalanceDate ? 4 : 0);
+            });
+        }
         
     } else {
         console.log('⚠️ 无每日数据，使用调仓期数据');
@@ -930,7 +1049,7 @@ function formatDate(dateStr) {
     return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}`;
 }
 
-function displayRiskMetrics(customRisk, indexRisk, trackingError) {
+function displayRiskMetrics(customRisk, indexRisk, fundRisk, trackingError) {
     if (!customRisk || !indexRisk) return;
     
     const riskSection = document.getElementById('riskMetrics');
@@ -940,6 +1059,7 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
     
     const customMetrics = document.getElementById('customRiskMetrics');
     const indexMetrics = document.getElementById('indexRiskMetrics');
+    const fundMetrics = document.getElementById('fundRiskMetrics');
     
     customMetrics.innerHTML = `
         <div class="risk-item">
@@ -995,6 +1115,36 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
         </div>
     `;
     
+    // 添加512890.SH基金的风险指标
+    if (fundMetrics && fundRisk) {
+        fundMetrics.innerHTML = `
+            <div class="risk-item">
+                <span class="risk-label">累计收益率:</span>
+                <span class="risk-value">${(fundRisk.totalReturn * 100).toFixed(2)}%</span>
+            </div>
+            <div class="risk-item">
+                <span class="risk-label">年化收益率:</span>
+                <span class="risk-value">${(fundRisk.annualizedReturn * 100).toFixed(2)}%</span>
+            </div>
+            <div class="risk-item">
+                <span class="risk-label">年化波动率:</span>
+                <span class="risk-value">${(fundRisk.volatility * 100).toFixed(2)}%</span>
+            </div>
+            <div class="risk-item">
+                <span class="risk-label">最大回撤:</span>
+                <span class="risk-value" style="color: #FF6B6B;">${(fundRisk.maxDrawdown * 100).toFixed(2)}%</span>
+            </div>
+            <div class="risk-item">
+                <span class="risk-label">夏普比率:</span>
+                <span class="risk-value">${fundRisk.sharpeRatio ? fundRisk.sharpeRatio.toFixed(2) : '-'}</span>
+            </div>
+            <div class="risk-item">
+                <span class="risk-label">索提诺比率:</span>
+            <span class="risk-value">${fundRisk.sortinoRatio ? fundRisk.sortinoRatio.toFixed(2) : '-'}</span>
+            </div>
+        `;
+    }
+    
     // 显示跟踪误差
     if (trackingError) {
         const trackingErrorDiv = document.getElementById('trackingErrorMetrics');
@@ -1013,14 +1163,14 @@ function displayRiskMetrics(customRisk, indexRisk, trackingError) {
     }
     
     // 渲染风险收益指标对比表格
-    renderComparisonTable(customRisk, indexRisk);
+    renderComparisonTable(customRisk, indexRisk, fundRisk);
 }
 
-function renderComparisonTable(customRisk, indexRisk) {
+function renderComparisonTable(customRisk, indexRisk, fundRisk) {
     const comparisonTable = document.getElementById('comparisonTable');
     const comparisonTableBody = document.getElementById('comparisonTableBody');
     
-    console.log('renderComparisonTable called', { comparisonTable, comparisonTableBody, customRisk, indexRisk });
+    console.log('renderComparisonTable called', { comparisonTable, comparisonTableBody, customRisk, indexRisk, fundRisk });
     
     if (!comparisonTable || !comparisonTableBody) {
         console.error('对比表格元素未找到', { comparisonTable, comparisonTableBody });
@@ -1039,36 +1189,42 @@ function renderComparisonTable(customRisk, indexRisk) {
             metric: '年化收益率',
             strategy: `${(customRisk.annualizedReturn * 100).toFixed(1)}%`,
             index: `${(indexRisk.annualizedReturn * 100).toFixed(1)}%`,
+            fund: fundRisk ? `${(fundRisk.annualizedReturn * 100).toFixed(1)}%` : '-',
             analysis: generateAnalysis('return', returnDiff, customRisk, indexRisk)
         },
         {
             metric: '夏普比率',
             strategy: customRisk.sharpeRatio ? customRisk.sharpeRatio.toFixed(2) : '-',
             index: indexRisk.sharpeRatio ? indexRisk.sharpeRatio.toFixed(2) : '-',
+            fund: fundRisk && fundRisk.sharpeRatio ? fundRisk.sharpeRatio.toFixed(2) : '-',
             analysis: generateAnalysis('sharpe', sharpeDiff, customRisk, indexRisk)
         },
         {
             metric: '索提诺比率',
             strategy: customRisk.sortinoRatio ? customRisk.sortinoRatio.toFixed(2) : '-',
             index: indexRisk.sortinoRatio ? indexRisk.sortinoRatio.toFixed(2) : '-',
+            fund: fundRisk && fundRisk.sortinoRatio ? fundRisk.sortinoRatio.toFixed(2) : '-',
             analysis: generateAnalysis('sortino', sortinoDiff, customRisk, indexRisk)
         },
         {
             metric: '卡玛比率',
             strategy: customRisk.maxDrawdown > 0 ? (customRisk.annualizedReturn / customRisk.maxDrawdown).toFixed(2) : '-',
             index: indexRisk.maxDrawdown > 0 ? (indexRisk.annualizedReturn / indexRisk.maxDrawdown).toFixed(2) : '-',
+            fund: fundRisk && fundRisk.maxDrawdown > 0 ? (fundRisk.annualizedReturn / fundRisk.maxDrawdown).toFixed(2) : '-',
             analysis: '衡量回撤修复能力，数值越高表示单位回撤获得的收益越高'
         },
         {
             metric: '最大回撤',
             strategy: `${(customRisk.maxDrawdown * 100).toFixed(0)}%`,
             index: `${(indexRisk.maxDrawdown * 100).toFixed(0)}%`,
+            fund: fundRisk ? `${(fundRisk.maxDrawdown * 100).toFixed(0)}%` : '-',
             analysis: generateAnalysis('drawdown', drawdownDiff, customRisk, indexRisk)
         },
         {
             metric: '波动率',
             strategy: `${(customRisk.volatility * 100).toFixed(1)}%`,
             index: `${(indexRisk.volatility * 100).toFixed(1)}%`,
+            fund: fundRisk ? `${(fundRisk.volatility * 100).toFixed(1)}%` : '-',
             analysis: customRisk.volatility < indexRisk.volatility 
                 ? '策略波动更小，风险控制更好' 
                 : '策略波动较大，但可能带来更高收益'
@@ -1081,6 +1237,7 @@ function renderComparisonTable(customRisk, indexRisk) {
             <td class="metric-name">${row.metric}</td>
             <td class="strategy-col">${row.strategy}</td>
             <td class="index-col">${row.index}</td>
+            <td class="fund-col">${row.fund}</td>
             <td class="analysis-col">${row.analysis}</td>
         </tr>
     `).join('');
@@ -1166,8 +1323,16 @@ function updatePeriodInfo(period) {
     // 期间收益率（持有起始日到持有结束日的单期收益率）
     const customReturn = formatPercent(period.customReturn);
     const indexReturn = formatPercent(period.indexReturn);
+    const fundReturn = formatPercent(period.fundReturn);
+    
     const periodReturnEl = document.getElementById('periodReturn');
-    if (periodReturnEl) periodReturnEl.innerHTML = `自定义策略: <strong>${customReturn}</strong> | 指数: <strong>${indexReturn}</strong>`;
+    if (periodReturnEl) periodReturnEl.innerHTML = `<strong>${customReturn}</strong>`;
+    
+    const indexPeriodReturnEl = document.getElementById('indexPeriodReturn');
+    if (indexPeriodReturnEl) indexPeriodReturnEl.innerHTML = `<strong>${indexReturn}</strong>`;
+    
+    const fundPeriodReturnEl = document.getElementById('fundPeriodReturn');
+    if (fundPeriodReturnEl) fundPeriodReturnEl.innerHTML = `<strong>${fundReturn}</strong>`;
     
     const totalWeightEl = document.getElementById('totalWeight');
     if (totalWeightEl) {

@@ -162,7 +162,17 @@ class TushareService {
       return data.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
     }
     
-    // 2. 数据库没有，调用Tushare API
+    // 2. 检查是否已标记为缺失（针对超过一个月的数据）
+    const actualEndDate = endDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    if (dbService.isOlderThanOneMonth(actualEndDate)) {
+      const isMarked = await dbService.isMarkedAsMissing(fundCode, 'fund_nav', actualEndDate);
+      if (isMarked) {
+        console.log(`⚠️ ${fundCode} 的净值数据已标记为缺失，跳过API查询`);
+        return [];
+      }
+    }
+    
+    // 3. 数据库没有，调用Tushare API
     console.log(`数据库无净值数据，正在调用Tushare API`);
     const apiParams = {
       ts_code: fundCode,
@@ -172,15 +182,30 @@ class TushareService {
       apiParams.end_date = endDate;
     }
     
-    data = await this.callApi('fund_nav', apiParams);
-    
-    // 3. 保存到数据库
-    if (data.length > 0) {
-      await dbService.saveFundNav(data);
-      console.log('✅ 净值数据已同步到数据库');
+    try {
+      data = await this.callApi('fund_nav', apiParams);
+      
+      // 4. 保存到数据库
+      if (data.length > 0) {
+        await dbService.saveFundNav(data);
+        console.log('✅ 净值数据已同步到数据库');
+      } else {
+        // 如果API返回空数据且日期超过一个月，标记为缺失
+        if (dbService.isOlderThanOneMonth(actualEndDate)) {
+          await dbService.markDataAsMissing(fundCode, 'fund_nav', actualEndDate, 'Tushare API返回空数据');
+          console.log(`✅ 已标记 ${fundCode} 的净值数据为缺失`);
+        }
+      }
+      
+      return data.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+    } catch (error) {
+      // API调用失败，如果日期超过一个月，标记为缺失
+      if (dbService.isOlderThanOneMonth(actualEndDate)) {
+        await dbService.markDataAsMissing(fundCode, 'fund_nav', actualEndDate, `API调用失败: ${error.message}`);
+        console.log(`✅ 已标记 ${fundCode} 的净值数据为缺失`);
+      }
+      throw error;
     }
-    
-    return data.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
   }
 
   /**
@@ -299,8 +324,18 @@ class TushareService {
     const missingCodes = [];
     const missingNames = [];  // 缺少名称的股票代码
     const missingFinancials = [];  // 缺少财务数据的股票代码
+    const isOldData = dbService.isOlderThanOneMonth(tradeDate);
     
     for (const tsCode of tsCodes) {
+      // 检查是否已标记为缺失（针对超过一个月的数据）
+      if (isOldData) {
+        const isMarked = await dbService.isMarkedAsMissing(tsCode, 'stock_basic_info', tradeDate);
+        if (isMarked) {
+          console.log(`⚠️ ${tsCode} 的基本信息已标记为缺失，跳过`);
+          continue;
+        }
+      }
+      
       const dbData = await dbService.getStockBasicInfo(tsCode, tradeDate);
       if (dbData) {
         results[tsCode] = {
@@ -367,6 +402,9 @@ class TushareService {
       console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票基本信息（含完整财务数据）`);
       return results;
     }
+    
+    // 如果有缺失的股票且是超过一个月的数据，在API调用失败后标记
+    const failedCodes = [];
     
     if (missingCodes.length === 0 && missingFinancials.length > 0) {
       console.log(`✅ 全部从数据库获取 ${tsCodes.length} 只股票基本信息，但${missingFinancials.length}只缺少财务数据`);
@@ -483,6 +521,9 @@ class TushareService {
             });
             
             successCount++;
+          } else {
+            // 记录未找到数据的股票
+            failedCodes.push(tsCode);
           }
         });
         
@@ -500,6 +541,18 @@ class TushareService {
     if (dataToSave.length > 0) {
       await dbService.saveStockBasicInfo(dataToSave);
       console.log('✅ 股票基本信息已同步到数据库');
+    }
+    
+    // 标记失败的股票（如果是超过一个月的数据）
+    if (isOldData && failedCodes.length > 0) {
+      const marks = failedCodes.map(code => ({
+        tsCode: code,
+        dataType: 'stock_basic_info',
+        tradeDate: tradeDate,
+        reason: 'API未返回数据'
+      }));
+      await dbService.markDataAsMissingBatch(marks);
+      console.log(`✅ 已标记 ${failedCodes.length} 只股票的基本信息为缺失`);
     }
     
     // 获取财务指标（ROE、负债率）
@@ -594,7 +647,19 @@ class TushareService {
 
     // 先尝试从数据库获取，但要验证数据完整性
     const missingCodes = [];
+    const isOldData = dbService.isOlderThanOneMonth(endDate);
+    
     for (const tsCode of tsCodes) {
+      // 检查是否已标记为缺失（针对超过一个月的数据）
+      if (isOldData) {
+        const isDailyMarked = await dbService.isMarkedAsMissing(tsCode, 'daily', endDate);
+        const isAdjMarked = await dbService.isMarkedAsMissing(tsCode, 'adj_factor', endDate);
+        if (isDailyMarked && isAdjMarked) {
+          console.log(`⚠️ ${tsCode} 的股票数据已标记为缺失，跳过`);
+          continue;
+        }
+      }
+      
       const dailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
       const adjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
       
@@ -685,6 +750,18 @@ class TushareService {
         if (noDataCodes.length > 0) {
           console.warn(`⚠️  以下 ${noDataCodes.length} 只股票在时间段 ${startDate}-${endDate} 无交易数据（可能停牌）:`);
           noDataCodes.forEach(code => console.warn(`   - ${code}`));
+          
+          // 如果是超过一个月的数据，标记为缺失
+          if (isOldData) {
+            const marks = noDataCodes.map(code => ({
+              tsCode: code,
+              dataType: 'daily',
+              tradeDate: endDate,
+              reason: '停牌或无交易数据'
+            }));
+            await dbService.markDataAsMissingBatch(marks);
+            console.log(`✅ 已标记 ${noDataCodes.length} 只股票的数据为缺失`);
+          }
           
           // 方案2：为停牌股票查询最后一个交易日的价格
           for (const code of noDataCodes) {
@@ -794,6 +871,7 @@ class TushareService {
         connection.release();
         
         if (rows && rows.length > 0) {
+          console.log(`✅ 从数据库获取到 ${rows.length} 条指数日线数据`);
           return rows;
         }
       } catch (dbError) {
@@ -801,16 +879,79 @@ class TushareService {
         console.warn(`从数据库读取指数数据失败，尝试API: ${dbError.message}`);
       }
       
-      // 2. 数据库没有，调用Tushare API
+      // 2. 检查是否已标记为缺失（针对超过一个月的数据）
+      if (dbService.isOlderThanOneMonth(endDate)) {
+        const isMarked = await dbService.isMarkedAsMissing(tsCode, 'index_daily', endDate);
+        if (isMarked) {
+          console.log(`⚠️ ${tsCode} 的指数数据已标记为缺失，跳过API查询`);
+          return [];
+        }
+      }
+      
+      // 3. 数据库没有，调用Tushare API
+      console.log(`数据库无数据，正在调用Tushare API`);
       const data = await this.callApi('index_daily', {
         ts_code: tsCode,
         start_date: startDate,
         end_date: endDate
       });
       
+      // 4. 保存到数据库
+      if (data && data.length > 0) {
+        const connection2 = await dbService.pool.getConnection();
+        try {
+          await connection2.beginTransaction();
+          
+          for (const item of data) {
+            await connection2.execute(`
+              INSERT INTO index_daily 
+              (ts_code, trade_date, open_price, high_price, low_price, close_price, volume, amount)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              ON DUPLICATE KEY UPDATE
+                open_price = VALUES(open_price),
+                high_price = VALUES(high_price),
+                low_price = VALUES(low_price),
+                close_price = VALUES(close_price),
+                volume = VALUES(volume),
+                amount = VALUES(amount),
+                updated_at = CURRENT_TIMESTAMP
+            `, [
+              tsCode,
+              item.trade_date,
+              item.open,
+              item.high,
+              item.low,
+              item.close,
+              item.vol,
+              item.amount
+            ]);
+          }
+          
+          await connection2.commit();
+          console.log(`✅ 指数数据已同步到数据库`);
+        } catch (error) {
+          await connection2.rollback();
+          throw error;
+        } finally {
+          connection2.release();
+        }
+      } else {
+        // 如果API返回空数据且日期超过一个月，标记为缺失
+        if (dbService.isOlderThanOneMonth(endDate)) {
+          await dbService.markDataAsMissing(tsCode, 'index_daily', endDate, 'Tushare API返回空数据');
+          console.log(`✅ 已标记 ${tsCode} 的指数数据为缺失`);
+        }
+      }
+      
       return data || [];
     } catch (error) {
       console.error(`获取指数日线数据失败 (${indexCode}):`, error.message);
+      // API调用失败，如果日期超过一个月，标记为缺失
+      if (dbService.isOlderThanOneMonth(endDate)) {
+        const tsCode = indexCode.replace(/^h/, '9');
+        await dbService.markDataAsMissing(tsCode, 'index_daily', endDate, `API调用失败: ${error.message}`);
+        console.log(`✅ 已标记 ${tsCode} 的指数数据为缺失`);
+      }
       return [];
     }
   }
@@ -831,24 +972,49 @@ class TushareService {
         return data;
       }
       
-      // 2. 数据库没有，调用Tushare API
-      console.log(`数据库无数据，正在调用Tushare API: ${indexCode}`);
-      data = await this.callApi('index_weight', {
-        index_code: indexCode
-      });
-      
-      if (!data || data.length === 0) {
-        console.warn(`⚠️  未获取到指数成分股数据: ${indexCode}`);
-        return [];
+      // 2. 检查是否已标记为缺失（使用当前日期作为参考）
+      const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      if (dbService.isOlderThanOneMonth(currentDate)) {
+        const isMarked = await dbService.isMarkedAsMissing(indexCode, 'index_weight', currentDate);
+        if (isMarked) {
+          console.log(`⚠️ ${indexCode} 的指数权重数据已标记为缺失，跳过API查询`);
+          return [];
+        }
       }
       
-      console.log(`✅ 从API获取到 ${data.length} 条成分股权重记录`);
-      
-      // 3. 保存到数据库
-      await dbService.saveIndexWeight(data);
-      console.log(`✅ 已保存到数据库`);
-      
-      return data;
+      // 3. 数据库没有，调用Tushare API
+      console.log(`数据库无数据，正在调用Tushare API: ${indexCode}`);
+      try {
+        data = await this.callApi('index_weight', {
+          index_code: indexCode
+        });
+        
+        if (!data || data.length === 0) {
+          console.warn(`⚠️  未获取到指数成分股数据: ${indexCode}`);
+          
+          // 标记为缺失
+          if (dbService.isOlderThanOneMonth(currentDate)) {
+            await dbService.markDataAsMissing(indexCode, 'index_weight', currentDate, 'Tushare API返回空数据');
+            console.log(`✅ 已标记 ${indexCode} 的指数权重数据为缺失`);
+          }
+          return [];
+        }
+        
+        console.log(`✅ 从API获取到 ${data.length} 条成分股权重记录`);
+        
+        // 4. 保存到数据库
+        await dbService.saveIndexWeight(data);
+        console.log(`✅ 已保存到数据库`);
+        
+        return data;
+      } catch (apiError) {
+        // API调用失败，标记为缺失
+        if (dbService.isOlderThanOneMonth(currentDate)) {
+          await dbService.markDataAsMissing(indexCode, 'index_weight', currentDate, `API调用失败: ${apiError.message}`);
+          console.log(`✅ 已标记 ${indexCode} 的指数权重数据为缺失`);
+        }
+        throw apiError;
+      }
     } catch (error) {
       console.error(`获取指数成分股权重失败 (${indexCode}):`, error.message);
       throw error;
@@ -977,6 +1143,8 @@ class TushareService {
       // 4. 数据库没有数据或数据不足，从 Tushare 获取并保存
       console.log(`从 Tushare 获取 ${tsCode} 的日线数据: ${startDate} - ${endDate}`);
       
+      const isOldData = dbService.isOlderThanOneMonth(endDate);
+      
       // 获取日线数据
       const apiDailyData = await this.getStockDaily(tsCode, startDate, endDate);
       if (apiDailyData.length > 0) {
@@ -984,8 +1152,14 @@ class TushareService {
         // 记录同步状态（即使数据可能不完整，也记录实际获取的数量）
         await dbService.recordSyncStatus(tsCode, 'daily', startDate, endDate, apiDailyData.length, 'completed');
       } else {
-        // 没有数据，可能是停牌或非交易日，记录为已完成避免重复查询
+        // 没有数据，可能是停牌或非交易日
         await dbService.recordSyncStatus(tsCode, 'daily', startDate, endDate, 0, 'completed');
+        
+        // 如果是超过一个月的数据，标记为缺失
+        if (isOldData) {
+          await dbService.markDataAsMissing(tsCode, 'daily', endDate, '停牌或无交易数据');
+          console.log(`✅ 已标记 ${tsCode} 的日线数据为缺失`);
+        }
       }
       
       // 获取复权因子
@@ -995,6 +1169,12 @@ class TushareService {
         await dbService.recordSyncStatus(tsCode, 'adj_factor', startDate, endDate, apiAdjFactorData.length, 'completed');
       } else {
         await dbService.recordSyncStatus(tsCode, 'adj_factor', startDate, endDate, 0, 'completed');
+        
+        // 如果是超过一个月的数据，标记为缺失
+        if (isOldData) {
+          await dbService.markDataAsMissing(tsCode, 'adj_factor', endDate, '无复权因子数据');
+          console.log(`✅ 已标记 ${tsCode} 的复权因子数据为缺失`);
+        }
       }
       
       // 计算后复权价格

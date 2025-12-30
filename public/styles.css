@@ -156,22 +156,53 @@ body {
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
+    margin-top: 10px;
+    table-layout: fixed;
 }
 
-thead {
-    background: var(--primary-color);
-    color: white;
-}
-
-th, td {
-    padding: 12px 15px;
+table th,
+table td {
+    padding: 8px 10px;
     text-align: left;
-    border-bottom: 1px solid var(--bg-color);
+    border-bottom: 1px solid #eee;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-tbody tr:hover {
+table th {
     background: var(--bg-color);
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 0.9rem;
+}
+
+table td {
+    font-size: 0.85rem;
+}
+
+table tr:hover {
+    background: #f8f9fa;
+}
+
+table td:last-child {
+    text-align: center;
+}
+
+/* 三列表格布局优化 */
+.table-container table th:nth-child(1),
+.table-container table td:nth-child(1) {
+    width: 15%;
+}
+
+.table-container table th:nth-child(2),
+.table-container table td:nth-child(2) {
+    width: 35%;
+}
+
+.table-container table th:nth-child(3),
+.table-container table td:nth-child(3) {
+    width: 50%;
 }
 
 .positive {
@@ -488,6 +519,7 @@ tbody tr:hover {
     background: #ddd;
     outline: none;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .weight-item input[type="range"]::-webkit-slider-thumb {
@@ -828,14 +860,17 @@ tbody tr:hover {
     color: var(--text-color);
 }
 
-.date-input {
-    width: 100%;
-    padding: 10px 15px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
+input[type="number"],
+input[type="text"],
+input[type="date"] {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
     font-size: 1rem;
-    transition: all 0.3s ease;
-    background: white;
+    transition: border-color 0.3s;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
 .date-input:focus {

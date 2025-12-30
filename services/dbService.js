@@ -238,6 +238,23 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据同步记录表'
       `);
 
+      // 8. 数据缺失标记表（标记确认不存在的数据，避免重复查询）
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS data_missing_mark (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ts_code VARCHAR(20) NOT NULL COMMENT '股票/基金/指数代码',
+          data_type VARCHAR(50) NOT NULL COMMENT '数据类型：daily/adj_factor/fund_nav/index_daily等',
+          trade_date VARCHAR(8) NOT NULL COMMENT '交易日期',
+          mark_reason VARCHAR(100) COMMENT '标记原因',
+          mark_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '标记时间',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_missing_mark (ts_code, data_type, trade_date),
+          KEY idx_ts_code (ts_code),
+          KEY idx_data_type (data_type),
+          KEY idx_trade_date (trade_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据缺失标记表'
+      `);
+
       console.log('✅ 数据库表创建/检查完成');
     } finally {
       connection.release();
@@ -829,6 +846,82 @@ class DatabaseService {
         sync_time = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
     `, [tsCode, dataType, startDate, endDate, recordCount, syncStatus]);
+  }
+
+  // ==================== 数据缺失标记相关 ====================
+  
+  /**
+   * 检查数据是否已标记为缺失
+   * @param {string} tsCode - 代码
+   * @param {string} dataType - 数据类型
+   * @param {string} tradeDate - 交易日期
+   * @returns {boolean} 是否已标记为缺失
+   */
+  async isMarkedAsMissing(tsCode, dataType, tradeDate) {
+    const [rows] = await this.pool.execute(`
+      SELECT * FROM data_missing_mark 
+      WHERE ts_code = ? AND data_type = ? AND trade_date = ?
+    `, [tsCode, dataType, tradeDate]);
+    return rows.length > 0;
+  }
+
+  /**
+   * 标记数据为缺失
+   * @param {string} tsCode - 代码
+   * @param {string} dataType - 数据类型
+   * @param {string} tradeDate - 交易日期
+   * @param {string} reason - 标记原因
+   */
+  async markDataAsMissing(tsCode, dataType, tradeDate, reason = '数据不存在') {
+    await this.pool.execute(`
+      INSERT IGNORE INTO data_missing_mark 
+      (ts_code, data_type, trade_date, mark_reason)
+      VALUES (?, ?, ?, ?)
+    `, [tsCode, dataType, tradeDate, reason]);
+  }
+
+  /**
+   * 批量标记数据为缺失
+   * @param {Array} marks - 标记数组，每项包含 {tsCode, dataType, tradeDate, reason}
+   */
+  async markDataAsMissingBatch(marks) {
+    if (!marks || marks.length === 0) return;
+    
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      for (const mark of marks) {
+        await connection.execute(`
+          INSERT IGNORE INTO data_missing_mark 
+          (ts_code, data_type, trade_date, mark_reason)
+          VALUES (?, ?, ?, ?)
+        `, [mark.tsCode, mark.dataType, mark.tradeDate, mark.reason || '数据不存在']);
+      }
+      
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * 检查日期是否超过一个月
+   * @param {string} dateStr - 日期字符串（YYYYMMDD）
+   * @returns {boolean} 是否超过一个月
+   */
+  isOlderThanOneMonth(dateStr) {
+    const date = new Date(
+      dateStr.substring(0, 4),
+      parseInt(dateStr.substring(4, 6)) - 1,
+      dateStr.substring(6, 8)
+    );
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    return date < oneMonthAgo;
   }
 
   async close() {

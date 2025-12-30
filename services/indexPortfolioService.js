@@ -468,6 +468,34 @@ class IndexPortfolioService {
     console.log(`${'='.repeat(60)}\n`);
 
     // 准备每日收益率数据用于前端绘图
+    // 添加512890.SH基金的每日收益率数据
+    const allFundDailyReturns = [];
+    if (fundCode) {
+      try {
+        // 获取基金的完整净值数据
+        const fundStartDate = startDate || rebalanceDates[0];
+        const fundEndDate = endDate || rebalanceDates[rebalanceDates.length - 1];
+        const fundNavData = await tushareService.getFundNav(fundCode, fundStartDate, fundEndDate);
+        
+        if (fundNavData && fundNavData.length > 0) {
+          // 使用第一个净值作为基准
+          const baseNav = fundNavData[0].unit_nav;
+          
+          fundNavData.forEach(nav => {
+            const cumulative = (nav.unit_nav - baseNav) / baseNav;
+            allFundDailyReturns.push({
+              date: nav.nav_date,
+              cumulative: cumulative
+            });
+          });
+          
+          console.log(`✅ 获取到 ${allFundDailyReturns.length} 条基金每日净值数据`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ 获取基金每日净值数据失败: ${error.message}`);
+      }
+    }
+    
     const dailyData = {
       custom: allCustomDailyReturns.map(d => ({
         date: d.date,
@@ -477,12 +505,14 @@ class IndexPortfolioService {
         date: d.date,
         cumulative: d.cumulative
       })),
+      fund: allFundDailyReturns,  // 新增：基金每日收益率数据
       rebalanceDates: results.map(r => r.rebalanceDate)
     };
     
     console.log(`\n📊 返回给前端的数据:`);
     console.log(`   自定义策略每日数据点: ${dailyData.custom.length}`);
     console.log(`   指数策略每日数据点: ${dailyData.index.length}`);
+    console.log(`   基金每日数据点: ${dailyData.fund.length}`);
     console.log(`   调仓日期标记点: ${dailyData.rebalanceDates.length}`);
 
     return {

@@ -216,6 +216,95 @@ router.get('/rebalance-changes', async (req, res) => {
 });
 
 /**
+ * 获取512890.SH基金的持仓数据
+ * 查询参数:
+ * - endDate: 披露日期，格式YYYYMMDD（如 20231231）
+ */
+router.get('/fund-holdings', async (req, res) => {
+  try {
+    const { endDate } = req.query;
+    
+    if (!endDate) {
+      return res.json({
+        success: false,
+        error: '请提供披露日期参数'
+      });
+    }
+    
+    // 获取基金持仓数据
+    const holdings = await tushareService.getFundHoldings(FUND_CODE);
+    
+    if (!holdings || holdings.length === 0) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // 筛选指定披露期的数据
+    const filteredHoldings = holdings.filter(h => h.end_date === endDate);
+    
+    // 按持仓比例排序
+    const sortedHoldings = filteredHoldings.sort((a, b) => {
+      const ratioA = parseFloat(a.stk_mkv_ratio) || 0;
+      const ratioB = parseFloat(b.stk_mkv_ratio) || 0;
+      return ratioB - ratioA;
+    });
+    
+    // 获取前10大重仓股
+    const top10 = sortedHoldings.slice(0, 10);
+    
+    // 批量获取股票名称
+    const stockCodes = top10.map(h => h.symbol);
+    const stockNames = {};
+    
+    for (const code of stockCodes) {
+      try {
+        const stockInfo = await dbService.getStockBasicInfo(code, endDate);
+        if (stockInfo && stockInfo.name) {
+          stockNames[code] = stockInfo.name;
+        } else {
+          // 如果数据库中没有，尝试从 Tushare API 获取
+          const apiData = await tushareService.callApi('stock_basic', {
+            ts_code: code,
+            fields: 'ts_code,name'
+          });
+          if (apiData && apiData.length > 0 && apiData[0].name) {
+            stockNames[code] = apiData[0].name;
+          } else {
+            stockNames[code] = code;
+          }
+        }
+      } catch (error) {
+        console.error(`获取股票 ${code} 名称失败:`, error.message);
+        stockNames[code] = code;
+      }
+    }
+    
+    // 添加股票名称
+    const result = top10.map(h => ({
+      symbol: h.symbol,
+      name: stockNames[h.symbol] || h.symbol,
+      stk_mkv_ratio: h.stk_mkv_ratio,
+      mkv: h.mkv,
+      amount: h.amount,
+      end_date: h.end_date
+    }));
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('获取基金持仓失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
  * 查询指定日期的指数成分股
  * 查询参数:
  * - date: 调仓日期，格式YYYYMMDD
