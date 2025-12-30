@@ -478,18 +478,18 @@ class IndexPortfolioService {
         const fundNavData = await tushareService.getFundNav(fundCode, fundStartDate, fundEndDate);
         
         if (fundNavData && fundNavData.length > 0) {
-          // 使用第一个净值作为基准
-          const baseNav = fundNavData[0].unit_nav;
+          // 使用累计净值作为基准，避免基金拆分/分红导致的异常
+          const baseNav = fundNavData[0].accum_nav;
           
           fundNavData.forEach(nav => {
-            const cumulative = (nav.unit_nav - baseNav) / baseNav;
+            const cumulative = (nav.accum_nav - baseNav) / baseNav;
             allFundDailyReturns.push({
               date: nav.nav_date,
               cumulative: cumulative
             });
           });
           
-          console.log(`✅ 获取到 ${allFundDailyReturns.length} 条基金每日净值数据`);
+          console.log(`✅ 获取到 ${allFundDailyReturns.length} 条基金每日净值数据（使用累计净值）`);
         }
       } catch (error) {
         console.warn(`⚠️ 获取基金每日净值数据失败: ${error.message}`);
@@ -988,45 +988,20 @@ class IndexPortfolioService {
       return null;
     }
 
-    // 使用单位净值计算收益率（不使用累计净值，避免重复计算分红）
-    const unitNavChange = (endNav.unit_nav - startNav.unit_nav) / startNav.unit_nav;
-    
-    // 检测异常数据：单期收益率超过±50%视为异常
-    if (Math.abs(unitNavChange) > 0.5) {
-      console.warn(`⚠️  基金净值异常: ${startNav.nav_date}(${startNav.unit_nav}) → ${endNav.nav_date}(${endNav.unit_nav}), 收益率: ${(unitNavChange * 100).toFixed(2)}%`);
-      console.warn(`⚠️  疑似数据错误，使用累计净值重新计算`);
-      
-      // 尝试使用累计净值计算
-      if (startNav.accum_nav && endNav.accum_nav) {
-        const accumNavChange = (endNav.accum_nav - startNav.accum_nav) / startNav.accum_nav;
-        console.log(`📊 使用累计净值: ${startNav.nav_date}(${startNav.accum_nav}) → ${endNav.nav_date}(${endNav.accum_nav}), 收益率: ${(accumNavChange * 100).toFixed(2)}%`);
-        
-        // 如果累计净值的收益率也异常，则返回null
-        if (Math.abs(accumNavChange) > 0.5) {
-          console.error(`❌ 累计净值也异常，跳过该期基金数据`);
-          return null;
-        }
-        
-        return {
-          return: accumNavChange,
-          startNav: startNav.accum_nav,
-          endNav: endNav.accum_nav,
-          startDate: startNav.nav_date,
-          endDate: endNav.nav_date
-        };
-      }
-      
-      // 如果没有累计净值，返回null
+    // 始终使用累计净值计算收益率，避免基金拆分和分红导致的异常
+    if (!startNav.accum_nav || !endNav.accum_nav) {
       console.error(`❌ 无累计净值数据，跳过该期基金数据`);
       return null;
     }
     
-    console.log(`📊 基金净值: ${startNav.nav_date}(${startNav.unit_nav}) → ${endNav.nav_date}(${endNav.unit_nav}), 收益率: ${(unitNavChange * 100).toFixed(2)}%`);
+    const accumNavChange = (endNav.accum_nav - startNav.accum_nav) / startNav.accum_nav;
+    
+    console.log(`📊 基金净值（累计）: ${startNav.nav_date}(${startNav.accum_nav}) → ${endNav.nav_date}(${endNav.accum_nav}), 收益率: ${(accumNavChange * 100).toFixed(2)}%`);
     
     return {
-      return: unitNavChange,
-      startNav: startNav.unit_nav,
-      endNav: endNav.unit_nav,
+      return: accumNavChange,
+      startNav: startNav.accum_nav,
+      endNav: endNav.accum_nav,
       startDate: startNav.nav_date,
       endDate: endNav.nav_date
     };

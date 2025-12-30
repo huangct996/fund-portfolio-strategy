@@ -189,20 +189,68 @@ table td:last-child {
     text-align: center;
 }
 
-/* 三列表格布局优化 */
-.table-container table th:nth-child(1),
-.table-container table td:nth-child(1) {
+/* 指数持仓和基金持仓表格（4列：排名、代码、名称、权重） */
+#indexHoldingsTable th:nth-child(1),
+#indexHoldingsTable td:nth-child(1),
+#fundHoldingsTable th:nth-child(1),
+#fundHoldingsTable td:nth-child(1) {
+    width: 12%;
+}
+
+#indexHoldingsTable th:nth-child(2),
+#indexHoldingsTable td:nth-child(2),
+#fundHoldingsTable th:nth-child(2),
+#fundHoldingsTable td:nth-child(2) {
+    width: 28%;
+}
+
+#indexHoldingsTable th:nth-child(3),
+#indexHoldingsTable td:nth-child(3),
+#fundHoldingsTable th:nth-child(3),
+#fundHoldingsTable td:nth-child(3) {
+    width: 40%;
+}
+
+#indexHoldingsTable th:nth-child(4),
+#indexHoldingsTable td:nth-child(4),
+#fundHoldingsTable th:nth-child(4),
+#fundHoldingsTable td:nth-child(4) {
+    width: 20%;
+}
+
+/* 策略持仓表格（市值加权：5列，综合得分：7列） */
+#adjustedHoldingsTable th:nth-child(1),
+#adjustedHoldingsTable td:nth-child(1) {
+    width: 8%;
+}
+
+#adjustedHoldingsTable th:nth-child(2),
+#adjustedHoldingsTable td:nth-child(2) {
+    width: 20%;
+}
+
+#adjustedHoldingsTable th:nth-child(3),
+#adjustedHoldingsTable td:nth-child(3) {
+    width: 25%;
+}
+
+#adjustedHoldingsTable th:nth-child(4),
+#adjustedHoldingsTable td:nth-child(4) {
     width: 15%;
 }
 
-.table-container table th:nth-child(2),
-.table-container table td:nth-child(2) {
-    width: 35%;
+#adjustedHoldingsTable th:nth-child(5),
+#adjustedHoldingsTable td:nth-child(5),
+#adjustedHoldingsTable th:nth-child(6),
+#adjustedHoldingsTable td:nth-child(6),
+#adjustedHoldingsTable th:nth-child(7),
+#adjustedHoldingsTable td:nth-child(7) {
+    width: 12%;
 }
 
-.table-container table th:nth-child(3),
-.table-container table td:nth-child(3) {
-    width: 50%;
+#adjustedHoldingsTable th:nth-child(8),
+#adjustedHoldingsTable td:nth-child(8) {
+    width: 10%;
 }
 
 .positive {

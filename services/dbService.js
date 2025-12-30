@@ -544,6 +544,43 @@ class DatabaseService {
     }
   }
 
+  // ==================== 指数日线相关 ====================
+  
+  async saveIndexDaily(data) {
+    if (!data || data.length === 0) return;
+
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const item of data) {
+        await connection.execute(`
+          INSERT INTO index_daily 
+          (ts_code, trade_date, close_price, volume, amount)
+          VALUES (?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            close_price = VALUES(close_price),
+            volume = VALUES(volume),
+            amount = VALUES(amount),
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+          item.ts_code,
+          item.trade_date,
+          item.close,
+          item.vol || 0,
+          item.amount || 0
+        ]);
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   // ==================== 基金净值相关 ====================
   
   async getFundNav(tsCode, startDate, endDate = null) {
