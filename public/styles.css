@@ -157,7 +157,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 table th,
@@ -194,28 +194,34 @@ table td:last-child {
 #indexHoldingsTable td:nth-child(1),
 #fundHoldingsTable th:nth-child(1),
 #fundHoldingsTable td:nth-child(1) {
-    width: 12%;
+    width: 50px !important;  /* 排名 - 固定宽度 */
+    min-width: 50px !important;
+    max-width: 50px !important;
 }
 
 #indexHoldingsTable th:nth-child(2),
 #indexHoldingsTable td:nth-child(2),
 #fundHoldingsTable th:nth-child(2),
 #fundHoldingsTable td:nth-child(2) {
-    width: 28%;
+    width: 100px !important;  /* 股票代码 - 固定宽度 */
+    min-width: 100px !important;
+    max-width: 100px !important;
 }
 
 #indexHoldingsTable th:nth-child(3),
 #indexHoldingsTable td:nth-child(3),
 #fundHoldingsTable th:nth-child(3),
 #fundHoldingsTable td:nth-child(3) {
-    width: 40%;
+    width: auto !important;  /* 股票名称 - 自适应 */
 }
 
 #indexHoldingsTable th:nth-child(4),
 #indexHoldingsTable td:nth-child(4),
 #fundHoldingsTable th:nth-child(4),
 #fundHoldingsTable td:nth-child(4) {
-    width: 20%;
+    width: 80px !important;  /* 持仓比例 - 固定宽度 */
+    min-width: 80px !important;
+    max-width: 80px !important;
 }
 
 /* 策略持仓表格（市值加权：5列，综合得分：7列） */
