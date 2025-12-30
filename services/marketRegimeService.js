@@ -236,13 +236,13 @@ class MarketRegimeService {
   classifyRegime(trend, breadth, volatility, momentum) {
     // 优先使用市场宽度作为主要判断依据（因为趋势和动量可能为0）
     
-    // 1. 强势牛市：市场宽度高（52%以上股票上涨）- 进一步降低阈值
-    if (breadth >= 0.52) {
+    // 1. 强势牛市：市场宽度高（50%以上股票上涨）- 降低阈值以适应实际市场
+    if (breadth >= 0.50) {
       return 'AGGRESSIVE_BULL';
     }
     
-    // 2. 温和牛市：市场宽度中等（42-52%股票上涨）- 进一步降低阈值
-    if (breadth >= 0.42) {
+    // 2. 温和牛市：市场宽度中等（35-50%股票上涨）- 大幅降低阈值，让40%被识别为牛市
+    if (breadth >= 0.35) {
       return 'MODERATE_BULL';
     }
     
@@ -251,12 +251,12 @@ class MarketRegimeService {
       return 'PANIC';
     }
     
-    // 4. 弱势市场：市场宽度低（32%以下股票上涨）- 进一步降低阈值
-    if (breadth < 0.32) {
+    // 4. 弱势市场：市场宽度低（28%以下股票上涨）- 降低阈值
+    if (breadth < 0.28) {
       return 'WEAK_BEAR';
     }
     
-    // 5. 震荡市场：其他情况（32-42%）
+    // 5. 震荡市场：其他情况（28-35%）
     return 'SIDEWAYS';
   }
   
