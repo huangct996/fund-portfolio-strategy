@@ -153,10 +153,10 @@ async function fetchAllReturns(config) {
     });
     
     // 根据策略类型添加不同的参数
-    if (config.useRiskParity) {
-        // 风险平价策略参数
+    if (config.useRiskParity || config.useAdaptive) {
+        // 风险平价策略或自适应策略参数
         params.append('strategyType', 'riskParity');
-        params.append('useAdaptive', 'true');  // 启用自适应策略
+        params.append('useAdaptive', config.useAdaptive ? 'true' : 'false');  // 区分是否启用自适应
         if (config.riskParityParams) {
             params.append('volatilityWindow', config.riskParityParams.volatilityWindow);
             params.append('ewmaDecay', config.riskParityParams.ewmaDecay);
@@ -429,19 +429,28 @@ function updateStrategyDisplay(strategy) {
     const compositeWeights = document.getElementById('compositeWeights');
     const marketValueConfig = document.getElementById('marketValueConfig');
     const riskParityConfig = document.getElementById('riskParityConfig');
+    const adaptiveConfig = document.getElementById('adaptiveConfig');
     
     if (strategy === 'composite') {
         compositeWeights.style.display = 'block';
         marketValueConfig.style.display = 'none';
         riskParityConfig.style.display = 'none';
+        adaptiveConfig.style.display = 'none';
     } else if (strategy === 'riskParity') {
         compositeWeights.style.display = 'none';
         marketValueConfig.style.display = 'none';
         riskParityConfig.style.display = 'block';
+        adaptiveConfig.style.display = 'none';
+    } else if (strategy === 'adaptive') {
+        compositeWeights.style.display = 'none';
+        marketValueConfig.style.display = 'none';
+        riskParityConfig.style.display = 'none';
+        adaptiveConfig.style.display = 'block';
     } else {
         compositeWeights.style.display = 'none';
         marketValueConfig.style.display = 'block';
         riskParityConfig.style.display = 'none';
+        adaptiveConfig.style.display = 'none';
     }
 }
 
@@ -486,6 +495,7 @@ async function applyConfiguration() {
     const strategy = document.querySelector('input[name="strategy"]:checked').value;
     const useCompositeScore = strategy === 'composite';
     const useRiskParity = strategy === 'riskParity';
+    const useAdaptive = strategy === 'adaptive';
     
     // 获取质量因子类型
     const qualityFactorType = document.querySelector('input[name="qualityFactor"]:checked')?.value || 'pe_pb';
@@ -495,17 +505,19 @@ async function applyConfiguration() {
     const dvWeight = parseFloat(document.getElementById('dvWeight').value);
     const qualityWeight = parseFloat(document.getElementById('qualityWeight').value);
     
-    // 获取权重上限（自适应策略会动态调整，这里只是基础值）
+    // 获取权重上限
     let maxWeight;
     if (useCompositeScore) {
         maxWeight = parseInt(document.getElementById('maxWeightSlider').value) / 100;
     } else if (useRiskParity) {
-        maxWeight = 0.13;  // 自适应策略的基础值，实际会根据市场状态动态调整
+        maxWeight = parseInt(document.getElementById('rpMaxWeightSlider').value) / 100;
+    } else if (useAdaptive) {
+        maxWeight = 0.13;  // 自适应策略的基础值，实际会根据市场温度动态调整
     } else {
         maxWeight = parseInt(document.getElementById('mvMaxWeightSlider').value) / 100;
     }
     
-    // 风险平价策略参数（自适应策略会自动调整这些参数）
+    // 风险平价策略参数
     let riskParityParams = null;
     if (useRiskParity) {
         riskParityParams = {
@@ -517,7 +529,25 @@ async function applyConfiguration() {
                 ? parseInt(document.getElementById('tradingCostSlider').value) / 10000 
                 : 0,
             riskFreeRate: parseFloat(document.getElementById('riskFreeRateInput').value) / 100,
-            // 综合优化参数（已移除，由自适应策略控制）
+            maxWeight: maxWeight,
+            useQualityTilt: false,
+            useCovariance: document.getElementById('enableCovariance').checked,
+            hybridRatio: parseInt(document.getElementById('hybridRatioSlider').value) / 100,
+            enableStockFilter: false,  // 风险平价策略不启用股票筛选
+            stockFilterParams: null
+        };
+    } else if (useAdaptive) {
+        // 自适应策略参数
+        riskParityParams = {
+            volatilityWindow: parseInt(document.getElementById('adaptiveVolatilityWindowInput').value) || 6,
+            ewmaDecay: parseFloat(document.getElementById('adaptiveEwmaDecayInput').value) || 0.91,
+            rebalanceFrequency: document.getElementById('adaptiveRebalanceFrequency').value,
+            enableTradingCost: document.getElementById('adaptiveEnableTradingCost').checked,
+            tradingCostRate: document.getElementById('adaptiveEnableTradingCost').checked 
+                ? parseInt(document.getElementById('adaptiveTradingCostSlider').value) / 10000 
+                : 0,
+            riskFreeRate: parseFloat(document.getElementById('adaptiveRiskFreeRateInput').value) / 100,
+            maxWeight: maxWeight,
             useQualityTilt: false,
             useCovariance: false,
             hybridRatio: 0,
@@ -549,6 +579,7 @@ async function applyConfiguration() {
         endDate: endDate ? endDate.replace(/-/g, '') : '',
         useCompositeScore,
         useRiskParity,
+        useAdaptive,
         mvWeight,
         dvWeight,
         qualityWeight,
