@@ -117,10 +117,25 @@ async function loadMultiIndexTemperature() {
         if (result.success) {
             multiIndexData = result.data;
             console.log('multiIndexData已设置:', multiIndexData);
-            console.log('开始更新图表...');
-            updateTemperatureChart();
+            
+            // 先显示分布统计（不依赖Chart.js）
             console.log('开始显示分布统计...');
-            displayDistributionStats();
+            try {
+                displayDistributionStats();
+                console.log('分布统计显示完成');
+            } catch (error) {
+                console.error('显示分布统计失败:', error);
+            }
+            
+            // 再更新图表（可能依赖Chart.js）
+            console.log('开始更新图表...');
+            try {
+                updateTemperatureChart();
+                console.log('图表更新完成');
+            } catch (error) {
+                console.error('图表更新失败:', error);
+            }
+            
             console.log('数据加载完成');
         } else {
             console.error('加载多指数温度失败:', result.error);
