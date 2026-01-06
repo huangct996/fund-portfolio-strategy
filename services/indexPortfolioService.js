@@ -169,8 +169,8 @@ class IndexPortfolioService {
         
         if (useAdaptive && useRiskParity && riskParityParams) {
           try {
-            // 🌡️ 计算市场温度（新版：基于指数PE/PB）
-            marketTemperature = await marketThermometerService.calculateMarketTemperature('000300.SH', currentDate);
+            // 🌡️ 计算市场温度（多指数综合温度）
+            marketTemperature = await marketThermometerService.calculateCompositeTemperature(currentDate);
             
             // 使用温度计的策略参数建议
             const adaptiveParams = marketTemperature.params;

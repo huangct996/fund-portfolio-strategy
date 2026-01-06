@@ -445,4 +445,53 @@ router.get('/historical-temperature', async (req, res) => {
   }
 });
 
+/**
+ * 获取多指数综合温度
+ */
+router.get('/composite-temperature', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const marketThermometerService = require('../services/marketThermometerService');
+    
+    const temperature = await marketThermometerService.calculateCompositeTemperature(date);
+    
+    res.json({
+      success: true,
+      data: temperature
+    });
+  } catch (error) {
+    console.error('获取多指数综合温度失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取多指数历史温度（用于对比）
+ */
+router.get('/multi-index-temperature', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const marketThermometerService = require('../services/marketThermometerService');
+    
+    const result = await marketThermometerService.calculateMultiIndexHistoricalTemperature(
+      startDate,
+      endDate
+    );
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('获取多指数历史温度失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

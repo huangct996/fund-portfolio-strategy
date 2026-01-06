@@ -17,6 +17,14 @@ class MarketThermometerService {
     this.defaultIndex = '000300.SH';
     // 历史数据起始日期（2005年沪深300发布）
     this.defaultStartDate = '20050101';
+    
+    // 多指数配置（用于综合温度计算）
+    this.multiIndexConfig = [
+      { code: '000300.SH', name: '沪深300', weight: 0.35, startDate: '20050101' },  // 大盘蓝筹
+      { code: '000905.SH', name: '中证500', weight: 0.30, startDate: '20070115' },  // 中盘成长
+      { code: '000852.SH', name: '中证1000', weight: 0.20, startDate: '20141017' }, // 小盘
+      { code: '000016.SH', name: '上证50', weight: 0.15, startDate: '20040102' }    // 超大盘
+    ];
   }
   
   /**
@@ -457,6 +465,192 @@ class MarketThermometerService {
    */
   getTodayDate() {
     return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  }
+  
+  /**
+   * 计算多指数综合温度
+   * @param {string} date - 日期（YYYYMMDD）
+   * @returns {Object} 综合温度结果
+   */
+  async calculateCompositeTemperature(date = null) {
+    try {
+      const tradeDate = date || this.getTodayDate();
+      console.log(`\n🌡️ 开始计算多指数综合温度 [${tradeDate}]`);
+      
+      const indexTemperatures = [];
+      let totalWeight = 0;
+      let weightedTempSum = 0;
+      
+      // 计算每个指数的温度
+      for (const indexConfig of this.multiIndexConfig) {
+        try {
+          const temp = await this.calculateMarketTemperature(indexConfig.code, tradeDate);
+          
+          if (temp && temp.temperature !== null) {
+            indexTemperatures.push({
+              code: indexConfig.code,
+              name: indexConfig.name,
+              weight: indexConfig.weight,
+              temperature: temp.temperature,
+              level: temp.level,
+              levelName: temp.levelName,
+              pe: temp.values.pe,
+              pb: temp.values.pb,
+              peTemp: temp.components.pe,
+              pbTemp: temp.components.pb,
+              confidence: temp.confidence
+            });
+            
+            weightedTempSum += temp.temperature * indexConfig.weight;
+            totalWeight += indexConfig.weight;
+            
+            console.log(`   ${indexConfig.name}: ${temp.temperature}° (权重${(indexConfig.weight * 100).toFixed(0)}%)`);
+          }
+        } catch (error) {
+          console.warn(`   ⚠️ ${indexConfig.name} 温度计算失败: ${error.message}`);
+        }
+      }
+      
+      if (totalWeight === 0 || indexTemperatures.length === 0) {
+        console.warn('⚠️ 无有效指数温度数据，返回默认值');
+        return this.getDefaultTemperature(tradeDate);
+      }
+      
+      // 计算加权平均温度
+      const compositeTemp = Math.round(weightedTempSum / totalWeight);
+      const level = this.getTemperatureLevel(compositeTemp);
+      
+      // 计算置信度（基于有效指数数量）
+      const confidence = indexTemperatures.length / this.multiIndexConfig.length;
+      
+      console.log(`\n   📊 综合温度: ${compositeTemp}° (${level.name})`);
+      console.log(`   📈 有效指数: ${indexTemperatures.length}/${this.multiIndexConfig.length}`);
+      console.log(`   🎯 置信度: ${(confidence * 100).toFixed(0)}%`);
+      
+      return {
+        temperature: compositeTemp,
+        level: level.code,
+        levelName: level.name,
+        confidence: confidence,
+        suggestion: level.suggestion,
+        params: this.getStrategyParams(level.code),
+        date: tradeDate,
+        indexTemperatures: indexTemperatures,
+        composition: {
+          weightedAverage: compositeTemp,
+          totalWeight: totalWeight,
+          validIndices: indexTemperatures.length,
+          totalIndices: this.multiIndexConfig.length
+        }
+      };
+    } catch (error) {
+      console.error('计算多指数综合温度失败:', error);
+      return this.getDefaultTemperature(date);
+    }
+  }
+  
+  /**
+   * 计算多指数历史温度序列
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Object} 包含所有指数的历史温度数据
+   */
+  async calculateMultiIndexHistoricalTemperature(startDate, endDate) {
+    try {
+      console.log(`\n📊 开始计算多指数历史温度 [${startDate} - ${endDate}]`);
+      
+      const result = {
+        startDate,
+        endDate,
+        indices: {}
+      };
+      
+      // 为每个指数计算历史温度
+      for (const indexConfig of this.multiIndexConfig) {
+        try {
+          console.log(`\n   计算 ${indexConfig.name} 历史温度...`);
+          const temps = await this.calculateHistoricalTemperature(indexConfig.code, startDate, endDate);
+          
+          result.indices[indexConfig.code] = {
+            name: indexConfig.name,
+            weight: indexConfig.weight,
+            temperatures: temps,
+            distribution: this.calculateTemperatureDistribution(temps)
+          };
+          
+          console.log(`   ✅ ${indexConfig.name}: ${temps.length} 个数据点`);
+        } catch (error) {
+          console.warn(`   ⚠️ ${indexConfig.name} 历史温度计算失败: ${error.message}`);
+        }
+      }
+      
+      // 计算综合温度序列
+      const compositeTempSeries = this.calculateCompositeTemperatureSeries(result.indices);
+      result.composite = {
+        name: '综合温度',
+        temperatures: compositeTempSeries,
+        distribution: this.calculateTemperatureDistribution(compositeTempSeries)
+      };
+      
+      console.log(`\n✅ 多指数历史温度计算完成`);
+      console.log(`   综合温度数据点: ${compositeTempSeries.length}`);
+      
+      return result;
+    } catch (error) {
+      console.error('计算多指数历史温度失败:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * 计算综合温度序列（从各指数温度数据中）
+   */
+  calculateCompositeTemperatureSeries(indicesData) {
+    const dateMap = new Map();
+    
+    // 收集所有日期的温度数据
+    for (const [code, data] of Object.entries(indicesData)) {
+      if (!data.temperatures) continue;
+      
+      data.temperatures.forEach(temp => {
+        if (!dateMap.has(temp.date)) {
+          dateMap.set(temp.date, []);
+        }
+        dateMap.get(temp.date).push({
+          temperature: temp.temperature,
+          weight: data.weight
+        });
+      });
+    }
+    
+    // 计算每个日期的加权平均温度
+    const compositeSeries = [];
+    for (const [date, temps] of dateMap.entries()) {
+      let weightedSum = 0;
+      let totalWeight = 0;
+      
+      temps.forEach(t => {
+        weightedSum += t.temperature * t.weight;
+        totalWeight += t.weight;
+      });
+      
+      if (totalWeight > 0) {
+        const avgTemp = Math.round(weightedSum / totalWeight);
+        const level = this.getTemperatureLevel(avgTemp);
+        
+        compositeSeries.push({
+          date: date,
+          temperature: avgTemp,
+          level: level.code,
+          levelName: level.name
+        });
+      }
+    }
+    
+    // 按日期排序
+    compositeSeries.sort((a, b) => a.date.localeCompare(b.date));
+    
+    return compositeSeries;
   }
 }
 
