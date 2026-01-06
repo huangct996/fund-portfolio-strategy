@@ -111,11 +111,11 @@ class MarketThermometerService {
       
       const result = {
         temperature,
-        level,
-        levelName: this.getLevelName(level),
-        levelDescription: this.getLevelDescription(level),
-        color: this.getLevelColor(level),
-        suggestion: this.getSuggestion(level),
+        level: level.code,
+        levelName: level.name,
+        levelDescription: this.getLevelDescription(level.code),
+        color: this.getLevelColor(level.code),
+        suggestion: level.suggestion,
         confidence,
         components: {
           pe: Math.round(peTemp),
@@ -125,8 +125,8 @@ class MarketThermometerService {
           pe: currentPE,
           pb: currentPB
         },
-        params: this.getStrategyParams(level),
-        warning: this.getWarning(temperature, level),
+        params: this.getStrategyParams(level.code),
+        warning: this.getWarning(temperature, level.code),
         date: tradeDate,
         indexCode: tsCode,
         dataPoints: validData.length
@@ -229,7 +229,8 @@ class MarketThermometerService {
         temperatures.push({
           date: item.trade_date,
           temperature,
-          level,
+          level: level.code,
+          levelName: level.name,
           components: {
             pe: Math.round(peTemp),
             pb: Math.round(pbTemp)
@@ -299,9 +300,23 @@ class MarketThermometerService {
    * 温度分级
    */
   getTemperatureLevel(temperature) {
-    if (temperature < 30) return 'COLD';      // 低估
-    if (temperature < 70) return 'NORMAL';    // 中估
-    return 'HOT';                             // 高估
+    let code, name, suggestion;
+    
+    if (temperature < 30) {
+      code = 'COLD';
+      name = '低估';
+      suggestion = '💰 买入最佳时机 - 市场处于低估状态，建议积极配置';
+    } else if (temperature < 70) {
+      code = 'NORMAL';
+      name = '中估';
+      suggestion = '⚖️ 合理估值 - 市场处于适中状态，适度配置';
+    } else {
+      code = 'HOT';
+      name = '高估';
+      suggestion = '⚠️ 谨慎减仓 - 市场处于高估状态，控制风险';
+    }
+    
+    return { code, name, suggestion };
   }
   
   /**
@@ -636,13 +651,13 @@ class MarketThermometerService {
       
       if (totalWeight > 0) {
         const avgTemp = Math.round(weightedSum / totalWeight);
-        const level = this.getTemperatureLevel(avgTemp);
+        const levelObj = this.getTemperatureLevel(avgTemp);
         
         compositeSeries.push({
           date: date,
           temperature: avgTemp,
-          level: level.code,
-          levelName: level.name
+          level: levelObj.code,
+          levelName: levelObj.name
         });
       }
     }
