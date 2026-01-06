@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>温度分布测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .card { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 10px 0; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>温度分布统计测试</h1>
+    <div id="status">正在测试...</div>
+    <div id="result"></div>
+    
+    <script>
+        async function testDistribution() {
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                statusDiv.innerHTML = '正在调用API...';
+                const response = await fetch('/api/multi-index-temperature?startDate=20210106&endDate=20260106');
+                const data = await response.json();
+                
+                statusDiv.innerHTML = '<span class="success">✅ API调用成功</span>';
+                
+                if (!data.success) {
+                    resultDiv.innerHTML = '<div class="error">API返回失败: ' + data.error + '</div>';
+                    return;
+                }
+                
+                let html = '<h2>数据结构检查</h2>';
+                
+                // 检查综合温度
+                html += '<div class="card">';
+                html += '<h3>综合温度</h3>';
+                html += '<p>存在: ' + (data.data.composite ? '✅' : '❌') + '</p>';
+                html += '<p>temperatures数组: ' + (data.data.composite?.temperatures ? '✅ (' + data.data.composite.temperatures.length + '个)' : '❌') + '</p>';
+                html += '<p>distribution对象: ' + (data.data.composite?.distribution ? '✅' : '❌') + '</p>';
+                
+                if (data.data.composite?.distribution) {
+                    const dist = data.data.composite.distribution;
+                    html += '<h4>分布数据:</h4>';
+                    html += '<p>平均温度: ' + dist.average + '°</p>';
+                    html += '<p>低估 (0-30°): ' + dist.cold.percentage + '%</p>';
+                    html += '<p>中估 (30-70°): ' + dist.normal.percentage + '%</p>';
+                    html += '<p>高估 (70-100°): ' + dist.hot.percentage + '%</p>';
+                }
+                html += '</div>';
+                
+                // 检查各指数
+                html += '<h2>各指数数据</h2>';
+                for (const [code, indexData] of Object.entries(data.data.indices)) {
+                    html += '<div class="card">';
+                    html += '<h3>' + indexData.name + ' (' + code + ')</h3>';
+                    html += '<p>temperatures数组: ' + (indexData.temperatures ? '✅ (' + indexData.temperatures.length + '个)' : '❌') + '</p>';
+                    html += '<p>distribution对象: ' + (indexData.distribution ? '✅' : '❌') + '</p>';
+                    
+                    if (indexData.distribution) {
+                        html += '<p>平均温度: ' + indexData.distribution.average + '°</p>';
+                    }
+                    html += '</div>';
+                }
+                
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                statusDiv.innerHTML = '<span class="error">❌ 测试失败</span>';
+                resultDiv.innerHTML = '<div class="error">错误: ' + error.message + '</div>';
+                console.error('测试失败:', error);
+            }
+        }
+        
+        testDistribution();
+    </script>
+</body>
+</html>
