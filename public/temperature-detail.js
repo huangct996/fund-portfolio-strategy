@@ -86,15 +86,21 @@ function displayIndicesGrid(indexTemperatures) {
         const levelClass = index.level === 'COLD' ? 'cold' : index.level === 'HOT' ? 'hot' : 'normal';
         const tempColor = index.level === 'COLD' ? '#2196f3' : index.level === 'HOT' ? '#f44336' : '#ffc107';
         
+        // 检查数据是否可用
+        const hasPEPB = index.pe != null && index.pb != null;
+        const peDisplay = hasPEPB ? `${index.pe.toFixed(2)} (温度${index.peTemp}°)` : '暂无数据';
+        const pbDisplay = hasPEPB ? `${index.pb.toFixed(2)} (温度${index.pbTemp}°)` : '暂无数据';
+        
         return `
             <div class="index-card ${levelClass}">
                 <div class="index-name">${index.name}</div>
                 <div class="index-temp" style="color: ${tempColor}">${index.temperature}°</div>
                 <div style="font-size: 14px; color: #666; margin-bottom: 5px;">${index.levelName}</div>
                 <div class="index-details">
-                    <div>PE: ${index.pe?.toFixed(2) || 'N/A'} (温度${index.peTemp}°)</div>
-                    <div>PB: ${index.pb?.toFixed(2) || 'N/A'} (温度${index.pbTemp}°)</div>
+                    <div>PE: ${peDisplay}</div>
+                    <div>PB: ${pbDisplay}</div>
                     <div style="margin-top: 5px; font-weight: 500;">权重: ${(index.weight * 100).toFixed(0)}%</div>
+                    ${!hasPEPB ? '<div style="margin-top: 5px; color: #ff9800; font-size: 12px;">⚠️ 该指数暂无估值数据</div>' : ''}
                 </div>
             </div>
         `;
@@ -183,9 +189,18 @@ function formatDate(date) {
 
 // 更新温度曲线图
 function updateTemperatureChart() {
-    if (!multiIndexData) return;
+    if (!multiIndexData) {
+        console.warn('multiIndexData为空，跳过图表更新');
+        return;
+    }
     
-    const ctx = document.getElementById('temperatureChart').getContext('2d');
+    const chartElement = document.getElementById('temperatureChart');
+    if (!chartElement) {
+        console.error('找不到temperatureChart元素');
+        return;
+    }
+    
+    const ctx = chartElement.getContext('2d');
     
     // 销毁旧图表
     if (temperatureChart) {
