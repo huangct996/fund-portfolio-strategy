@@ -1598,3 +1598,389 @@ function displayConstituents(data) {
         tbody.appendChild(tr);
     });
 }
+
+// ==================== 市场温度计相关函数 ====================
+
+/**
+ * 加载市场温度计数据
+ */
+async function loadMarketThermometer() {
+    try {
+        const response = await fetch(`${API_BASE}/market-temperature`);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            displayMarketThermometer(result.data);
+            document.getElementById('marketThermometer').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('加载市场温度计失败:', error);
+    }
+}
+
+/**
+ * 显示市场温度计
+ */
+function displayMarketThermometer(data) {
+    // 更新温度值
+    document.getElementById('currentTemperature').textContent = data.temperature;
+    
+    // 更新温度级别
+    const levelElement = document.getElementById('temperatureLevel');
+    levelElement.textContent = data.levelDescription;
+    levelElement.style.backgroundColor = data.color;
+    levelElement.style.color = 'white';
+    
+    // 更新温度指示器位置
+    const indicator = document.getElementById('temperatureIndicator');
+    indicator.style.left = `${data.temperature}%`;
+    
+    // 更新PE/PB温度
+    document.getElementById('peTemp').textContent = `${data.components.pe}°`;
+    document.getElementById('pbTemp').textContent = `${data.components.pb}°`;
+    
+    // 更新建议
+    document.getElementById('temperatureSuggestion').textContent = data.suggestion;
+    
+    // 更新预警
+    const warningElement = document.getElementById('temperatureWarning');
+    if (data.warning && data.warning.length > 0) {
+        warningElement.style.display = 'block';
+        warningElement.className = `thermometer-warning ${data.warning[0].type}`;
+        warningElement.textContent = data.warning[0].message;
+    } else {
+        warningElement.style.display = 'none';
+    }
+}
+
+/**
+ * 加载历史温度曲线
+ */
+async function loadHistoricalTemperature() {
+    try {
+        const startDate = '20150101'; // 从2015年开始
+        const endDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        
+        const response = await fetch(`${API_BASE}/historical-temperature?startDate=${startDate}&endDate=${endDate}`);
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.temperatures) {
+            // 保存完整数据到全局变量
+            fullTemperatureData = result.data.temperatures;
+            
+            // 默认显示近一年数据
+            updateTemperatureDisplay('1y');
+            
+            document.getElementById('temperatureChartContainer').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('加载历史温度失败:', error);
+    }
+}
+
+/**
+ * 显示温度曲线图表
+ */
+let temperatureChartInstance = null;
+function displayTemperatureChart(temperatures) {
+    const ctx = document.getElementById('temperatureChart');
+    if (!ctx) return;
+    
+    // 销毁旧图表
+    if (temperatureChartInstance) {
+        temperatureChartInstance.destroy();
+    }
+    
+    // 准备数据
+    const dates = temperatures.map(t => {
+        const dateStr = t.date;
+        return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+    });
+    const temps = temperatures.map(t => t.temperature);
+    
+    // 创建背景色块插件
+    const backgroundPlugin = {
+        id: 'customBackground',
+        beforeDraw: (chart) => {
+            const ctx = chart.ctx;
+            const chartArea = chart.chartArea;
+            const yAxis = chart.scales.y;
+            
+            // 保存当前状态
+            ctx.save();
+            
+            // 低估区间 (0-30°) - 蓝色
+            const coldTop = yAxis.getPixelForValue(30);
+            const coldBottom = yAxis.getPixelForValue(0);
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+            ctx.fillRect(chartArea.left, coldTop, chartArea.right - chartArea.left, coldBottom - coldTop);
+            
+            // 中估区间 (30-70°) - 黄色
+            const normalTop = yAxis.getPixelForValue(70);
+            const normalBottom = yAxis.getPixelForValue(30);
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.1)';
+            ctx.fillRect(chartArea.left, normalTop, chartArea.right - chartArea.left, normalBottom - normalTop);
+            
+            // 高估区间 (70-100°) - 红色
+            const hotTop = yAxis.getPixelForValue(100);
+            const hotBottom = yAxis.getPixelForValue(70);
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+            ctx.fillRect(chartArea.left, hotTop, chartArea.right - chartArea.left, hotBottom - hotTop);
+            
+            // 恢复状态
+            ctx.restore();
+        }
+    };
+    
+    // 创建新图表
+    temperatureChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: '市场温度',
+                data: temps,
+                borderColor: '#f97316',
+                backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                borderWidth: 2.5,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#f97316',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 13,
+                            weight: 'bold'
+                        },
+                        color: '#f97316'
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    callbacks: {
+                        label: function(context) {
+                            const temp = context.parsed.y;
+                            let level = '中估';
+                            let color = '🟡';
+                            if (temp < 30) {
+                                level = '低估';
+                                color = '🔵';
+                            } else if (temp > 70) {
+                                level = '高估';
+                                color = '🔴';
+                            }
+                            return `${color} 温度: ${temp.toFixed(1)}° (${level})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: '温度 (°)',
+                        font: {
+                            size: 13,
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        stepSize: 10,
+                        font: {
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: function(context) {
+                            // 在30°和70°处画加粗参考线
+                            if (context.tick.value === 30 || context.tick.value === 70) {
+                                return 'rgba(0, 0, 0, 0.4)';
+                            }
+                            return 'rgba(0, 0, 0, 0.08)';
+                        },
+                        lineWidth: function(context) {
+                            if (context.tick.value === 30 || context.tick.value === 70) {
+                                return 2;
+                            }
+                            return 1;
+                        }
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '日期',
+                        font: {
+                            size: 13,
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        maxTicksLimit: 12,
+                        font: {
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        },
+        plugins: [backgroundPlugin]
+    });
+}
+
+/**
+ * 显示温度分布统计
+ */
+function displayTemperatureDistribution(distribution) {
+    if (!distribution) return;
+    
+    document.getElementById('coldPercentage').textContent = `${distribution.cold.percentage}%`;
+    document.getElementById('normalPercentage').textContent = `${distribution.normal.percentage}%`;
+    document.getElementById('hotPercentage').textContent = `${distribution.hot.percentage}%`;
+    document.getElementById('averageTemp').textContent = distribution.avgTemperature || distribution.average;
+}
+
+// 全局变量存储完整温度数据
+let fullTemperatureData = [];
+
+/**
+ * 根据时间周期筛选温度数据
+ */
+function filterTemperatureByPeriod(period) {
+    if (!fullTemperatureData || fullTemperatureData.length === 0) {
+        return [];
+    }
+    
+    const latestDate = fullTemperatureData[fullTemperatureData.length - 1].date;
+    let startDate;
+    
+    // 计算起始日期
+    const latest = new Date(
+        parseInt(latestDate.substring(0, 4)),
+        parseInt(latestDate.substring(4, 6)) - 1,
+        parseInt(latestDate.substring(6, 8))
+    );
+    
+    switch(period) {
+        case '1y':
+            startDate = new Date(latest);
+            startDate.setFullYear(startDate.getFullYear() - 1);
+            break;
+        case '3y':
+            startDate = new Date(latest);
+            startDate.setFullYear(startDate.getFullYear() - 3);
+            break;
+        case '5y':
+            startDate = new Date(latest);
+            startDate.setFullYear(startDate.getFullYear() - 5);
+            break;
+        case 'all':
+        default:
+            return fullTemperatureData;
+    }
+    
+    const startDateStr = startDate.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    return fullTemperatureData.filter(t => t.date >= startDateStr);
+}
+
+/**
+ * 计算温度分布统计
+ */
+function calculateDistribution(temperatures) {
+    if (!temperatures || temperatures.length === 0) {
+        return null;
+    }
+    
+    const distribution = { cold: 0, normal: 0, hot: 0 };
+    
+    temperatures.forEach(t => {
+        const temp = t.temperature;
+        if (temp < 30) distribution.cold++;
+        else if (temp < 70) distribution.normal++;
+        else distribution.hot++;
+    });
+    
+    const total = temperatures.length;
+    const avgTemp = (temperatures.reduce((sum, t) => sum + t.temperature, 0) / total).toFixed(1);
+    
+    return {
+        cold: { 
+            count: distribution.cold, 
+            percentage: (distribution.cold / total * 100).toFixed(1)
+        },
+        normal: { 
+            count: distribution.normal, 
+            percentage: (distribution.normal / total * 100).toFixed(1)
+        },
+        hot: { 
+            count: distribution.hot, 
+            percentage: (distribution.hot / total * 100).toFixed(1)
+        },
+        avgTemperature: avgTemp
+    };
+}
+
+/**
+ * 更新温度图表和统计
+ */
+function updateTemperatureDisplay(period) {
+    const filteredData = filterTemperatureByPeriod(period);
+    
+    if (filteredData.length > 0) {
+        displayTemperatureChart(filteredData);
+        const distribution = calculateDistribution(filteredData);
+        displayTemperatureDistribution(distribution);
+    }
+}
+
+// 页面加载时自动加载温度计和历史温度
+document.addEventListener('DOMContentLoaded', () => {
+    loadMarketThermometer();
+    loadHistoricalTemperature();
+    
+    // 绑定时间筛选按钮事件
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // 移除所有active类
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            // 添加active类到当前按钮
+            this.classList.add('active');
+            // 更新显示
+            const period = this.getAttribute('data-period');
+            updateTemperatureDisplay(period);
+        });
+    });
+});

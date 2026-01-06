@@ -108,7 +108,31 @@ class DatabaseService {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数日线行情表'
       `);
 
-      // 5. 股票基本信息表（市值、股息率、PE、PB、ROE、负债率等）
+      // 5. 指数日线基本指标表（PE、PB等）
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS index_daily_basic (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ts_code VARCHAR(20) NOT NULL COMMENT '指数代码',
+          trade_date VARCHAR(8) NOT NULL COMMENT '交易日期',
+          total_mv DECIMAL(20, 2) COMMENT '总市值（亿元）',
+          float_mv DECIMAL(20, 2) COMMENT '流通市值（亿元）',
+          total_share DECIMAL(20, 2) COMMENT '总股本（亿股）',
+          float_share DECIMAL(20, 2) COMMENT '流通股本（亿股）',
+          free_share DECIMAL(20, 2) COMMENT '自由流通股本（亿股）',
+          turnover_rate DECIMAL(10, 4) COMMENT '换手率（%）',
+          turnover_rate_f DECIMAL(10, 4) COMMENT '换手率（自由流通股本）',
+          pe DECIMAL(10, 4) COMMENT '市盈率',
+          pe_ttm DECIMAL(10, 4) COMMENT '市盈率TTM',
+          pb DECIMAL(10, 4) COMMENT '市净率',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_index_daily_basic (ts_code, trade_date),
+          KEY idx_ts_code (ts_code),
+          KEY idx_trade_date (trade_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数日线基本指标表'
+      `);
+
+      // 6. 股票基本信息表（市值、股息率、PE、PB、ROE、负债率等）
       await connection.execute(`
         CREATE TABLE IF NOT EXISTS stock_basic_info (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -943,6 +967,106 @@ class DatabaseService {
     } finally {
       connection.release();
     }
+  }
+
+  // ==================== 指数基本指标相关 ====================
+  
+  /**
+   * 保存指数日线基本指标数据
+   * @param {Array} data - 指数基本指标数据数组
+   */
+  async saveIndexDailyBasic(data) {
+    if (!data || data.length === 0) return;
+    
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      for (const item of data) {
+        await connection.execute(`
+          INSERT INTO index_daily_basic 
+          (ts_code, trade_date, total_mv, float_mv, total_share, float_share, free_share, 
+           turnover_rate, turnover_rate_f, pe, pe_ttm, pb)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            total_mv = VALUES(total_mv),
+            float_mv = VALUES(float_mv),
+            total_share = VALUES(total_share),
+            float_share = VALUES(float_share),
+            free_share = VALUES(free_share),
+            turnover_rate = VALUES(turnover_rate),
+            turnover_rate_f = VALUES(turnover_rate_f),
+            pe = VALUES(pe),
+            pe_ttm = VALUES(pe_ttm),
+            pb = VALUES(pb),
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+          item.ts_code,
+          item.trade_date,
+          item.total_mv || null,
+          item.float_mv || null,
+          item.total_share || null,
+          item.float_share || null,
+          item.free_share || null,
+          item.turnover_rate || null,
+          item.turnover_rate_f || null,
+          item.pe || null,
+          item.pe_ttm || null,
+          item.pb || null
+        ]);
+      }
+      
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * 查询指数日线基本指标数据
+   * @param {string} indexCode - 指数代码
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Array} 指数基本指标数据
+   */
+  async getIndexDailyBasic(indexCode, startDate, endDate) {
+    const [rows] = await this.pool.execute(`
+      SELECT * FROM index_daily_basic
+      WHERE ts_code = ? AND trade_date >= ? AND trade_date <= ?
+      ORDER BY trade_date ASC
+    `, [indexCode, startDate, endDate]);
+    
+    return rows;
+  }
+
+  /**
+   * 批量查询成分股基本信息（PE、PB等）
+   * @param {Array} stockCodes - 股票代码数组
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Array} 成分股基本信息数据
+   */
+  async getStockBasicInfoBatch(stockCodes, startDate, endDate) {
+    if (!stockCodes || stockCodes.length === 0) {
+      return [];
+    }
+    
+    // 构建IN查询的占位符
+    const placeholders = stockCodes.map(() => '?').join(',');
+    
+    const [rows] = await this.pool.execute(`
+      SELECT ts_code, trade_date, pe_ttm, pb, dv_ratio, total_mv
+      FROM stock_basic_info
+      WHERE ts_code IN (${placeholders}) 
+        AND trade_date >= ? 
+        AND trade_date <= ?
+      ORDER BY trade_date ASC, ts_code ASC
+    `, [...stockCodes, startDate, endDate]);
+    
+    return rows;
   }
 
   /**

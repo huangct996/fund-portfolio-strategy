@@ -1,6 +1,7 @@
 const tushareService = require('./tushareService');
 const stockFilterService = require('./stockFilterService');
 const marketRegimeService = require('./marketRegimeService');
+const marketThermometerService = require('./marketThermometerService');
 
 /**
  * 基于指数成分股的投资组合回测服务
@@ -163,6 +164,7 @@ class IndexPortfolioService {
         
         // 🔄 自适应策略：识别市场状态并调整参数
         let marketRegime = null;
+        let marketTemperature = null;
         let effectiveRiskParityParams = riskParityParams;
         
         if (useAdaptive && useRiskParity && riskParityParams) {
@@ -175,6 +177,9 @@ class IndexPortfolioService {
             }
             
             if (tempWeights && tempWeights.length > 0) {
+              // 🌡️ 计算市场温度（新增）
+              marketTemperature = await marketThermometerService.calculateMarketTemperature(indexCode, currentDate, tempWeights);
+              
               // 传入用户配置的基础参数
               const baseParams = {
                 volatilityWindow: config.riskParityParams?.volatilityWindow,
@@ -185,25 +190,32 @@ class IndexPortfolioService {
               
               marketRegime = await marketRegimeService.identifyMarketRegime(indexCode, tempWeights, currentDate, baseParams);
               
+              // 优先使用温度计参数，如果没有则使用市场状态参数
+              const adaptiveParams = marketTemperature ? marketTemperature.params : marketRegime.params;
+              
               // 合并自适应参数到基础参数
               effectiveRiskParityParams = {
                 ...riskParityParams,
-                ...marketRegime.params
+                ...adaptiveParams
               };
               
               // 关键修复：如果自适应策略设置了filterByQuality，需要覆盖stockFilterParams中的值
-              if (marketRegime.params.filterByQuality !== undefined && effectiveRiskParityParams.stockFilterParams) {
+              if (adaptiveParams.filterByQuality !== undefined && effectiveRiskParityParams.stockFilterParams) {
                 effectiveRiskParityParams.stockFilterParams = {
                   ...effectiveRiskParityParams.stockFilterParams,
-                  filterByQuality: marketRegime.params.filterByQuality
+                  filterByQuality: adaptiveParams.filterByQuality
                 };
               }
               
               // 每4个调仓期输出一次，避免日志过多
               if (i === 0 || i % 4 === 0) {
+                if (marketTemperature) {
+                  console.log(`\n🌡️ [${currentDate}] 市场温度: ${marketTemperature.temperature}° (${marketTemperature.levelName})`);
+                  console.log(`   PE温度: ${marketTemperature.components.pe}°, PB温度: ${marketTemperature.components.pb}°`);
+                  console.log(`   调整参数: maxWeight=${(adaptiveParams.maxWeight * 100).toFixed(0)}%, volatilityWindow=${adaptiveParams.volatilityWindow}月, minROE=${(adaptiveParams.minROE * 100).toFixed(0)}%`);
+                }
                 console.log(`\n🔍 [${currentDate}] 市场状态: ${marketRegime.regimeName} (置信度: ${(marketRegime.confidence * 100).toFixed(0)}%)`);
                 console.log(`   趋势: ${(marketRegime.trendStrength * 100).toFixed(2)}%, 宽度: ${(marketRegime.marketBreadth * 100).toFixed(1)}%, 波动: ${(marketRegime.volatilityLevel * 100).toFixed(0)}%`);
-                console.log(`   调整参数: maxWeight=${(marketRegime.params.maxWeight * 100).toFixed(0)}%, volatilityWindow=${marketRegime.params.volatilityWindow}月, minROE=${(marketRegime.params.minROE * 100).toFixed(0)}%`);
               }
             }
           } catch (error) {
@@ -283,7 +295,9 @@ class IndexPortfolioService {
             isYearlyRebalance,  // 添加年度调仓标记
             marketRegime: marketRegime ? marketRegime.regime : null,
             marketRegimeName: marketRegime ? marketRegime.regimeName : null,
-            adaptiveParams: marketRegime ? marketRegime.params : null,
+            marketTemperature: marketTemperature ? marketTemperature.temperature : null,
+            temperatureLevel: marketTemperature ? marketTemperature.levelName : null,
+            adaptiveParams: marketTemperature ? marketTemperature.params : (marketRegime ? marketRegime.params : null),
             ...periodResult
           });
           

@@ -109,6 +109,49 @@ class TushareService {
   }
 
   /**
+   * 获取指数日线基本指标（包含PE、PB等）
+   * @param {string} indexCode - 指数代码
+   * @param {string} startDate - 开始日期 YYYYMMDD
+   * @param {string} endDate - 结束日期 YYYYMMDD
+   * @returns {Array} 指数日线基本指标数据
+   */
+  async getIndexDailyBasic(indexCode, startDate, endDate) {
+    try {
+      await this.ensureDbInitialized();
+      
+      // 1. 先从数据库查询
+      let data = await dbService.getIndexDailyBasic(indexCode, startDate, endDate);
+      
+      if (data && data.length > 0) {
+        console.log(`✅ 从数据库获取到 ${data.length} 条指数基本指标数据`);
+        return data.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+      }
+      
+      // 2. 数据库没有，调用Tushare API
+      console.log(`📡 调用Tushare API获取指数基本指标: ${indexCode} [${startDate} - ${endDate}]`);
+      data = await this.callApi('index_dailybasic', {
+        ts_code: indexCode,
+        start_date: startDate,
+        end_date: endDate,
+        fields: 'ts_code,trade_date,total_mv,float_mv,total_share,float_share,free_share,turnover_rate,turnover_rate_f,pe,pe_ttm,pb'
+      });
+      
+      console.log(`✅ 获取到 ${data.length} 条指数基本指标数据`);
+      
+      // 3. 保存到数据库
+      if (data.length > 0) {
+        await dbService.saveIndexDailyBasic(data);
+        console.log('✅ 指数基本指标数据已同步到数据库');
+      }
+      
+      return data.sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+    } catch (error) {
+      console.error('获取指数基本指标失败:', error.message);
+      return [];
+    }
+  }
+
+  /**
    * 获取基金持仓数据（优先从数据库查询）
    */
   async getFundHoldings(fundCode) {

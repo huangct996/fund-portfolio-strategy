@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>中证红利低波100指数回测系统</title>
-    <link rel="stylesheet" href="styles.css?v=4.0">
+    <link rel="stylesheet" href="styles.css?v=6.0">
 </head>
 <body>
     <div class="container">
@@ -68,6 +68,52 @@
                         <label for="endDate">结束日期：</label>
                         <input type="date" id="endDate" class="date-input">
                         <small style="color: #666; display: block; margin-top: 5px;">留空则到指数最新的调仓日结束</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 市场温度计 -->
+            <div class="config-section" id="marketThermometer" style="display: none;">
+                <h3>🌡️ 市场温度计</h3>
+                <div class="thermometer-container">
+                    <div class="thermometer-display">
+                        <div class="temperature-value">
+                            <span id="currentTemperature">--</span>°
+                        </div>
+                        <div class="temperature-level" id="temperatureLevel">加载中...</div>
+                    </div>
+                    
+                    <div class="thermometer-scale">
+                        <div class="scale-bar">
+                            <div class="scale-segment cold"></div>
+                            <div class="scale-segment normal"></div>
+                            <div class="scale-segment hot"></div>
+                        </div>
+                        <div class="scale-labels">
+                            <span>0°</span>
+                            <span>30°</span>
+                            <span>70°</span>
+                            <span>100°</span>
+                        </div>
+                        <div class="scale-indicator" id="temperatureIndicator" style="left: 50%"></div>
+                    </div>
+                    
+                    <div class="thermometer-components">
+                        <div class="component-item">
+                            <span class="component-label">PE温度</span>
+                            <span class="component-value" id="peTemp">--°</span>
+                        </div>
+                        <div class="component-item">
+                            <span class="component-label">PB温度</span>
+                            <span class="component-value" id="pbTemp">--°</span>
+                        </div>
+                    </div>
+                    
+                    <div class="thermometer-suggestion" id="temperatureSuggestion">
+                        正在计算市场温度...
+                    </div>
+                    
+                    <div class="thermometer-warning" id="temperatureWarning" style="display: none;">
                     </div>
                 </div>
             </div>
@@ -296,6 +342,49 @@
             <div class="chart-container">
                 <h3>累计收益率对比（按调仓日期）</h3>
                 <canvas id="cumulativeReturnChart"></canvas>
+            </div>
+            
+            <!-- 历史温度曲线 -->
+            <div class="chart-container" id="temperatureChartContainer" style="display: none; margin-top: 30px;">
+                <h3>🌡️ 历史市场温度曲线</h3>
+                <div class="info-note">
+                    <strong>💡 说明：</strong>展示市场温度随时间的变化趋势，帮助识别市场周期位置。
+                </div>
+                
+                <!-- 时间筛选按钮 -->
+                <div class="time-filter-buttons" style="margin: 15px 0;">
+                    <button class="filter-btn active" data-period="1y">近一年</button>
+                    <button class="filter-btn" data-period="3y">近三年</button>
+                    <button class="filter-btn" data-period="5y">近五年</button>
+                    <button class="filter-btn" data-period="all">全部</button>
+                </div>
+                
+                <canvas id="temperatureChart"></canvas>
+                
+                <!-- 温度分布统计 -->
+                <div class="temperature-distribution" id="temperatureDistribution" style="margin-top: 20px;">
+                    <h4>温度分布统计</h4>
+                    <div class="distribution-stats">
+                        <div class="stat-item cold">
+                            <div class="stat-label">低估区间 (0-30°)</div>
+                            <div class="stat-value" id="coldPercentage">--</div>
+                            <div class="stat-desc">买入最佳时机</div>
+                        </div>
+                        <div class="stat-item normal">
+                            <div class="stat-label">中估区间 (30-70°)</div>
+                            <div class="stat-value" id="normalPercentage">--</div>
+                            <div class="stat-desc">适度买入</div>
+                        </div>
+                        <div class="stat-item hot">
+                            <div class="stat-label">高估区间 (70-100°)</div>
+                            <div class="stat-value" id="hotPercentage">--</div>
+                            <div class="stat-desc">谨慎或减仓</div>
+                        </div>
+                    </div>
+                    <div class="average-temp">
+                        平均温度: <span id="averageTemp">--</span>°
+                    </div>
+                </div>
             </div>
         </section>
 

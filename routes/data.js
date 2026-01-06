@@ -4,6 +4,7 @@ const tushareService = require('../services/tushareService');
 const portfolioService = require('../services/portfolioService');
 const indexPortfolioService = require('../services/indexPortfolioService');
 const dbService = require('../services/dbService');
+const marketThermometerService = require('../services/marketThermometerService');
 
 const FUND_CODE = process.env.FUND_CODE || '512890.SH';
 const INDEX_CODE = process.env.INDEX_CODE || 'h30269.CSI';
@@ -381,6 +382,75 @@ router.get('/index-constituents', async (req, res) => {
     });
   } catch (error) {
     console.error('查询指数成分股失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取当前市场温度
+ */
+router.get('/market-temperature', async (req, res) => {
+  try {
+    const indexCode = req.query.indexCode || INDEX_CODE;
+    let date = req.query.date;
+    
+    // 如果没有指定日期，使用最近有数据的日期
+    if (!date) {
+      const dbService = require('../services/dbService');
+      await dbService.init(); // 确保数据库已初始化
+      
+      const [latestDate] = await dbService.pool.execute(`
+        SELECT MAX(trade_date) as latest_date 
+        FROM index_weight 
+        WHERE index_code = ?
+      `, [indexCode]);
+      
+      date = latestDate[0].latest_date || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      console.log(`使用最近有数据的日期: ${date}`);
+    }
+    
+    const temperature = await marketThermometerService.calculateMarketTemperature(indexCode, date);
+    
+    res.json({
+      success: true,
+      data: temperature
+    });
+  } catch (error) {
+    console.error('获取市场温度失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取历史温度序列
+ */
+router.get('/historical-temperature', async (req, res) => {
+  try {
+    const indexCode = req.query.indexCode || INDEX_CODE;
+    const startDate = req.query.startDate || '20200101';
+    const endDate = req.query.endDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    
+    const temperatures = await marketThermometerService.calculateHistoricalTemperature(
+      indexCode, startDate, endDate
+    );
+    
+    const distribution = marketThermometerService.calculateTemperatureDistribution(temperatures);
+    
+    res.json({
+      success: true,
+      data: {
+        temperatures: temperatures,
+        distribution: distribution
+      }
+    });
+  } catch (error) {
+    console.error('获取历史温度失败:', error);
     res.json({
       success: false,
       error: error.message
