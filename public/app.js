@@ -38,6 +38,11 @@ async function initializePage() {
         // 设置配置面板
         setupConfigPanel();
         
+        // 加载市场温度计
+        if (typeof loadMarketTemperature === 'function') {
+            await loadMarketTemperature();
+        }
+        
         // 不自动加载数据，等待用户点击"应用配置并计算"
         showLoading(false);
         

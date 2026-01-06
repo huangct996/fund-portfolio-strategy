@@ -97,6 +97,51 @@ class StockFilterService {
       console.log(`   ✓ 质量得分 >= 中位数: ${beforeCount} → ${filteredStocks.length}`);
     }
 
+    // 5. 最小持仓股票数检查（防止持仓过度集中）
+    const MIN_HOLDINGS = 10;
+    if (filteredStocks.length < MIN_HOLDINGS && filteredStocks.length < stocks.length) {
+      console.log(`   ⚠️  筛选后股票数过少（${filteredStocks.length}只），放宽筛选条件以保证至少${MIN_HOLDINGS}只股票`);
+      
+      // 如果启用了质量筛选，先尝试关闭质量筛选
+      if (filterParams.filterByQuality && filteredStocks.length < MIN_HOLDINGS) {
+        console.log(`   → 尝试关闭质量筛选...`);
+        // 重新筛选，但不使用质量筛选
+        let relaxedStocks = stocks;
+        
+        // 重新应用ROE筛选
+        if (filterParams.minROE > 0) {
+          relaxedStocks = relaxedStocks.filter(stock => {
+            const roe = stock.roe || 0;
+            return roe >= filterParams.minROE;
+          });
+        }
+        
+        // 重新应用动量筛选
+        if (filterParams.momentumMonths > 0 && filterParams.minMomentumReturn !== undefined) {
+          const momentumResult = await this.filterByMomentum(
+            relaxedStocks, 
+            rebalanceDate, 
+            filterParams.momentumMonths, 
+            filterParams.minMomentumReturn
+          );
+          relaxedStocks = momentumResult.filtered;
+        }
+        
+        if (relaxedStocks.length >= MIN_HOLDINGS) {
+          filteredStocks = relaxedStocks;
+          console.log(`   ✓ 关闭质量筛选后: ${filteredStocks.length}只股票`);
+        }
+      }
+      
+      // 如果还是不够，使用原始股票池
+      if (filteredStocks.length < MIN_HOLDINGS) {
+        console.log(`   → 筛选条件过于严格，使用原始股票池（${stocks.length}只）`);
+        filteredStocks = stocks;
+        removedStocks = [];
+        filterReasons.clear();
+      }
+    }
+    
     // 收集所有被筛选掉的股票
     const filteredCodes = new Set(filteredStocks.map(s => s.con_code));
     stocks.forEach(stock => {

@@ -1,6 +1,7 @@
 const tushareService = require('./tushareService');
 const stockFilterService = require('./stockFilterService');
 const marketRegimeService = require('./marketRegimeService');
+const marketThermometerService = require('./marketThermometerService');
 
 /**
  * 基于指数成分股的投资组合回测服务
@@ -161,53 +162,45 @@ class IndexPortfolioService {
         const isYearlyRebalance = yearlyRebalanceDates.includes(currentDate);
         // console.log(`   当前日期 ${currentDate} 是否年度调仓: ${isYearlyRebalance}`);
         
-        // 🔄 自适应策略：识别市场状态并调整参数
+        // 🔄 自适应策略：基于市场温度调整参数
+        let marketTemperature = null;
         let marketRegime = null;
         let effectiveRiskParityParams = riskParityParams;
         
         if (useAdaptive && useRiskParity && riskParityParams) {
           try {
-            // 获取成分股列表用于市场宽度计算
-            let tempWeights = await tushareService.getIndexWeightByDate(indexCode, currentDate);
-            if (!tempWeights || tempWeights.length === 0) {
-              const nearestDate = yearlyRebalanceDates.filter(d => d <= currentDate).sort((a, b) => b.localeCompare(a))[0];
-              if (nearestDate) tempWeights = await tushareService.getIndexWeightByDate(indexCode, nearestDate);
+            // 🌡️ 计算市场温度（新版：基于指数PE/PB）
+            marketTemperature = await marketThermometerService.calculateMarketTemperature('000300.SH', currentDate);
+            
+            // 使用温度计的策略参数建议
+            const adaptiveParams = marketTemperature.params;
+            
+            // 合并自适应参数到基础参数
+            effectiveRiskParityParams = {
+              ...riskParityParams,
+              maxWeight: adaptiveParams.maxWeight,
+              volatilityWindow: adaptiveParams.volatilityWindow
+            };
+            
+            // 更新质量过滤参数
+            if (effectiveRiskParityParams.stockFilterParams) {
+              effectiveRiskParityParams.stockFilterParams = {
+                ...effectiveRiskParityParams.stockFilterParams,
+                filterByQuality: adaptiveParams.filterByQuality,
+                minROE: adaptiveParams.minROE || effectiveRiskParityParams.stockFilterParams.minROE,
+                maxDebtRatio: adaptiveParams.maxDebtRatio || effectiveRiskParityParams.stockFilterParams.maxDebtRatio
+              };
             }
             
-            if (tempWeights && tempWeights.length > 0) {
-              // 传入用户配置的基础参数
-              const baseParams = {
-                volatilityWindow: config.riskParityParams?.volatilityWindow,
-                ewmaDecay: config.riskParityParams?.ewmaDecay,
-                momentumMonths: config.riskParityParams?.stockFilterParams?.momentumMonths,
-                minMomentumReturn: config.riskParityParams?.stockFilterParams?.minMomentumReturn
-              };
-              
-              marketRegime = await marketRegimeService.identifyMarketRegime(indexCode, tempWeights, currentDate, baseParams);
-              
-              // 合并自适应参数到基础参数
-              effectiveRiskParityParams = {
-                ...riskParityParams,
-                ...marketRegime.params
-              };
-              
-              // 关键修复：如果自适应策略设置了filterByQuality，需要覆盖stockFilterParams中的值
-              if (marketRegime.params.filterByQuality !== undefined && effectiveRiskParityParams.stockFilterParams) {
-                effectiveRiskParityParams.stockFilterParams = {
-                  ...effectiveRiskParityParams.stockFilterParams,
-                  filterByQuality: marketRegime.params.filterByQuality
-                };
-              }
-              
-              // 每4个调仓期输出一次，避免日志过多
-              if (i === 0 || i % 4 === 0) {
-                console.log(`\n🔍 [${currentDate}] 市场状态: ${marketRegime.regimeName} (置信度: ${(marketRegime.confidence * 100).toFixed(0)}%)`);
-                console.log(`   趋势: ${(marketRegime.trendStrength * 100).toFixed(2)}%, 宽度: ${(marketRegime.marketBreadth * 100).toFixed(1)}%, 波动: ${(marketRegime.volatilityLevel * 100).toFixed(0)}%`);
-                console.log(`   调整参数: maxWeight=${(marketRegime.params.maxWeight * 100).toFixed(0)}%, volatilityWindow=${marketRegime.params.volatilityWindow}月, minROE=${(marketRegime.params.minROE * 100).toFixed(0)}%`);
-              }
+            // 每4个调仓期输出一次，避免日志过多
+            if (i === 0 || i % 4 === 0) {
+              console.log(`\n🌡️ [${currentDate}] 市场温度: ${marketTemperature.temperature}° (${marketTemperature.levelName})`);
+              console.log(`   PE: ${marketTemperature.values.pe?.toFixed(2) || 'N/A'} (温度${marketTemperature.components.pe}°), PB: ${marketTemperature.values.pb?.toFixed(2) || 'N/A'} (温度${marketTemperature.components.pb}°)`);
+              console.log(`   置信度: ${(marketTemperature.confidence * 100).toFixed(0)}%`);
+              console.log(`   调整参数: maxWeight=${(adaptiveParams.maxWeight * 100).toFixed(0)}%, volatilityWindow=${adaptiveParams.volatilityWindow}月, filterByQuality=${adaptiveParams.filterByQuality}`);
             }
           } catch (error) {
-            console.warn(`⚠️  识别市场状态失败，使用默认参数: ${error.message}`);
+            console.warn(`⚠️  计算市场温度失败，使用默认参数: ${error.message}`);
           }
         }
         
@@ -281,9 +274,10 @@ class IndexPortfolioService {
             startDate,
             endDate: periodEndDate,
             isYearlyRebalance,  // 添加年度调仓标记
-            marketRegime: marketRegime ? marketRegime.regime : null,
-            marketRegimeName: marketRegime ? marketRegime.regimeName : null,
-            adaptiveParams: marketRegime ? marketRegime.params : null,
+            marketTemperature: marketTemperature ? marketTemperature.temperature : null,
+            temperatureLevel: marketTemperature ? marketTemperature.levelName : null,
+            temperatureComponents: marketTemperature ? marketTemperature.components : null,
+            adaptiveParams: marketTemperature ? marketTemperature.params : null,
             ...periodResult
           });
           
@@ -364,14 +358,16 @@ class IndexPortfolioService {
     
     results.forEach((period, idx) => {
       if (period.customDailyReturns && period.customDailyReturns.length > 0) {
-        // 计算当前调仓期的累计收益率：(1 + 上期累计) × (1 + 当期收益) - 1
+        // 计算当前调仓期的累计收益率
+        // 注意：day.periodReturn 已经是从调仓日到当前日的累计收益率（portfolioValue - 1）
+        // 所以跨期累计时，需要用复利公式：(1 + 上期末累计) × (1 + 当期累计) - 1
         period.customDailyReturns.forEach(day => {
           // 过滤掉超过用户选择的结束日期的数据
           if (endDate && day.date > endDate) {
             return;
           }
           
-          // 当前日的累计收益率 = (1 + 上期末累计) × (1 + 当期从调仓日到当前日的收益) - 1
+          // 当前日的累计收益率 = (1 + 上期末累计) × (1 + 当期从调仓日到当前日的累计) - 1
           const currentCumulative = (1 + customCumulativeReturn) * (1 + day.periodReturn) - 1;
           
           allCustomDailyReturns.push({
@@ -383,10 +379,11 @@ class IndexPortfolioService {
           });
         });
         
-        // 更新累计收益率：使用当期最后一天的累计值（在结束日期范围内）
+        // 更新累计收益率：使用当期最后一天的期间收益率
         const validDays = period.customDailyReturns.filter(d => !endDate || d.date <= endDate);
         if (validDays.length > 0) {
           const lastDay = validDays[validDays.length - 1];
+          // 跨期累计：(1 + 上期末) × (1 + 当期末) - 1
           customCumulativeReturn = (1 + customCumulativeReturn) * (1 + lastDay.periodReturn) - 1;
         }
       }

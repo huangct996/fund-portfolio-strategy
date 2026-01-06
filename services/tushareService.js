@@ -297,6 +297,93 @@ class TushareService {
   }
 
   /**
+   * 获取指数每日估值指标（优先从数据库查询）
+   * @param {string} tsCode - 指数代码（如 000300.SH）
+   * @param {string} startDate - 开始日期（YYYYMMDD）
+   * @param {string} endDate - 结束日期（YYYYMMDD，可选）
+   * @returns {Array} 指数每日估值指标数据
+   */
+  async getIndexDailybasic(tsCode, startDate, endDate = null) {
+    await this.ensureDbInitialized();
+    
+    const actualEndDate = endDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    
+    // 1. 先从数据库查询
+    let data = await dbService.getIndexDailybasic(tsCode, startDate, actualEndDate);
+    
+    if (data && data.length > 0) {
+      console.log(`✅ 从数据库获取到 ${data.length} 条指数估值数据`);
+      return data;
+    }
+    
+    // 2. 数据库没有，调用Tushare API
+    console.log(`数据库无数据，正在调用Tushare API获取指数估值数据...`);
+    
+    try {
+      const apiParams = {
+        ts_code: tsCode,
+        start_date: startDate
+      };
+      if (endDate) {
+        apiParams.end_date = endDate;
+      }
+      
+      data = await this.callApi('index_dailybasic', apiParams);
+      
+      // 3. 保存到数据库
+      if (data.length > 0) {
+        await dbService.saveIndexDailybasic(data);
+        console.log(`✅ 已同步 ${data.length} 条指数估值数据到数据库`);
+      } else {
+        console.warn(`⚠️ API返回空数据`);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error(`获取指数估值数据失败:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 批量同步多个指数的历史估值数据
+   * @param {Array} indices - 指数代码数组
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   */
+  async syncIndexDailybasicBatch(indices, startDate, endDate = null) {
+    await this.ensureDbInitialized();
+    
+    console.log(`\n开始批量同步 ${indices.length} 个指数的估值数据...`);
+    console.log(`时间范围: ${startDate} - ${endDate || '今天'}\n`);
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    for (const tsCode of indices) {
+      try {
+        console.log(`正在同步 ${tsCode}...`);
+        const data = await this.getIndexDailybasic(tsCode, startDate, endDate);
+        results.success.push({ tsCode, count: data.length });
+        
+        // 避免频繁调用，每个指数间隔500ms
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`同步 ${tsCode} 失败:`, error.message);
+        results.failed.push({ tsCode, error: error.message });
+      }
+    }
+    
+    console.log(`\n批量同步完成:`);
+    console.log(`  成功: ${results.success.length} 个`);
+    console.log(`  失败: ${results.failed.length} 个`);
+    
+    return results;
+  }
+
+  /**
    * 批量获取股票基本信息（包含名称、市值、股息率、质量因子、ROE、负债率，优先从数据库查询）
    */
   async batchGetStockBasic(stockCodes, tradeDate) {

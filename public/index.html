@@ -299,6 +299,69 @@
             </div>
         </section>
 
+        <section id="temperatureSection" class="card" style="display: none;">
+            <h2>🌡️ 市场温度计</h2>
+            
+            <div class="info-note">
+                <strong>💡 说明：</strong>基于沪深300指数PE/PB估值的历史分位数计算市场温度，帮助判断市场估值水平。
+                <ul style="margin: 5px 0; padding-left: 20px;">
+                    <li><strong>低估区间(0-30°)：</strong>买入最佳时机，建议积极配置</li>
+                    <li><strong>中估区间(30-70°)：</strong>合理估值，适度配置</li>
+                    <li><strong>高估区间(70-100°)：</strong>谨慎或减仓，控制风险</li>
+                </ul>
+            </div>
+
+            <div class="temperature-display">
+                <div class="current-temperature">
+                    <h3>当前市场温度</h3>
+                    <div id="currentTempValue" class="temp-value">--°</div>
+                    <div id="currentTempLevel" class="temp-level">--</div>
+                    <div id="currentTempSuggestion" class="temp-suggestion">加载中...</div>
+                    <div class="temp-components">
+                        <span id="tempPE">PE: --°</span>
+                        <span id="tempPB">PB: --°</span>
+                        <span id="tempConfidence">置信度: --%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="time-filter-buttons">
+                <button class="filter-btn active" data-period="1year">近一年</button>
+                <button class="filter-btn" data-period="3years">近三年</button>
+                <button class="filter-btn" data-period="5years">近五年</button>
+                <button class="filter-btn" data-period="all">全部</button>
+            </div>
+
+            <div class="chart-container">
+                <h3>历史温度曲线</h3>
+                <canvas id="temperatureChart"></canvas>
+            </div>
+
+            <div class="temperature-distribution">
+                <h3>温度分布统计</h3>
+                <div class="distribution-stats">
+                    <div class="stat-item cold">
+                        <div class="stat-label">低估区间 (0-30°)</div>
+                        <div class="stat-value" id="coldCount">--</div>
+                        <div class="stat-percent" id="coldPercent">--%</div>
+                    </div>
+                    <div class="stat-item normal">
+                        <div class="stat-label">中估区间 (30-70°)</div>
+                        <div class="stat-value" id="normalCount">--</div>
+                        <div class="stat-percent" id="normalPercent">--%</div>
+                    </div>
+                    <div class="stat-item hot">
+                        <div class="stat-label">高估区间 (70-100°)</div>
+                        <div class="stat-value" id="hotCount">--</div>
+                        <div class="stat-percent" id="hotPercent">--%</div>
+                    </div>
+                </div>
+                <div class="avg-temperature">
+                    平均温度: <span id="avgTemperature">--°</span>
+                </div>
+            </div>
+        </section>
+
         <section id="riskMetrics" class="card" style="display: none;">
             <h2>风险指标对比</h2>
             
@@ -564,6 +627,7 @@
     </div>
 
     <script src="chart.min.js"></script>
+    <script src="temperature.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

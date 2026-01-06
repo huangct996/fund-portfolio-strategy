@@ -388,4 +388,61 @@ router.get('/index-constituents', async (req, res) => {
   }
 });
 
+// ==================== 市场温度计相关接口 ====================
+
+/**
+ * 获取当前市场温度
+ */
+router.get('/market-temperature', async (req, res) => {
+  try {
+    const { indexCode } = req.query;
+    const marketThermometerService = require('../services/marketThermometerService');
+    
+    const temperature = await marketThermometerService.calculateMarketTemperature(indexCode);
+    
+    res.json({
+      success: true,
+      data: temperature
+    });
+  } catch (error) {
+    console.error('获取市场温度失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取历史市场温度
+ */
+router.get('/historical-temperature', async (req, res) => {
+  try {
+    const { indexCode, startDate, endDate } = req.query;
+    const marketThermometerService = require('../services/marketThermometerService');
+    
+    const temperatures = await marketThermometerService.calculateHistoricalTemperature(
+      indexCode,
+      startDate,
+      endDate
+    );
+    
+    const distribution = marketThermometerService.calculateTemperatureDistribution(temperatures);
+    
+    res.json({
+      success: true,
+      data: {
+        temperatures,
+        distribution
+      }
+    });
+  } catch (error) {
+    console.error('获取历史温度失败:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

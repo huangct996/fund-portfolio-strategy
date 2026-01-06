@@ -128,6 +128,32 @@ class DatabaseService {
           KEY idx_trade_date (trade_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='股票基本信息表'
       `);
+
+      // 6. 指数每日估值指标表（PE、PB、市值等）
+      await connection.execute(`
+        CREATE TABLE IF NOT EXISTS index_dailybasic (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ts_code VARCHAR(20) NOT NULL COMMENT '指数代码',
+          trade_date VARCHAR(8) NOT NULL COMMENT '交易日期',
+          total_mv DECIMAL(20, 2) COMMENT '总市值（万元）',
+          float_mv DECIMAL(20, 2) COMMENT '流通市值（万元）',
+          total_share DECIMAL(20, 2) COMMENT '总股本（万股）',
+          float_share DECIMAL(20, 2) COMMENT '流通股本（万股）',
+          free_share DECIMAL(20, 2) COMMENT '自由流通股本（万股）',
+          turnover_rate DECIMAL(10, 4) COMMENT '换手率（%）',
+          turnover_rate_f DECIMAL(10, 4) COMMENT '换手率（自由流通）（%）',
+          pe DECIMAL(10, 4) COMMENT '市盈率',
+          pe_ttm DECIMAL(10, 4) COMMENT '市盈率TTM',
+          pb DECIMAL(10, 4) COMMENT '市净率',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uk_index_dailybasic (ts_code, trade_date),
+          KEY idx_ts_code (ts_code),
+          KEY idx_trade_date (trade_date),
+          KEY idx_pe (pe),
+          KEY idx_pb (pb)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='指数每日估值指标表'
+      `);
       
       // 确保name、roe、debt_ratio字段存在（兼容旧版本表结构）
       try {
@@ -943,6 +969,120 @@ class DatabaseService {
     } finally {
       connection.release();
     }
+  }
+
+  // ==================== 指数每日估值指标相关 ====================
+  
+  /**
+   * 保存指数每日估值指标数据
+   * @param {Array} data - 指数每日估值指标数据数组
+   */
+  async saveIndexDailybasic(data) {
+    if (!data || data.length === 0) return;
+    
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      for (const item of data) {
+        await connection.execute(`
+          INSERT INTO index_dailybasic 
+          (ts_code, trade_date, total_mv, float_mv, total_share, float_share, 
+           free_share, turnover_rate, turnover_rate_f, pe, pe_ttm, pb)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            total_mv = VALUES(total_mv),
+            float_mv = VALUES(float_mv),
+            total_share = VALUES(total_share),
+            float_share = VALUES(float_share),
+            free_share = VALUES(free_share),
+            turnover_rate = VALUES(turnover_rate),
+            turnover_rate_f = VALUES(turnover_rate_f),
+            pe = VALUES(pe),
+            pe_ttm = VALUES(pe_ttm),
+            pb = VALUES(pb),
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+          item.ts_code,
+          item.trade_date,
+          item.total_mv,
+          item.float_mv,
+          item.total_share,
+          item.float_share,
+          item.free_share,
+          item.turnover_rate,
+          item.turnover_rate_f,
+          item.pe,
+          item.pe_ttm,
+          item.pb
+        ]);
+      }
+      
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * 查询指数每日估值指标数据
+   * @param {string} tsCode - 指数代码
+   * @param {string} startDate - 开始日期
+   * @param {string} endDate - 结束日期
+   * @returns {Array} 指数每日估值指标数据
+   */
+  async getIndexDailybasic(tsCode, startDate, endDate = null) {
+    let sql = `
+      SELECT * FROM index_dailybasic 
+      WHERE ts_code = ? AND trade_date >= ?
+    `;
+    const params = [tsCode, startDate];
+    
+    if (endDate) {
+      sql += ' AND trade_date <= ?';
+      params.push(endDate);
+    }
+    
+    sql += ' ORDER BY trade_date ASC';
+    
+    const [rows] = await this.pool.execute(sql, params);
+    return rows;
+  }
+
+  /**
+   * 获取指数最新的估值指标
+   * @param {string} tsCode - 指数代码
+   * @returns {Object} 最新估值指标
+   */
+  async getLatestIndexDailybasic(tsCode) {
+    const [rows] = await this.pool.execute(`
+      SELECT * FROM index_dailybasic 
+      WHERE ts_code = ? 
+      ORDER BY trade_date DESC 
+      LIMIT 1
+    `, [tsCode]);
+    return rows[0] || null;
+  }
+
+  /**
+   * 检查指数数据是否需要更新
+   * @param {string} tsCode - 指数代码
+   * @returns {Object} {needUpdate: boolean, lastDate: string}
+   */
+  async checkIndexDailybasicUpdate(tsCode) {
+    const latest = await this.getLatestIndexDailybasic(tsCode);
+    
+    if (!latest) {
+      return { needUpdate: true, lastDate: null };
+    }
+    
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const needUpdate = latest.trade_date < today;
+    
+    return { needUpdate, lastDate: latest.trade_date };
   }
 
   /**
