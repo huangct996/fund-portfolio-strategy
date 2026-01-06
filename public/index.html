@@ -364,61 +364,114 @@
                         <p style="margin: 5px 0; color: #666;">根据市场温度（基于沪深300 PE/PB估值）自动调整策略参数。您可以自定义各温度区间的参数配置。</p>
                     </div>
                     
-                    <div style="margin-top: 15px;">
-                        <label>
-                            <input type="checkbox" id="enableStockFilter" checked>
-                            <strong>★ 启用股票池筛选（激进配置）</strong>
-                        </label>
-                        <small style="color: #666; display: block; margin-left: 20px;">
-                            仅针对自定义策略，指数策略保持原有成分股不变
-                        </small>
-                    </div>
-                    
-                    <div id="stockFilterConfig" style="display: none; margin-left: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; margin-top: 10px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label>
-                                    <input type="checkbox" id="enableROEFilter">
-                                    <span style="font-size: 0.9em; color: #333;">启用ROE筛选</span>
-                                </label>
-                                <div id="roeFilterConfig" style="display: none; margin-top: 5px;">
-                                    <label style="font-size: 0.85em; color: #666;">最低ROE (%):</label>
-                                    <input type="number" id="minROE" min="0" max="30" step="1" value="0" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 2px;">剔除ROE低于此值的股票（自适应策略会自动调整）</small>
+                    <!-- 温度参数自定义配置 -->
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <h4 style="margin-top: 0; color: #2196f3;">🌡️ 温度区间参数配置</h4>
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
+                            根据市场温度自动调整策略参数。温度基于沪深300指数PE/PB估值的历史分位数计算（0-100°）。
+                        </p>
+                        
+                        <!-- 低估区间 (0-30°) -->
+                        <div style="margin-bottom: 20px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+                            <h5 style="margin: 0 0 10px 0; color: #1976d2;">
+                                <span style="background: #2196f3; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.85em;">低估 0-30°</span>
+                                积极进攻策略
+                            </h5>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">单只股票最大权重 (%):</label>
+                                    <input type="number" id="coldMaxWeight" min="5" max="30" step="1" value="20" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">波动率窗口 (月):</label>
+                                    <input type="number" id="coldVolWindow" min="3" max="24" step="1" value="6" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">最低ROE (%):</label>
+                                    <input type="number" id="coldMinROE" min="0" max="30" step="1" value="0" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
                                 </div>
                             </div>
-                            <div>
-                                <label>
-                                    <input type="checkbox" id="enableDebtFilter">
-                                    <span style="font-size: 0.9em; color: #333;">启用负债率筛选</span>
+                            <div style="margin-top: 8px;">
+                                <label style="font-size: 0.85em;">
+                                    <input type="checkbox" id="coldFilterByQuality">
+                                    启用质量筛选
                                 </label>
-                                <div id="debtFilterConfig" style="display: none; margin-top: 5px;">
-                                    <label style="font-size: 0.85em; color: #666;">最高负债率 (%):</label>
-                                    <input type="number" id="maxDebtRatio" min="0" max="100" step="5" value="100" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 2px;">剔除负债率高于此值的股票（自适应策略会自动调整）</small>
-                                </div>
-                            </div>
-                            <div>
-                                <label style="font-size: 0.9em; color: #333;">动量期间（月）:</label>
-                                <input type="number" id="momentumMonths" min="1" max="12" step="1" value="6" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                <small style="color: #666; font-size: 0.85em;">计算过去N个月的收益率</small>
-                            </div>
-                            <div>
-                                <label style="font-size: 0.9em; color: #333;">最低动量收益率 (%):</label>
-                                <input type="number" id="minMomentumReturn" min="-50" max="50" step="5" value="-10" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
-                                <small style="color: #666; font-size: 0.85em;">剔除动量收益率低于此值的股票</small>
                             </div>
                         </div>
-                        <div style="margin-top: 10px;">
-                            <label>
-                                <input type="checkbox" id="filterByQuality">
-                                <span style="font-size: 0.9em;">剔除质量得分低于中位数的股票（基于PE、PB、股息率）</span>
-                            </label>
-                            <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.85em; color: #856404;">
-                                <strong>💡 提示：</strong>启用自适应策略时，此选项将根据市场温度自动调整：<br>
-                                • 低估时（0-30°）：自动禁用质量筛选，保留更多股票捕捉收益<br>
-                                • 高估时（70-100°）：自动启用质量筛选，过滤低质量股票防守
+                        
+                        <!-- 中估区间 (30-70°) -->
+                        <div style="margin-bottom: 20px; padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                            <h5 style="margin: 0 0 10px 0; color: #f57c00;">
+                                <span style="background: #ffc107; color: #333; padding: 2px 8px; border-radius: 3px; font-size: 0.85em;">中估 30-70°</span>
+                                均衡配置策略
+                            </h5>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">单只股票最大权重 (%):</label>
+                                    <input type="number" id="normalMaxWeight" min="5" max="30" step="1" value="15" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">波动率窗口 (月):</label>
+                                    <input type="number" id="normalVolWindow" min="3" max="24" step="1" value="6" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">最低ROE (%):</label>
+                                    <input type="number" id="normalMinROE" min="0" max="30" step="1" value="0" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
                             </div>
+                            <div style="margin-top: 8px;">
+                                <label style="font-size: 0.85em;">
+                                    <input type="checkbox" id="normalFilterByQuality">
+                                    启用质量筛选
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 高估区间 (70-100°) -->
+                        <div style="margin-bottom: 10px; padding: 12px; background: #ffebee; border-left: 4px solid #f44336; border-radius: 4px;">
+                            <h5 style="margin: 0 0 10px 0; color: #c62828;">
+                                <span style="background: #f44336; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.85em;">高估 70-100°</span>
+                                谨慎防守策略
+                            </h5>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">单只股票最大权重 (%):</label>
+                                    <input type="number" id="hotMaxWeight" min="5" max="30" step="1" value="10" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">波动率窗口 (月):</label>
+                                    <input type="number" id="hotVolWindow" min="3" max="24" step="1" value="12" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.85em; color: #555;">最低ROE (%):</label>
+                                    <input type="number" id="hotMinROE" min="0" max="30" step="1" value="2" 
+                                           style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                </div>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <label style="font-size: 0.85em;">
+                                    <input type="checkbox" id="hotFilterByQuality">
+                                    启用质量筛选
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-left: 3px solid #4caf50; font-size: 0.85em;">
+                            <strong>💡 说明：</strong>
+                            <ul style="margin: 5px 0; padding-left: 20px;">
+                                <li>系统会根据当前市场温度自动选择对应区间的参数</li>
+                                <li>低估时：提高maxWeight，降低筛选标准，积极进攻</li>
+                                <li>高估时：降低maxWeight，提高筛选标准，谨慎防守</li>
+                                <li>所有参数都会在调仓时动态应用</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
