@@ -242,6 +242,64 @@
                             0%=纯风险平价，30%=70%风险平价+30%市值加权，50%=各占50%
                         </small>
                     </div>
+                    
+                    <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
+                        <strong>🎯 股票池筛选（可选辅助功能）</strong>
+                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合</p>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <label>
+                            <input type="checkbox" id="rpEnableStockFilter">
+                            <strong>★ 启用股票池筛选</strong>
+                        </label>
+                        <small style="color: #666; display: block; margin-left: 20px;">
+                            仅针对自定义策略，指数策略保持原有成分股不变
+                        </small>
+                    </div>
+                    
+                    <div id="rpStockFilterConfig" style="display: none; margin-left: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; margin-top: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label>
+                                    <input type="checkbox" id="rpEnableROEFilter">
+                                    <span style="font-size: 0.9em; color: #333;">启用ROE筛选</span>
+                                </label>
+                                <div id="rpRoeFilterConfig" style="display: none; margin-top: 5px;">
+                                    <label style="font-size: 0.85em; color: #666;">最低ROE (%):</label>
+                                    <input type="number" id="rpMinROE" min="0" max="30" step="1" value="5" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 2px;">剔除ROE低于此值的股票</small>
+                                </div>
+                            </div>
+                            <div>
+                                <label>
+                                    <input type="checkbox" id="rpEnableDebtFilter">
+                                    <span style="font-size: 0.9em; color: #333;">启用负债率筛选</span>
+                                </label>
+                                <div id="rpDebtFilterConfig" style="display: none; margin-top: 5px;">
+                                    <label style="font-size: 0.85em; color: #666;">最高负债率 (%):</label>
+                                    <input type="number" id="rpMaxDebtRatio" min="0" max="100" step="5" value="70" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                    <small style="color: #666; font-size: 0.8em; display: block; margin-top: 2px;">剔除负债率高于此值的股票</small>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">动量期间（月）:</label>
+                                <input type="number" id="rpMomentumMonths" min="1" max="12" step="1" value="6" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">计算过去N个月的收益率</small>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">最低动量收益率 (%):</label>
+                                <input type="number" id="rpMinMomentumReturn" min="-50" max="50" step="5" value="-20" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除动量收益率低于此值的股票</small>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label>
+                                <input type="checkbox" id="rpFilterByQuality">
+                                <span style="font-size: 0.9em;">剔除质量得分低于中位数的股票（基于PE、PB、股息率）</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -301,9 +359,9 @@
                         <small style="color: #666;">指数加权移动平均的衰减系数，越大越重视近期数据</small>
                     </div>
                     
-                    <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
-                        <strong>🎯 股票池筛选（可选辅助功能）</strong>
-                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合。自适应策略会根据市场温度自动调整筛选参数。</p>
+                    <div class="info-note" style="margin-top: 15px; background: #e3f2fd; border-left-color: #2196f3;">
+                        <strong>🌡️ 温度参数自定义配置</strong>
+                        <p style="margin: 5px 0; color: #666;">根据市场温度（基于沪深300 PE/PB估值）自动调整策略参数。您可以自定义各温度区间的参数配置。</p>
                     </div>
                     
                     <div style="margin-top: 15px;">
