@@ -41,6 +41,20 @@
                     <span class="value" id="foundDate">-</span>
                 </div>
             </div>
+            
+            <!-- 市场温度简化展示 -->
+            <div id="marketTempBanner" style="margin-top: 20px; padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span style="font-size: 24px;">🌡️</span>
+                    <div>
+                        <div style="font-size: 14px; opacity: 0.9;">市场温度</div>
+                        <div id="tempBannerText" style="font-size: 18px; font-weight: bold; margin-top: 3px;">加载中...</div>
+                    </div>
+                </div>
+                <a href="/temperature-detail.html" style="color: white; text-decoration: none; padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 4px; font-size: 14px; font-weight: 500; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    查看详情 →
+                </a>
+            </div>
         </section>
 
         <section id="configPanel" class="card" style="display: none;">
@@ -497,31 +511,6 @@
             </div>
         </section>
 
-        <section id="temperatureSection" class="card" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0;">🌡️ 市场温度计</h2>
-                <a href="/temperature-detail.html" style="color: #667eea; text-decoration: none; font-weight: 500; padding: 8px 16px; background: #f0f4ff; border-radius: 4px;">
-                    查看详情 →
-                </a>
-            </div>
-            
-            <div class="info-note" style="margin-bottom: 20px;">
-                <strong>💡 说明：</strong>基于多指数（沪深300、中证500、中证1000、上证50）PE/PB估值的历史分位数计算综合市场温度。
-            </div>
-
-            <div class="temperature-display">
-                <div class="current-temperature" style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
-                    <h3 style="margin: 0 0 10px 0; opacity: 0.9;">当前市场温度</h3>
-                    <div id="currentTempValue" class="temp-value" style="font-size: 72px; font-weight: bold; margin: 10px 0;">--°</div>
-                    <div id="currentTempLevel" class="temp-level" style="font-size: 24px; margin-bottom: 10px;">--</div>
-                    <div id="currentTempSuggestion" class="temp-suggestion" style="font-size: 16px; opacity: 0.9;">加载中...</div>
-                    <div class="temp-components" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.3); display: flex; justify-content: center; gap: 30px; font-size: 14px;">
-                        <span id="tempConfidence">置信度: --%</span>
-                        <span id="tempIndices">有效指数: --</span>
-                    </div>
-                </div>
-            </div>
-        </section>
 
         <section id="riskMetrics" class="card" style="display: none;">
             <h2>风险指标对比</h2>

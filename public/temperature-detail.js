@@ -279,26 +279,40 @@ function formatDateForChart(dateStr) {
 
 // 显示温度分布统计
 function displayDistributionStats() {
-    if (!multiIndexData) return;
+    if (!multiIndexData) {
+        console.warn('multiIndexData is null');
+        return;
+    }
     
     const container = document.getElementById('distributionStats');
     
     let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
     
+    let hasData = false;
+    
     // 综合温度分布
     if (multiIndexData.composite && multiIndexData.composite.distribution) {
         html += createDistributionCard('综合温度', multiIndexData.composite.distribution);
+        hasData = true;
     }
     
     // 各指数分布
-    for (const [code, data] of Object.entries(multiIndexData.indices)) {
-        if (data.distribution) {
-            html += createDistributionCard(data.name, data.distribution);
+    if (multiIndexData.indices) {
+        for (const [code, data] of Object.entries(multiIndexData.indices)) {
+            if (data && data.distribution && data.distribution.average) {
+                html += createDistributionCard(data.name, data.distribution);
+                hasData = true;
+            }
         }
     }
     
     html += '</div>';
-    container.innerHTML = html;
+    
+    if (hasData) {
+        container.innerHTML = html;
+    } else {
+        container.innerHTML = '<div class="loading">暂无温度分布数据</div>';
+    }
 }
 
 // 创建分布统计卡片

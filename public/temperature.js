@@ -6,24 +6,18 @@ let temperatureChart = null;
 let fullTemperatureData = [];
 
 /**
- * 加载并显示市场温度计
+ * 加载并显示市场温度计（简化版）
  */
 async function loadMarketTemperature() {
     try {
-        // 显示温度计区域
-        document.getElementById('temperatureSection').style.display = 'block';
-        
-        // 加载当前温度
+        // 加载当前温度并更新横幅
         await loadCurrentTemperature();
-        
-        // 加载历史温度（默认近一年）
-        await loadHistoricalTemperature('1year');
-        
-        // 绑定时间筛选按钮事件
-        bindFilterButtons();
     } catch (error) {
-        console.error('加载市场温度计失败:', error);
-        showError('加载市场温度计失败: ' + error.message);
+        console.error('加载市场温度失败:', error);
+        const banner = document.getElementById('tempBannerText');
+        if (banner) {
+            banner.textContent = '加载失败';
+        }
     }
 }
 
@@ -49,25 +43,32 @@ async function loadCurrentTemperature() {
 }
 
 /**
- * 显示当前温度（多指数综合）
+ * 显示当前温度（简化版横幅）
  */
 function displayCurrentTemperature(data) {
-    // 温度值
-    document.getElementById('currentTempValue').textContent = data.temperature + '°';
+    const banner = document.getElementById('tempBannerText');
+    const container = document.getElementById('marketTempBanner');
     
-    // 温度级别
-    const levelElement = document.getElementById('currentTempLevel');
-    levelElement.textContent = data.levelName || '中估';
-    levelElement.className = 'temp-level ' + (data.level || 'NORMAL').toLowerCase();
+    if (!banner || !container) return;
     
-    // 建议
-    document.getElementById('currentTempSuggestion').textContent = data.suggestion || '';
+    // 根据温度级别设置颜色
+    let bgColor, emoji;
+    const level = data.level || 'NORMAL';
     
-    // 置信度和有效指数
-    document.getElementById('tempConfidence').textContent = `置信度: ${(data.confidence * 100).toFixed(0)}%`;
-    if (data.composition) {
-        document.getElementById('tempIndices').textContent = `有效指数: ${data.composition.validIndices}/${data.composition.totalIndices}`;
+    if (level === 'COLD') {
+        bgColor = 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)';
+        emoji = '❄️';
+    } else if (level === 'HOT') {
+        bgColor = 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)';
+        emoji = '🔥';
+    } else {
+        bgColor = 'linear-gradient(135deg, #ffc107 0%, #ffa000 100%)';
+        emoji = '☀️';
     }
+    
+    // 更新横幅样式和内容
+    container.style.background = bgColor;
+    banner.innerHTML = `${emoji} 当前 ${data.temperature}° (${data.levelName || '中估'}) - ${data.suggestion || ''}`;
 }
 
 /**
