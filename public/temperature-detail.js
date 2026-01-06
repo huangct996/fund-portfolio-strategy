@@ -107,18 +107,28 @@ async function loadMultiIndexTemperature() {
         const timeRange = document.getElementById('timeRange').value;
         const { startDate, endDate } = getDateRange(timeRange);
         
+        console.log('正在加载多指数温度数据...', { startDate, endDate });
+        
         const response = await fetch(`/api/multi-index-temperature?startDate=${startDate}&endDate=${endDate}`);
         const result = await response.json();
         
+        console.log('API响应:', result);
+        
         if (result.success) {
             multiIndexData = result.data;
+            console.log('multiIndexData已设置:', multiIndexData);
+            console.log('开始更新图表...');
             updateTemperatureChart();
+            console.log('开始显示分布统计...');
             displayDistributionStats();
+            console.log('数据加载完成');
         } else {
             console.error('加载多指数温度失败:', result.error);
+            showError('distributionStats', '加载失败: ' + result.error);
         }
     } catch (error) {
         console.error('加载多指数温度失败:', error);
+        showError('distributionStats', '加载失败: ' + error.message);
     }
 }
 
@@ -279,39 +289,68 @@ function formatDateForChart(dateStr) {
 
 // 显示温度分布统计
 function displayDistributionStats() {
+    console.log('displayDistributionStats被调用');
+    console.log('multiIndexData:', multiIndexData);
+    
     if (!multiIndexData) {
         console.warn('multiIndexData is null');
+        const container = document.getElementById('distributionStats');
+        if (container) {
+            container.innerHTML = '<div class="loading">数据未加载</div>';
+        }
         return;
     }
     
     const container = document.getElementById('distributionStats');
+    if (!container) {
+        console.error('找不到distributionStats容器');
+        return;
+    }
+    
+    console.log('容器元素找到:', container);
     
     let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
     
     let hasData = false;
     
     // 综合温度分布
+    console.log('检查综合温度分布:', multiIndexData.composite);
     if (multiIndexData.composite && multiIndexData.composite.distribution) {
+        console.log('添加综合温度卡片');
         html += createDistributionCard('综合温度', multiIndexData.composite.distribution);
         hasData = true;
+    } else {
+        console.warn('综合温度分布不存在');
     }
     
     // 各指数分布
     if (multiIndexData.indices) {
+        console.log('检查各指数分布:', Object.keys(multiIndexData.indices));
         for (const [code, data] of Object.entries(multiIndexData.indices)) {
+            console.log(`检查指数 ${code}:`, data);
             if (data && data.distribution && data.distribution.average) {
+                console.log(`添加 ${data.name} 卡片`);
                 html += createDistributionCard(data.name, data.distribution);
                 hasData = true;
+            } else {
+                console.warn(`${code} 数据不完整`);
             }
         }
+    } else {
+        console.warn('indices数据不存在');
     }
     
     html += '</div>';
     
+    console.log('hasData:', hasData);
+    console.log('生成的HTML长度:', html.length);
+    
     if (hasData) {
         container.innerHTML = html;
+        console.log('HTML已设置到容器');
     } else {
         container.innerHTML = '<div class="loading">暂无温度分布数据</div>';
+        console.log('显示无数据提示');
     }
 }
 
