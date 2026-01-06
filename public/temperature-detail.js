@@ -231,7 +231,8 @@ function updateTemperatureChart() {
     // 各指数温度
     for (const [code, config] of Object.entries(indexConfig)) {
         const checkboxId = `show${code.replace('.', '')}`;
-        if (document.getElementById(checkboxId).checked && multiIndexData.indices[code]) {
+        const checkbox = document.getElementById(checkboxId);
+        if (checkbox && checkbox.checked && multiIndexData.indices[code]) {
             datasets.push({
                 label: config.name,
                 data: multiIndexData.indices[code].temperatures.map(t => ({
