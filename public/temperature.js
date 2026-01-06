@@ -28,11 +28,11 @@ async function loadMarketTemperature() {
 }
 
 /**
- * 加载当前市场温度
+ * 加载当前市场温度（多指数综合）
  */
 async function loadCurrentTemperature() {
     try {
-        const response = await fetch('/api/market-temperature?indexCode=000300.SH');
+        const response = await fetch('/api/composite-temperature');
         const result = await response.json();
         
         if (result.success) {
@@ -49,7 +49,7 @@ async function loadCurrentTemperature() {
 }
 
 /**
- * 显示当前温度
+ * 显示当前温度（多指数综合）
  */
 function displayCurrentTemperature(data) {
     // 温度值
@@ -57,16 +57,17 @@ function displayCurrentTemperature(data) {
     
     // 温度级别
     const levelElement = document.getElementById('currentTempLevel');
-    levelElement.textContent = data.levelName;
-    levelElement.className = 'temp-level ' + data.level.toLowerCase();
+    levelElement.textContent = data.levelName || '中估';
+    levelElement.className = 'temp-level ' + (data.level || 'NORMAL').toLowerCase();
     
     // 建议
-    document.getElementById('currentTempSuggestion').textContent = data.suggestion;
+    document.getElementById('currentTempSuggestion').textContent = data.suggestion || '';
     
-    // 组件温度
-    document.getElementById('tempPE').textContent = `PE: ${data.components.pe}°`;
-    document.getElementById('tempPB').textContent = `PB: ${data.components.pb}°`;
+    // 置信度和有效指数
     document.getElementById('tempConfidence').textContent = `置信度: ${(data.confidence * 100).toFixed(0)}%`;
+    if (data.composition) {
+        document.getElementById('tempIndices').textContent = `有效指数: ${data.composition.validIndices}/${data.composition.totalIndices}`;
+    }
 }
 
 /**
