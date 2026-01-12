@@ -1648,14 +1648,47 @@ class IndexPortfolioService {
       
       const totalInvVol = invVolatilities.reduce((sum, s) => sum + s.invVol, 0);
       
-      // 归一化权重
+      // 归一化权重（初始）
       invVolatilities.forEach(s => {
-        let weight = totalInvVol > 0 ? s.invVol / totalInvVol : 1 / stocks.length;
-        weight = Math.min(weight, maxWeight);
+        const weight = totalInvVol > 0 ? s.invVol / totalInvVol : 1 / stocks.length;
         riskParityWeights[s.tsCode] = weight;
       });
       
-      // 重新归一化
+      // 应用maxWeight限制（迭代方法，确保限制生效）
+      const maxIterations = 100;
+      let iteration = 0;
+      
+      while (iteration < maxIterations) {
+        let hasViolation = false;
+        let excessWeight = 0;
+        
+        // 找出超过maxWeight的股票
+        Object.keys(riskParityWeights).forEach(tsCode => {
+          if (riskParityWeights[tsCode] > maxWeight) {
+            excessWeight += riskParityWeights[tsCode] - maxWeight;
+            riskParityWeights[tsCode] = maxWeight;
+            hasViolation = true;
+          }
+        });
+        
+        if (!hasViolation) break;
+        
+        // 将超出的权重重新分配给未达上限的股票
+        const uncappedStocks = Object.keys(riskParityWeights).filter(
+          tsCode => riskParityWeights[tsCode] < maxWeight
+        );
+        
+        if (uncappedStocks.length === 0) break;
+        
+        const redistributeWeight = excessWeight / uncappedStocks.length;
+        uncappedStocks.forEach(tsCode => {
+          riskParityWeights[tsCode] += redistributeWeight;
+        });
+        
+        iteration++;
+      }
+      
+      // 最终归一化
       const totalWeight = Object.values(riskParityWeights).reduce((sum, w) => sum + w, 0);
       if (totalWeight > 0) {
         Object.keys(riskParityWeights).forEach(tsCode => {
@@ -1738,11 +1771,42 @@ class IndexPortfolioService {
         weights[stocks[idx].con_code] = invVol;
       });
       
+      // 初始归一化
       const totalInvVol = Object.values(weights).reduce((sum, w) => sum + w, 0);
       Object.keys(weights).forEach(code => {
-        weights[code] = Math.min(weights[code] / totalInvVol, maxWeight);
+        weights[code] = weights[code] / totalInvVol;
       });
       
+      // 应用maxWeight限制（迭代方法）
+      const maxIterations = 100;
+      let iteration = 0;
+      
+      while (iteration < maxIterations) {
+        let hasViolation = false;
+        let excessWeight = 0;
+        
+        Object.keys(weights).forEach(code => {
+          if (weights[code] > maxWeight) {
+            excessWeight += weights[code] - maxWeight;
+            weights[code] = maxWeight;
+            hasViolation = true;
+          }
+        });
+        
+        if (!hasViolation) break;
+        
+        const uncappedStocks = Object.keys(weights).filter(code => weights[code] < maxWeight);
+        if (uncappedStocks.length === 0) break;
+        
+        const redistributeWeight = excessWeight / uncappedStocks.length;
+        uncappedStocks.forEach(code => {
+          weights[code] += redistributeWeight;
+        });
+        
+        iteration++;
+      }
+      
+      // 最终归一化
       const totalWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
       Object.keys(weights).forEach(code => {
         weights[code] = weights[code] / totalWeight;
