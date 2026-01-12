@@ -1657,6 +1657,7 @@ class IndexPortfolioService {
       // 应用maxWeight限制（迭代方法，确保限制生效）
       const maxIterations = 100;
       let iteration = 0;
+      let totalCapped = 0;
       
       while (iteration < maxIterations) {
         let hasViolation = false;
@@ -1668,6 +1669,7 @@ class IndexPortfolioService {
             excessWeight += riskParityWeights[tsCode] - maxWeight;
             riskParityWeights[tsCode] = maxWeight;
             hasViolation = true;
+            totalCapped++;
           }
         });
         
@@ -1686,6 +1688,10 @@ class IndexPortfolioService {
         });
         
         iteration++;
+      }
+      
+      if (totalCapped > 0) {
+        console.log(`   ⚙️  应用maxWeight限制: ${totalCapped}只股票被限制在${(maxWeight * 100).toFixed(0)}%, 迭代${iteration}次`);
       }
       
       // 最终归一化
