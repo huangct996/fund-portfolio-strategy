@@ -171,12 +171,26 @@ class StrategyReportGenerator:
         print(f"✓ 已生成图表: {filename}")
         return filename
     
-    def create_monthly_returns_heatmap(self, daily_data, filename):
-        """创建月度收益率热力图"""
+    def create_monthly_returns_heatmap(self, daily_data, filename, start_date=None):
+        """创建月度收益率热力图
+        
+        Args:
+            daily_data: 日度数据
+            filename: 输出文件名
+            start_date: 起始日期（YYYY-MM-DD格式），用于排除起始月份
+        """
         # 转换为DataFrame
         df = pd.DataFrame(daily_data['custom'])
         df['date'] = pd.to_datetime(df['date'])
         df = df.set_index('date')
+        
+        # 如果提供了起始日期，排除起始月份
+        # 例如：2024-12-31作为起始日期，应排除2024年12月的数据
+        if start_date:
+            start_dt = pd.to_datetime(start_date)
+            # 排除起始月份：只保留起始日期的下个月开始的数据
+            next_month_start = (start_dt + pd.offsets.MonthBegin(1))
+            df = df[df.index >= next_month_start]
         
         # 计算月度收益率
         df['year'] = df.index.year
@@ -261,8 +275,14 @@ class StrategyReportGenerator:
         print(f"✓ 已生成图表: {filename}")
         return filename
     
-    def generate_word_report(self, backtest_results, output_filename):
-        """生成Word报告"""
+    def generate_word_report(self, backtest_results, output_filename, periods):
+        """生成Word报告
+        
+        Args:
+            backtest_results: 回测结果字典
+            output_filename: 输出文件名
+            periods: 回测期间列表，格式为[(期间名称, 开始日期, 结束日期), ...]
+        """
         print("\n开始生成Word报告...")
         
         doc = Document()
@@ -340,8 +360,11 @@ class StrategyReportGenerator:
         doc.add_heading('三、回测结果分析', 1)
         
         # 对每个回测期间生成分析
-        for period_name, data in backtest_results.items():
-            doc.add_heading(f'3.{list(backtest_results.keys()).index(period_name) + 1} {period_name}', 2)
+        for idx, (period_name, data) in enumerate(backtest_results.items()):
+            # 获取该期间的起始日期（用于热力图排除起始月份）
+            period_start_date = periods[idx][1]  # periods列表中的起始日期
+            
+            doc.add_heading(f'3.{idx + 1} {period_name}', 2)
             
             # 3.x.1 累计收益率曲线
             doc.add_heading('累计收益率对比', 3)
@@ -445,7 +468,8 @@ class StrategyReportGenerator:
                 doc.add_heading('月度收益率分布', 3)
                 
                 heatmap_file = f'chart_{period_name}_heatmap.png'
-                self.create_monthly_returns_heatmap(data['dailyData'], heatmap_file)
+                # 传入起始日期，排除起始月份（例如2024-12-31应排除2024年12月）
+                self.create_monthly_returns_heatmap(data['dailyData'], heatmap_file, period_start_date)
                 doc.add_picture(heatmap_file, width=Inches(6))
                 
                 doc.add_paragraph()
@@ -455,9 +479,9 @@ class StrategyReportGenerator:
         
         advantages = [
             '稳健收益：通过风险平价配置，实现风险分散，降低组合波动',
-            '自适应能力：根据市场状态动态调整参数，适应不同市场环境',
-            '质量优先：结合质量因子筛选优质股票，提升组合质量',
-            '风险控制：通过协方差优化和最大回撤控制，有效管理下行风险',
+            '质量优先：基于PE、PB、股息率筛选优质股票，剔除低质量标的',
+            '动量筛选：剔除过去6个月表现较差的股票，保留强势标的',
+            '风险控制：通过波动率加权和最大权重限制，有效管理下行风险',
             '成本优化：季度调仓频率平衡了收益优化与交易成本'
         ]
         
@@ -530,7 +554,7 @@ def main():
     # 生成报告
     if backtest_results:
         output_file = f'中证红利指数增强策略报告_{datetime.now().strftime("%Y%m%d")}.docx'
-        generator.generate_word_report(backtest_results, output_file)
+        generator.generate_word_report(backtest_results, output_file, periods)
         print(f"\n{'='*60}")
         print(f"报告生成完成！")
         print(f"文件路径: {output_file}")

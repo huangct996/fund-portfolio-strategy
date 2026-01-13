@@ -1144,11 +1144,16 @@ class IndexPortfolioService {
       console.log(`     夏普比率: ${sharpeRatio.toFixed(2)}`);
       console.log(`     最大回撤: ${(maxDrawdown * 100).toFixed(2)}%`);
       
+      // 计算卡玛比率（Calmar Ratio = 年化收益率 / 最大回撤）
+      const calmarRatio = maxDrawdown > 0 ? annualizedReturn / maxDrawdown : 0;
+      
       return {
         totalReturn,
         annualizedReturn,
         volatility: annualizedVolatility,
+        annualizedVolatility,  // 添加别名，兼容报告生成脚本
         sharpeRatio,
+        calmarRatio,  // 添加卡玛比率
         maxDrawdown,
         periods: navData.length
       };
@@ -1237,12 +1242,17 @@ class IndexPortfolioService {
     
     console.log(`\n${strategyName} 风险指标: 累计收益${(totalReturn * 100).toFixed(2)}%, 年化收益${(annualizedReturn * 100).toFixed(2)}%, 夏普${sharpeRatio.toFixed(2)}, 最大回撤${(maxDrawdown * 100).toFixed(2)}%`);
 
+    // 计算卡玛比率（Calmar Ratio = 年化收益率 / 最大回撤）
+    const calmarRatio = maxDrawdown > 0 ? annualizedReturn / maxDrawdown : 0;
+    
     return {
       totalReturn,
       annualizedReturn,
       volatility: annualizedVolatility,
+      annualizedVolatility,  // 添加别名，兼容报告生成脚本
       sharpeRatio,
       sortinoRatio,
+      calmarRatio,  // 添加卡玛比率
       maxDrawdown,
       tradingDays,
       actualYears,
@@ -1349,12 +1359,17 @@ class IndexPortfolioService {
       }
     });
 
+    // 计算卡玛比率（Calmar Ratio = 年化收益率 / 最大回撤）
+    const calmarRatio = maxDrawdown > 0 ? annualizedReturn / maxDrawdown : 0;
+    
     return {
       totalReturn,
       annualizedReturn,
       volatility: annualizedVolatility,
+      annualizedVolatility,  // 添加别名，兼容报告生成脚本
       sharpeRatio,
       sortinoRatio,
+      calmarRatio,  // 添加卡玛比率
       maxDrawdown,
       periods
     };

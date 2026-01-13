@@ -199,11 +199,29 @@ class TushareService {
       
       return data.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
     } catch (error) {
-      // API调用失败，如果日期超过一个月，标记为缺失
-      if (dbService.isOlderThanOneMonth(actualEndDate)) {
-        await dbService.markDataAsMissing(fundCode, 'fund_nav', actualEndDate, `API调用失败: ${error.message}`);
-        console.log(`✅ 已标记 ${fundCode} 的净值数据为缺失`);
+      console.error(`API调用失败 (${fundCode}):`, error.message);
+      
+      // API调用失败，尝试从数据库缓存读取数据作为降级方案
+      try {
+        console.log(`⚠️  尝试从数据库缓存读取 ${fundCode} 的净值数据...`);
+        const cachedData = await dbService.getFundNav(fundCode, startDate, actualEndDate);
+        
+        if (cachedData.length > 0) {
+          console.log(`✅ 从缓存读取到 ${cachedData.length} 条净值数据`);
+          return cachedData.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+        } else {
+          console.log(`❌ 缓存中没有 ${fundCode} 的净值数据`);
+          
+          // 如果日期超过一个月，标记为缺失
+          if (dbService.isOlderThanOneMonth(actualEndDate)) {
+            await dbService.markDataAsMissing(fundCode, 'fund_nav', actualEndDate, `API调用失败: ${error.message}`);
+            console.log(`✅ 已标记 ${fundCode} 的净值数据为缺失`);
+          }
+        }
+      } catch (cacheError) {
+        console.error(`读取缓存数据失败:`, cacheError.message);
       }
+      
       throw error;
     }
   }
@@ -946,12 +964,29 @@ class TushareService {
       return data || [];
     } catch (error) {
       console.error(`获取指数日线数据失败 (${indexCode}):`, error.message);
-      // API调用失败，如果日期超过一个月，标记为缺失
-      if (dbService.isOlderThanOneMonth(endDate)) {
-        const tsCode = indexCode.replace(/^h/, '9');
-        await dbService.markDataAsMissing(tsCode, 'index_daily', endDate, `API调用失败: ${error.message}`);
-        console.log(`✅ 已标记 ${tsCode} 的指数数据为缺失`);
+      
+      // API调用失败，尝试从数据库缓存读取数据作为降级方案
+      try {
+        console.log(`⚠️  尝试从数据库缓存读取 ${indexCode} 的指数数据...`);
+        const cachedData = await dbService.getIndexDaily(indexCode, startDate, endDate);
+        
+        if (cachedData.length > 0) {
+          console.log(`✅ 从缓存读取到 ${cachedData.length} 条指数数据`);
+          return cachedData;
+        } else {
+          console.log(`❌ 缓存中没有 ${indexCode} 的指数数据`);
+          
+          // 如果日期超过一个月，标记为缺失
+          if (dbService.isOlderThanOneMonth(endDate)) {
+            const tsCode = indexCode.replace(/^h/, '9');
+            await dbService.markDataAsMissing(tsCode, 'index_daily', endDate, `API调用失败: ${error.message}`);
+            console.log(`✅ 已标记 ${tsCode} 的指数数据为缺失`);
+          }
+        }
+      } catch (cacheError) {
+        console.error(`读取缓存数据失败:`, cacheError.message);
       }
+      
       return [];
     }
   }
@@ -1194,6 +1229,38 @@ class TushareService {
       return apiDailyData;
     } catch (error) {
       console.error(`获取股票日线数据失败 (${tsCode}):`, error.message);
+      
+      // API调用失败，尝试从数据库读取缓存数据作为降级方案
+      try {
+        console.log(`⚠️  尝试从数据库缓存读取 ${tsCode} 的数据...`);
+        const cachedDailyData = await dbService.getStockDaily(tsCode, startDate, endDate);
+        const cachedAdjFactorData = await dbService.getAdjFactor(tsCode, startDate, endDate);
+        
+        if (cachedDailyData.length > 0) {
+          console.log(`✅ 从缓存读取到 ${cachedDailyData.length} 条数据`);
+          
+          // 如果有复权因子，计算后复权价格
+          if (cachedAdjFactorData.length > 0) {
+            const adjFactorMap = {};
+            cachedAdjFactorData.forEach(item => {
+              adjFactorMap[item.trade_date] = item.adj_factor;
+            });
+            
+            const latestAdjFactor = cachedAdjFactorData[cachedAdjFactorData.length - 1].adj_factor;
+            return cachedDailyData.map(item => ({
+              ...item,
+              adj_close: item.close * (latestAdjFactor / (adjFactorMap[item.trade_date] || 1))
+            }));
+          }
+          
+          return cachedDailyData;
+        } else {
+          console.log(`❌ 缓存中没有 ${tsCode} 的数据`);
+        }
+      } catch (cacheError) {
+        console.error(`读取缓存数据失败:`, cacheError.message);
+      }
+      
       return [];
     }
   }
