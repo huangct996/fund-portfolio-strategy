@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>API测试 - 基金最大回撤</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .test-result { margin: 20px 0; padding: 15px; border-radius: 8px; background: #f5f5f5; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        button { padding: 12px 24px; margin: 10px 5px; cursor: pointer; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .highlight { background: yellow; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>基金最大回撤API测试</h1>
+    
+    <div>
+        <button onclick="testAPI()">测试API调用</button>
+        <button onclick="location.reload()">刷新页面（清除缓存）</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        const API_BASE = '/api';
+        
+        async function testAPI() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>正在调用API...</p>';
+            
+            try {
+                // 构建参数（与页面相同）
+                const params = new URLSearchParams({
+                    startDate: '20200101',
+                    endDate: '20241231',
+                    strategyType: 'riskParity',
+                    useAdaptive: 'false',
+                    maxWeight: '0.10',
+                    volatilityWindow: '6',
+                    ewmaDecay: '0.91',
+                    rebalanceFrequency: 'quarterly',
+                    enableTradingCost: 'true',
+                    tradingCostRate: '0.001',
+                    riskFreeRate: '0.02',
+                    useQualityTilt: 'false',
+                    useCovariance: 'false',
+                    hybridRatio: '0',
+                    enableStockFilter: 'true',
+                    momentumMonths: '6',
+                    minMomentumReturn: '-0.10',
+                    filterByQuality: 'true'
+                });
+                
+                console.log('请求URL:', `${API_BASE}/index-returns?${params}`);
+                
+                const response = await fetch(`${API_BASE}/index-returns?${params}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'API调用失败');
+                }
+                
+                const data = result.data;
+                const fundRisk = data.fundRisk;
+                
+                // 显示结果
+                let html = '<div class="test-result success">';
+                html += '<h2>✅ API调用成功</h2>';
+                
+                html += '<h3>基金风险指标（fundRisk）：</h3>';
+                html += '<pre>' + JSON.stringify(fundRisk, null, 2) + '</pre>';
+                
+                html += '<h3>关键数据：</h3>';
+                html += '<ul>';
+                html += `<li>maxDrawdown 原始值: ${fundRisk.maxDrawdown}</li>`;
+                html += `<li>maxDrawdown × 100: ${fundRisk.maxDrawdown * 100}</li>`;
+                html += `<li><span class="highlight">前端应该显示: ${(fundRisk.maxDrawdown * 100).toFixed(2)}%</span></li>`;
+                html += '</ul>';
+                
+                html += '<h3>完整风险指标：</h3>';
+                html += '<table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%;">';
+                html += '<tr><th>指标</th><th>原始值</th><th>显示值</th></tr>';
+                html += `<tr><td>累计收益率</td><td>${fundRisk.totalReturn}</td><td>${(fundRisk.totalReturn * 100).toFixed(2)}%</td></tr>`;
+                html += `<tr><td>年化收益率</td><td>${fundRisk.annualizedReturn}</td><td>${(fundRisk.annualizedReturn * 100).toFixed(2)}%</td></tr>`;
+                html += `<tr><td>年化波动率</td><td>${fundRisk.volatility}</td><td>${(fundRisk.volatility * 100).toFixed(2)}%</td></tr>`;
+                html += `<tr style="background: #fff3cd;"><td><strong>最大回撤</strong></td><td><strong>${fundRisk.maxDrawdown}</strong></td><td><strong>${(fundRisk.maxDrawdown * 100).toFixed(2)}%</strong></td></tr>`;
+                html += `<tr><td>夏普比率</td><td>${fundRisk.sharpeRatio}</td><td>${fundRisk.sharpeRatio.toFixed(2)}</td></tr>`;
+                html += `<tr><td>索提诺比率</td><td>${fundRisk.sortinoRatio}</td><td>${fundRisk.sortinoRatio.toFixed(2)}</td></tr>`;
+                html += '</table>';
+                
+                // 检查0.87%的来源
+                html += '<h3>查找0.87%的可能来源：</h3>';
+                html += '<ul>';
+                let found = false;
+                for (const [key, value] of Object.entries(fundRisk)) {
+                    if (typeof value === 'number') {
+                        if (Math.abs(value - 0.0087) < 0.001) {
+                            html += `<li class="highlight">找到! ${key} = ${value} (${(value * 100).toFixed(2)}%)</li>`;
+                            found = true;
+                        }
+                        if (Math.abs(value * 100 - 0.87) < 0.1) {
+                            html += `<li class="highlight">找到! ${key} × 100 = ${(value * 100).toFixed(2)}%</li>`;
+                            found = true;
+                        }
+                    }
+                }
+                if (!found) {
+                    html += '<li>未在fundRisk中找到0.87%的来源</li>';
+                    html += '<li><strong>结论：0.87%可能来自页面缓存的旧数据</strong></li>';
+                }
+                html += '</ul>';
+                
+                html += '</div>';
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="test-result error">
+                        <h2>❌ 测试失败</h2>
+                        <p>错误信息: ${error.message}</p>
+                    </div>
+                `;
+                console.error('API调用失败:', error);
+            }
+        }
+        
+        // 页面加载时自动测试
+        window.addEventListener('load', testAPI);
+    </script>
+</body>
+</html>

@@ -85,7 +85,11 @@
                     </label>
                     <label>
                         <input type="radio" name="strategy" value="riskParity" checked>
-                        风险平价策略 ⭐
+                        风险平价策略
+                    </label>
+                    <label>
+                        <input type="radio" name="strategy" value="adaptiveRiskParity">
+                        自适应风险平价策略 ⭐
                     </label>
                 </div>
             </div>
@@ -163,11 +167,11 @@
                 <h3>风险平价策略配置</h3>
                 
                 <div class="info-note" style="margin-bottom: 15px;">
-                    <strong>📌 自适应风险平价策略：</strong>
+                    <strong>📌 风险平价策略：</strong>
                     <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li><strong>核心原理：</strong>风险平价权重计算 + 自适应参数调整</li>
-                        <li><strong>自适应机制：</strong>根据市场宽度自动识别市场状态（强势牛市/温和牛市/震荡/弱势/恐慌），动态调整maxWeight、波动率窗口、EWMA衰减等参数</li>
-                        <li><strong>避免过拟合：</strong>基于市场宽度客观指标（>52%、42-52%、32-42%、<32%），不依赖"已知牛熊"</li>
+                        <li><strong>核心原理：</strong>使每只股票对组合总风险的贡献相等，实现风险分散</li>
+                        <li><strong>权重计算：</strong>基于历史波动率（EWMA方法）计算风险平价权重</li>
+                        <li><strong>参数固定：</strong>使用固定的波动率窗口、EWMA衰减系数等参数</li>
                         <li><strong>股票池筛选：</strong>可选的辅助功能，剔除低质量股票提升组合质量</li>
                     </ul>
                 </div>
@@ -216,7 +220,7 @@
                     
                     <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
                         <strong>🎯 股票池筛选（可选辅助功能）</strong>
-                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合。自适应策略会根据市场状态自动调整筛选参数。</p>
+                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合。</p>
                     </div>
                     
                     <div style="margin-top: 15px;">
@@ -266,7 +270,113 @@
                         </div>
                         <div style="margin-top: 10px;">
                             <label>
-                                <input type="checkbox" id="filterByQuality">
+                                <input type="checkbox" id="filterByQuality" checked>
+                                <span style="font-size: 0.9em;">剔除质量得分低于中位数的股票（基于PE、PB、股息率）</span>
+                            </label>
+                            <div style="margin-top: 5px; padding: 8px; background-color: #e7f3ff; border-left: 3px solid #2196F3; font-size: 0.85em; color: #0d47a1;">
+                                <strong>💡 提示：</strong>基于PE、PB、股息率计算质量得分，剔除低于中位数的股票。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="adaptiveRiskParityConfig" class="config-section" style="display: none;">
+                <h3>自适应风险平价策略配置</h3>
+                
+                <div class="info-note" style="margin-bottom: 15px;">
+                    <strong>📌 自适应风险平价策略：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li><strong>核心原理：</strong>风险平价权重计算 + 自适应参数调整</li>
+                        <li><strong>自适应机制：</strong>根据市场宽度自动识别市场状态（强势牛市/温和牛市/震荡/弱势/恐慌），动态调整maxWeight、波动率窗口等参数</li>
+                        <li><strong>避免过拟合：</strong>基于市场宽度客观指标（≥50%、35-50%、28-35%、<28%），不依赖"已知牛熊"</li>
+                        <li><strong>股票池筛选：</strong>可选的辅助功能，剔除低质量股票提升组合质量</li>
+                    </ul>
+                </div>
+                
+                <div class="weight-config">
+                    <div class="weight-item">
+                        <label>调仓频率:</label>
+                        <select id="adaptiveRebalanceFrequency" class="select-input">
+                            <option value="yearly">每年（跟随指数）</option>
+                            <option value="quarterly" selected>每季度</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                        <small style="color: #666;">高频调仓使用最近年度成分股，可能提升夏普比率但增加交易成本</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>
+                            <input type="checkbox" id="adaptiveEnableTradingCost">
+                            考虑交易成本
+                        </label>
+                    </div>
+                    
+                    <div class="weight-item" id="adaptiveTradingCostConfig" style="display: none; margin-left: 20px;">
+                        <label>交易成本比例: <span id="adaptiveTradingCostValue">0.30%</span></label>
+                        <input type="range" id="adaptiveTradingCostSlider" min="10" max="100" step="5" value="30">
+                        <small style="color: #666;">每次调仓的单边交易成本（买入+卖出）</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>无风险收益率 (%):</label>
+                        <input type="number" id="adaptiveRiskFreeRateInput" min="0" max="10" step="0.1" value="2.0" style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">用于计算夏普比率，中国10年期国债收益率约2-2.5%</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>波动率窗口（基础值，月）:</label>
+                        <input type="number" id="adaptiveVolatilityWindowInput" min="3" max="24" step="1" value="6" style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">自适应策略会根据市场状态动态调整此基础值</small>
+                    </div>
+                    
+                    <div class="weight-item">
+                        <label>EWMA衰减系数（基础值）:</label>
+                        <input type="number" id="adaptiveEwmaDecayInput" min="0.80" max="0.99" step="0.01" value="0.91" style="width: 100px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666;">自适应策略会根据市场状态动态调整此基础值</small>
+                    </div>
+                    
+                    <div class="info-note" style="margin-top: 15px; background: #e3f2fd; border-left-color: #2196F3;">
+                        <strong>🎯 自适应参数调整机制</strong>
+                        <p style="margin: 5px 0; color: #666;">策略会根据市场宽度自动调整以下参数：</p>
+                        <ul style="margin: 5px 0; padding-left: 20px; color: #666;">
+                            <li><strong>maxWeight：</strong>10%-20%（牛市提高集中度，熊市降低集中度）</li>
+                            <li><strong>filterByQuality：</strong>牛市禁用，熊市启用（牛市保留更多股票，熊市筛选优质股）</li>
+                            <li><strong>波动率窗口：</strong>恐慌市场缩短窗口，快速响应市场变化</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-note" style="margin-top: 15px; background: #fff3cd; border-left-color: #ffc107;">
+                        <strong>🎯 股票池筛选（可选辅助功能）</strong>
+                        <p style="margin: 5px 0; color: #666;">剔除低质量股票，只保留优质股票进入组合。自适应策略会根据市场状态自动调整筛选参数。</p>
+                    </div>
+                    
+                    <div style="margin-top: 15px;">
+                        <label>
+                            <input type="checkbox" id="adaptiveEnableStockFilter" checked>
+                            <strong>★ 启用股票池筛选（激进配置）</strong>
+                        </label>
+                        <small style="color: #666; display: block; margin-left: 20px;">
+                            仅针对自定义策略，指数策略保持原有成分股不变
+                        </small>
+                    </div>
+                    
+                    <div id="adaptiveStockFilterConfig" style="display: none; margin-left: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; margin-top: 10px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">动量期间（月）:</label>
+                                <input type="number" id="adaptiveMomentumMonths" min="1" max="12" step="1" value="6" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">计算过去N个月的收益率</small>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.9em; color: #333;">最低动量收益率 (%):</label>
+                                <input type="number" id="adaptiveMinMomentumReturn" min="-50" max="50" step="5" value="-10" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; margin-top: 3px;">
+                                <small style="color: #666; font-size: 0.85em;">剔除动量收益率低于此值的股票</small>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label>
+                                <input type="checkbox" id="adaptiveFilterByQuality" checked>
                                 <span style="font-size: 0.9em;">剔除质量得分低于中位数的股票（基于PE、PB、股息率）</span>
                             </label>
                             <div style="margin-top: 5px; padding: 8px; background-color: #fff3cd; border-left: 3px solid #ffc107; font-size: 0.85em; color: #856404;">

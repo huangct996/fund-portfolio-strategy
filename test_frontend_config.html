@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>风险平价策略配置测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>风险平价策略配置测试</h1>
+    
+    <div id="testResults"></div>
+    
+    <button onclick="testRiskParityConfig()">测试风险平价策略配置读取</button>
+    <button onclick="testAdaptiveRiskParityConfig()">测试自适应风险平价策略配置读取</button>
+    
+    <script>
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            document.getElementById('testResults').appendChild(div);
+        }
+        
+        function testRiskParityConfig() {
+            document.getElementById('testResults').innerHTML = '';
+            addResult('开始测试风险平价策略配置读取...', 'info');
+            
+            // 测试DOM元素是否存在
+            const elements = {
+                'volatilityWindowInput': document.getElementById('volatilityWindowInput'),
+                'ewmaDecayInput': document.getElementById('ewmaDecayInput'),
+                'rebalanceFrequency': document.getElementById('rebalanceFrequency'),
+                'enableTradingCost': document.getElementById('enableTradingCost'),
+                'tradingCostSlider': document.getElementById('tradingCostSlider'),
+                'riskFreeRateInput': document.getElementById('riskFreeRateInput'),
+                'enableStockFilter': document.getElementById('enableStockFilter'),
+                'momentumMonths': document.getElementById('momentumMonths'),
+                'minMomentumReturn': document.getElementById('minMomentumReturn'),
+                'filterByQuality': document.getElementById('filterByQuality')
+            };
+            
+            let allFound = true;
+            for (const [id, element] of Object.entries(elements)) {
+                if (element) {
+                    addResult(`✓ 找到元素: ${id}`, 'success');
+                } else {
+                    addResult(`✗ 未找到元素: ${id}`, 'error');
+                    allFound = false;
+                }
+            }
+            
+            if (allFound) {
+                addResult('所有风险平价策略配置元素都存在！', 'success');
+                
+                // 测试读取值
+                const config = {
+                    volatilityWindow: parseInt(elements.volatilityWindowInput.value) || 6,
+                    ewmaDecay: parseFloat(elements.ewmaDecayInput.value) || 0.91,
+                    rebalanceFrequency: elements.rebalanceFrequency.value,
+                    enableTradingCost: elements.enableTradingCost.checked,
+                    tradingCostRate: elements.enableTradingCost.checked 
+                        ? parseInt(elements.tradingCostSlider.value) / 10000 
+                        : 0,
+                    riskFreeRate: parseFloat(elements.riskFreeRateInput.value) / 100,
+                    enableStockFilter: elements.enableStockFilter.checked,
+                    momentumMonths: parseInt(elements.momentumMonths.value),
+                    minMomentumReturn: parseFloat(elements.minMomentumReturn.value) / 100,
+                    filterByQuality: elements.filterByQuality.checked
+                };
+                
+                addResult('配置读取成功: ' + JSON.stringify(config, null, 2), 'success');
+            }
+        }
+        
+        function testAdaptiveRiskParityConfig() {
+            document.getElementById('testResults').innerHTML = '';
+            addResult('开始测试自适应风险平价策略配置读取...', 'info');
+            
+            // 测试DOM元素是否存在
+            const elements = {
+                'adaptiveVolatilityWindowInput': document.getElementById('adaptiveVolatilityWindowInput'),
+                'adaptiveEwmaDecayInput': document.getElementById('adaptiveEwmaDecayInput'),
+                'adaptiveRebalanceFrequency': document.getElementById('adaptiveRebalanceFrequency'),
+                'adaptiveEnableTradingCost': document.getElementById('adaptiveEnableTradingCost'),
+                'adaptiveTradingCostSlider': document.getElementById('adaptiveTradingCostSlider'),
+                'adaptiveRiskFreeRateInput': document.getElementById('adaptiveRiskFreeRateInput'),
+                'adaptiveEnableStockFilter': document.getElementById('adaptiveEnableStockFilter'),
+                'adaptiveMomentumMonths': document.getElementById('adaptiveMomentumMonths'),
+                'adaptiveMinMomentumReturn': document.getElementById('adaptiveMinMomentumReturn'),
+                'adaptiveFilterByQuality': document.getElementById('adaptiveFilterByQuality')
+            };
+            
+            let allFound = true;
+            for (const [id, element] of Object.entries(elements)) {
+                if (element) {
+                    addResult(`✓ 找到元素: ${id}`, 'success');
+                } else {
+                    addResult(`✗ 未找到元素: ${id}`, 'error');
+                    allFound = false;
+                }
+            }
+            
+            if (allFound) {
+                addResult('所有自适应风险平价策略配置元素都存在！', 'success');
+                
+                // 测试读取值
+                const config = {
+                    volatilityWindow: parseInt(elements.adaptiveVolatilityWindowInput.value) || 6,
+                    ewmaDecay: parseFloat(elements.adaptiveEwmaDecayInput.value) || 0.91,
+                    rebalanceFrequency: elements.adaptiveRebalanceFrequency.value,
+                    enableTradingCost: elements.adaptiveEnableTradingCost.checked,
+                    tradingCostRate: elements.adaptiveEnableTradingCost.checked 
+                        ? parseInt(elements.adaptiveTradingCostSlider.value) / 10000 
+                        : 0,
+                    riskFreeRate: parseFloat(elements.adaptiveRiskFreeRateInput.value) / 100,
+                    enableStockFilter: elements.adaptiveEnableStockFilter.checked,
+                    momentumMonths: parseInt(elements.adaptiveMomentumMonths.value),
+                    minMomentumReturn: parseFloat(elements.adaptiveMinMomentumReturn.value) / 100,
+                    filterByQuality: elements.adaptiveFilterByQuality.checked
+                };
+                
+                addResult('配置读取成功: ' + JSON.stringify(config, null, 2), 'success');
+            }
+        }
+    </script>
+</body>
+</html>
