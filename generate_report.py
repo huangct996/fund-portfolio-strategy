@@ -275,6 +275,194 @@ class StrategyReportGenerator:
         print(f"✓ 已生成图表: {filename}")
         return filename
     
+    def create_performance_summary_table(self, doc, backtest_results):
+        """创建策略表现总览表"""
+        doc.add_heading('策略表现总览', 2)
+        
+        # 创建表格
+        table = doc.add_table(rows=len(backtest_results)+1, cols=6)
+        table.style = 'Light Grid Accent 1'
+        
+        # 表头
+        headers = ['回测期间', '年化收益', '年化波动', '夏普比率', '最大回撤', '卡玛比率']
+        for i, header in enumerate(headers):
+            cell = table.rows[0].cells[i]
+            cell.text = header
+            cell.paragraphs[0].runs[0].font.bold = True
+        
+        # 数据行
+        for i, (period_name, data) in enumerate(backtest_results.items(), 1):
+            custom_risk = data['customRisk']
+            table.rows[i].cells[0].text = period_name
+            table.rows[i].cells[1].text = f"{custom_risk['annualizedReturn']*100:.2f}%"
+            table.rows[i].cells[2].text = f"{custom_risk['annualizedVolatility']*100:.2f}%"
+            table.rows[i].cells[3].text = f"{custom_risk['sharpeRatio']:.2f}"
+            table.rows[i].cells[4].text = f"{custom_risk['maxDrawdown']*100:.2f}%"
+            table.rows[i].cells[5].text = f"{custom_risk['calmarRatio']:.2f}"
+        
+        doc.add_paragraph()
+    
+    def create_yearly_returns_table(self, doc, backtest_results):
+        """创建年度收益率对比表"""
+        doc.add_heading('年度收益率对比', 2)
+        
+        # 收集所有年度数据 - 使用最长的回测期间数据
+        longest_period_data = None
+        max_days = 0
+        
+        for period_name, data in backtest_results.items():
+            days = len(data['dailyData']['custom'])
+            if days > max_days:
+                max_days = days
+                longest_period_data = data['dailyData']
+        
+        if not longest_period_data:
+            doc.add_paragraph('无年度数据')
+            return
+        
+        # 解析自定义策略数据
+        custom_df = pd.DataFrame(longest_period_data['custom'])
+        custom_df['date'] = pd.to_datetime(custom_df['date'])
+        custom_df = custom_df.sort_values('date')
+        
+        # 解析指数数据
+        index_df = pd.DataFrame(longest_period_data['index'])
+        index_df['date'] = pd.to_datetime(index_df['date'])
+        index_df = index_df.sort_values('date')
+        
+        # 按年度计算收益率（使用每年最后一个交易日）
+        yearly_data = {}
+        
+        # 获取每年的最后一个交易日数据
+        custom_yearly = custom_df.groupby(custom_df['date'].dt.year).last()
+        index_yearly = index_df.groupby(index_df['date'].dt.year).last()
+        
+        years = sorted(custom_yearly.index.tolist())
+        
+        for i, year in enumerate(years):
+            if year not in yearly_data:
+                yearly_data[year] = {'custom': None, 'index': None}
+            
+            # 计算该年度收益率（相对于上一年末）
+            if i == 0:
+                # 第一年：从起始点到年末的收益率
+                custom_return = custom_yearly.loc[year]['cumulative'] * 100
+                index_return = index_yearly.loc[year]['cumulative'] * 100
+            else:
+                # 后续年份：从上一年末到本年末的收益率
+                prev_year = years[i-1]
+                
+                custom_start = custom_yearly.loc[prev_year]['cumulative']
+                custom_end = custom_yearly.loc[year]['cumulative']
+                custom_return = ((1 + custom_end) / (1 + custom_start) - 1) * 100
+                
+                index_start = index_yearly.loc[prev_year]['cumulative']
+                index_end = index_yearly.loc[year]['cumulative']
+                index_return = ((1 + index_end) / (1 + index_start) - 1) * 100
+            
+            yearly_data[year]['custom'] = custom_return
+            yearly_data[year]['index'] = index_return
+        
+        # 创建表格
+        years = sorted(yearly_data.keys())
+        table = doc.add_table(rows=len(years)+1, cols=4)
+        table.style = 'Light Grid Accent 1'
+        
+        # 表头
+        headers = ['年份', '增强策略', '中证红利', '超额收益']
+        for i, header in enumerate(headers):
+            cell = table.rows[0].cells[i]
+            cell.text = header
+            cell.paragraphs[0].runs[0].font.bold = True
+        
+        # 数据行
+        for i, year in enumerate(years, 1):
+            table.rows[i].cells[0].text = f"{year}年"
+            
+            custom_ret = yearly_data[year]['custom']
+            index_ret = yearly_data[year]['index']
+            
+            if custom_ret is not None:
+                table.rows[i].cells[1].text = f"{custom_ret:.2f}%"
+            else:
+                table.rows[i].cells[1].text = "-"
+            
+            if index_ret is not None:
+                table.rows[i].cells[2].text = f"{index_ret:.2f}%"
+            else:
+                table.rows[i].cells[2].text = "-"
+            
+            if custom_ret is not None and index_ret is not None:
+                excess = custom_ret - index_ret
+                table.rows[i].cells[3].text = f"{excess:+.2f}%"
+            else:
+                table.rows[i].cells[3].text = "-"
+        
+        doc.add_paragraph()
+    
+    def create_holdings_table(self, doc, period_name, periods_data):
+        """创建持仓明细表"""
+        doc.add_heading(f'{period_name} - 持仓明细', 3)
+        
+        # 获取所有调仓期的持仓数据
+        all_periods = periods_data.get('periods', [])
+        
+        if not all_periods:
+            doc.add_paragraph('无持仓数据')
+            return
+        
+        # 为每个调仓期创建持仓表
+        for period in all_periods:
+            rebalance_date = period.get('rebalanceDate', '')
+            holdings = period.get('holdings', [])
+            
+            if not holdings:
+                continue
+            
+            # 格式化日期
+            if rebalance_date:
+                formatted_date = f"{rebalance_date[:4]}-{rebalance_date[4:6]}-{rebalance_date[6:]}"
+                doc.add_heading(f'调仓日期: {formatted_date}', 4)
+            
+            # 按权重排序，取前15只
+            sorted_holdings = sorted(holdings, key=lambda x: x.get('customWeight', 0), reverse=True)[:15]
+            
+            # 创建表格
+            table = doc.add_table(rows=len(sorted_holdings)+1, cols=6)
+            table.style = 'Light Grid Accent 1'
+            
+            # 表头
+            headers = ['排名', '股票代码', '股票名称', '持仓比例', 'PE', 'PB']
+            for i, header in enumerate(headers):
+                cell = table.rows[0].cells[i]
+                cell.text = header
+                cell.paragraphs[0].runs[0].font.bold = True
+            
+            # 数据行
+            for i, holding in enumerate(sorted_holdings, 1):
+                table.rows[i].cells[0].text = str(i)
+                table.rows[i].cells[1].text = holding.get('symbol', '')
+                table.rows[i].cells[2].text = holding.get('name', '')
+                table.rows[i].cells[3].text = f"{holding.get('customWeight', 0)*100:.2f}%"
+                
+                pe = holding.get('peTtm', 0)
+                table.rows[i].cells[4].text = f"{pe:.2f}" if pe > 0 else "-"
+                
+                pb = holding.get('pb', 0)
+                table.rows[i].cells[5].text = f"{pb:.2f}" if pb > 0 else "-"
+            
+            # 添加集中度统计
+            top5_weight = sum([h.get('customWeight', 0) for h in sorted_holdings[:5]])
+            top10_weight = sum([h.get('customWeight', 0) for h in sorted_holdings[:10]])
+            
+            concentration = doc.add_paragraph()
+            concentration.add_run(f"Top 5持仓占比: ").bold = True
+            concentration.add_run(f"{top5_weight*100:.2f}%  ")
+            concentration.add_run(f"Top 10持仓占比: ").bold = True
+            concentration.add_run(f"{top10_weight*100:.2f}%")
+            
+            doc.add_paragraph()
+    
     def generate_word_report(self, backtest_results, output_filename, periods):
         """生成Word报告
         
@@ -298,11 +486,17 @@ class StrategyReportGenerator:
         # 报告信息
         info_para = doc.add_paragraph()
         info_para.add_run(f'报告日期: {datetime.now().strftime("%Y年%m月%d日")}\n').bold = True
-        info_para.add_run('策略类型: 自适应风险平价策略\n').bold = True
+        info_para.add_run('策略类型: 风险平价策略\n').bold = True
         info_para.add_run('基准指数: 中证红利低波动指数 (h30269.CSI)\n').bold = True
         info_para.add_run('对比基金: 512890.SH\n').bold = True
         
         doc.add_paragraph()
+        
+        # 添加策略表现总览表
+        self.create_performance_summary_table(doc, backtest_results)
+        
+        # 添加年度收益率对比表
+        self.create_yearly_returns_table(doc, backtest_results)
         
         # 一、策略概述
         doc.add_heading('一、策略概述', 1)
@@ -473,6 +667,10 @@ class StrategyReportGenerator:
                 doc.add_picture(heatmap_file, width=Inches(6))
                 
                 doc.add_paragraph()
+            
+            # 3.x.5 持仓明细（仅对2020年初至今的期间展示）
+            if '2020' in period_name or '2021' in period_name or '2022' in period_name or '2023' in period_name or '2024' in period_name:
+                self.create_holdings_table(doc, period_name, data)
         
         # 四、策略优势总结
         doc.add_heading('四、策略优势总结', 1)
@@ -521,13 +719,14 @@ def main():
     generator = StrategyReportGenerator()
     
     # 定义回测期间（用户指定的6个时间段）
+    # 注意：某年末的日期应理解为次年年初
     periods = [
-        ('2024年末至今', '2024-12-31', '2026-01-10'),
-        ('2023年末至今', '2023-12-31', '2026-01-10'),
-        ('2022年末至今', '2022-12-31', '2026-01-10'),
-        ('2021年末至今', '2021-12-31', '2026-01-10'),
-        ('2020年末至今', '2020-12-31', '2026-01-10'),
-        ('2019年末至今', '2019-12-31', '2026-01-10')
+        ('2025年初至今', '2024-12-31', '2026-01-10'),
+        ('2024年初至今', '2023-12-31', '2026-01-10'),
+        ('2023年初至今', '2022-12-31', '2026-01-10'),
+        ('2022年初至今', '2021-12-31', '2026-01-10'),
+        ('2021年初至今', '2020-12-31', '2026-01-10'),
+        ('2020年初至今', '2019-12-31', '2026-01-10')
     ]
     
     backtest_results = {}
